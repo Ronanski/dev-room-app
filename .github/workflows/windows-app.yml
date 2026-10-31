@@ -1,0 +1,142 @@
+name: Dev Room apps
+
+on:
+  push:
+    branches: [main, ccr-c1736103-c42su6]
+    paths: ["app/**", "mobile/**", ".github/workflows/windows-app.yml"]
+  workflow_dispatch:
+
+# One publish at a time, so the release always holds one matching set of files.
+concurrency:
+  group: dev-room-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        shell: bash
+        run: echo "DEVROOM_VERSION=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+      - name: Install Tauri CLI
+        working-directory: app
+        run: npm install
+      - name: Stamp version into the exe
+        shell: bash
+        working-directory: app
+        run: |
+          node -e "const f='src-tauri/tauri.conf.json',c=JSON.parse(require('fs').readFileSync(f));c.version=process.env.DEVROOM_VERSION;require('fs').writeFileSync(f,JSON.stringify(c,null,2))"
+          sed -i "0,/^version = .*/s//version = \"$DEVROOM_VERSION\"/" src-tauri/Cargo.toml
+      - name: Build portable exe
+        working-directory: app
+        env:
+          DEVROOM_BUILD: ${{ github.run_number }}
+          DEVROOM_COMMIT: ${{ github.sha }}
+        run: npx tauri build --no-bundle
+      - name: Collect
+        shell: bash
+        run: |
+          mkdir out
+          cp app/src-tauri/target/release/dev-room.exe out/DevRoom.exe
+          cp app/ui/index.html out/index.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: out/
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        shell: bash
+        run: echo "DEVROOM_VERSION=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      # The ubuntu runner ships the Android SDK (ANDROID_HOME); Gradle fetches any missing platform.
+      - name: Sync web shell into the Android project
+        working-directory: mobile
+        run: |
+          echo "window.APK_BUILD=${{ github.run_number }};window.APK_VERSION='$DEVROOM_VERSION';" > www/build.js
+          npm install
+          npx cap sync android
+      - name: Signing key
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/devroom.keystore"
+            echo "DEVROOM_KS_PATH=$RUNNER_TEMP/devroom.keystore" >> "$GITHUB_ENV"
+          else
+            echo "::warning::ANDROID_KEYSTORE_B64 is not set; the APK is debug-signed and later builds cannot install over it."
+          fi
+      - name: Build APK
+        working-directory: mobile/android
+        env:
+          DEVROOM_BUILD: ${{ github.run_number }}
+          DEVROOM_KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          mkdir -p ../../out && cp app/build/outputs/apk/release/app-release.apk ../../out/DevRoom.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: out/
+
+  publish:
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        shell: bash
+        run: echo "DEVROOM_VERSION=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          path: dl
+          merge-multiple: true
+      - name: Version file for the in-app updaters
+        run: |
+          API=$(tr -dc '0-9' < app/api-version.txt)
+          printf '{"version": "%s", "build": %s, "api": %s, "apk": %s, "commit": "%s"}\n' "$DEVROOM_VERSION" "${{ github.run_number }}" "$API" "${{ github.run_number }}" "${{ github.sha }}" > dl/version.json
+          ls -la dl && cat dl/version.json
+      # Every build gets its own release; GitHub refuses to update an existing one from this workflow.
+      # main builds become the Latest release, which the apps update from (releases/latest/download/...).
+      # Other branches publish pre-releases, so test builds never reach installed apps.
+      - name: Publish release v${{ env.DEVROOM_VERSION }}-build.${{ github.run_number }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.DEVROOM_VERSION }}-build.${{ github.run_number }}
+          name: Dev Room v${{ env.DEVROOM_VERSION }} (build ${{ github.run_number }})
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ github.ref != 'refs/heads/main' }}
+          make_latest: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
+          body: |
+            **Version ${{ env.DEVROOM_VERSION }}, build ${{ github.run_number }}**, from `${{ github.ref_name }}` at ${{ github.sha }}.
+
+            - **Windows:** download DevRoom.exe and run it; no install needed.
+            - **Android:** download DevRoom.apk and install it (allow "Install unknown apps" for your browser).
+
+            Installed apps update themselves from the latest release. index.html and version.json are for the in-app updaters. See CHANGELOG.md for what changed.
+          files: |
+            dl/DevRoom.exe
+            dl/DevRoom.apk
+            dl/index.html
+            dl/version.json

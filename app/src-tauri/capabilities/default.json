@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "Dev Room uses no Tauri commands; the UI talks to its local HTTP server.",
+  "windows": ["main"],
+  "permissions": []
+}

@@ -22,6 +22,26 @@ Mockup only. There is no real app yet.
   - If the connector is unavailable, the page shows clearly labelled sample data.
   - Published (owned by the ronan.ece account): https://claude.ai/artifact/GedDDtAx4mCNCTsqj1E6Zv
 - Published preview: https://claude.ai/artifact/RcjPyRzi2NLL72JgatPTUw
+- **Live data version:** `mockup/dev-room-logic-sim.html` shows the user's real **LOGIC_SIM_PROJECT** team (leader plus five subsessions on `Ronanski/icms-master-tool`), taken from claude.ai/code on 2026-10-31 20:24 UTC.
+  - Uses real time, with no random status changes.
+  - Each session's question, last status, repo, branch, model, context usage and artifacts come from its session record.
+  - `devRoomApply(records)` accepts fresh session records and moves the characters, so a server only needs to push the records.
+  - Chat replies are drafts only until the backend can call `send_message`.
+
+## Windows app (in progress)
+
+- `app/` holds a portable Windows app built with Tauri: `DevRoom.exe` plus a local server on port 4317. See `app/README.md`.
+- Claude Code hooks on the PC POST events to the app, so status is real time.
+  - The app installs the hooks itself, keeping a backup of `settings.json`.
+- Phones on the same Wi-Fi open the same office by scanning a QR code that carries a pairing token.
+- The GitHub Action **Windows app** builds the exe and the APK and publishes them as release `v<VERSION>-build.<N>`; builds from `main` are the Latest release.
+- **Android app (`mobile/`):** a Capacitor app that shows the office from the PC.
+  - It pairs through `devroom://pair` from the QR page.
+  - A foreground service polls the PC every 15 seconds and sends a notification when a session needs you.
+  - It offers its own updates from the same release, and is signed with a fixed key kept in repo secrets.
+- Next steps:
+  - Replying from the app.
+  - Cloud sessions through a public relay.
 
 ## Requirements from the user
 
@@ -54,8 +74,10 @@ Mockup only. There is no real app yet.
 ### Platforms and data
 - [ ] **Portable desktop app** and **Android app**. The mockup has a Desktop/Android preview toggle; a real app is not built yet.
 - [ ] Must work with **both local CLI sessions and cloud sessions** (claude.ai/code).
-- [ ] Each session's role comes from its **session name**, which follows a fixed format. The real format is still to be provided; the mockup assumes `[ROLE] task`.
-- [ ] Data source plan: Claude Code hooks POST events to the app's server.
+- [x] Each session's role comes from its **session name**. The real format is `ROLE: task` (for example `CODE FIXER: LOGIC, ENGINE, PLANT MODEL`). A name with no colon (`LOGIC_SIM_PROJECT`) is the leader.
+- [ ] Data source plan, option A: poll claude.ai/code session records (`status_bucket` and `post_turn_summary`). This is already proven by the live version.
+  - `WORKING` maps to working, `BLOCKED` to needs input, `REVIEW_READY` to done, `COMPLETED` to idle, and `FAILED` to error.
+- [ ] Data source plan, option B: Claude Code hooks POST events to the app's server.
   - SessionStart: a session arrived.
   - UserPromptSubmit and PreToolUse: working, with the current tool.
   - Notification: needs input.
@@ -76,8 +98,23 @@ Mockup only. There is no real app yet.
 
 ## Open questions
 
-1. What is the real session-name format? We need 2–3 examples.
+1. ~~What is the real session-name format?~~ Answered: `ROLE: task`, and the leader has no colon.
 2. Which stack should the build use?
    - Desktop: Electron or Tauri.
    - Android: Capacitor or React Native.
 3. Where should the event server run so that both local and cloud sessions can reach it?
+4. How should the app know which sessions belong to one team? The live version uses a fixed list of session IDs. Options are a shared tag, a shared repo, or a name prefix.
+
+## Improvement backlog (proposed 2026-11-01)
+
+Ordered by value to the user. Items already done are checked.
+
+1. [x] **Notifications when someone needs you.** The Android app's background watcher does this (built, not yet tried on a real phone). Desktop notifications from DevRoom.exe are still to do.
+2. [ ] **Use it away from home.** Reach the PC from mobile data through Tailscale (free) or a small relay.
+3. [ ] **Reply from Dev Room.** Hooks cannot inject a message into a running session. The first step is a **Buksan sa Claude** button that opens that session in the Claude app.
+4. [ ] **Cloud sessions** (claude.ai/code) in the office, next to the PC sessions.
+5. [ ] **Daily report:** how long each agent worked, how often they waited for you, and context usage. It could be an end-of-day summary from the leader.
+6. [ ] **One floor per project.** LOGIC_SIM, KWARTO_TV and others each get their own office, with an elevator or tabs to switch.
+7. [ ] **Sound:** a soft ding when someone queues at your office, with an on/off switch.
+8. [ ] **Day and night** following the real clock: the office darkens at night and the lamps turn on.
+9. [ ] **Code signing** for DevRoom.exe so Windows SmartScreen stops warning. Needs a paid certificate, so it is optional.

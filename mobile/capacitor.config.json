@@ -1,0 +1,7 @@
+{
+  "appId": "app.devroom.mobile",
+  "appName": "Dev Room",
+  "webDir": "www",
+  "server": { "androidScheme": "http", "cleartext": true },
+  "android": { "allowMixedContent": true }
+}
