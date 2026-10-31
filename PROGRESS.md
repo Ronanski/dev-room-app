@@ -31,7 +31,7 @@ Mockup only. There is no real app yet.
 - [x] **NPCs:**
   - The Guard greets new sessions at the lobby.
   - HR sends overworked sessions on break and reminds the user who is waiting.
-- [x] Top-down view is fine. Isometric is not required.
+- [x] **Isometric view** (the user asked to try it after top-down). Every character has a **dark outline** so it doesn't blend into the floor or furniture.
 - [x] **Characters and rooms must not look small.** The map is zoomed in by default. It supports drag to pan, + and − buttons, the scroll wheel and an "entire office" button, and it follows a selected character.
 
 ### Monitoring and chat
