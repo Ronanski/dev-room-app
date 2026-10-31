@@ -104,3 +104,17 @@ Mockup only. There is no real app yet.
    - Android: Capacitor or React Native.
 3. Where should the event server run so that both local and cloud sessions can reach it?
 4. How should the app know which sessions belong to one team? The live version uses a fixed list of session IDs. Options are a shared tag, a shared repo, or a name prefix.
+
+## Improvement backlog (proposed 2026-11-01)
+
+Ordered by value to the user. Items already done are checked.
+
+1. [x] **Notifications when someone needs you.** The Android app's background watcher does this (built, not yet tried on a real phone). Desktop notifications from DevRoom.exe are still to do.
+2. [ ] **Use it away from home.** Reach the PC from mobile data through Tailscale (free) or a small relay.
+3. [ ] **Reply from Dev Room.** Hooks cannot inject a message into a running session. The first step is a **Buksan sa Claude** button that opens that session in the Claude app.
+4. [ ] **Cloud sessions** (claude.ai/code) in the office, next to the PC sessions.
+5. [ ] **Daily report:** how long each agent worked, how often they waited for you, and context usage. It could be an end-of-day summary from the leader.
+6. [ ] **One floor per project.** LOGIC_SIM, KWARTO_TV and others each get their own office, with an elevator or tabs to switch.
+7. [ ] **Sound:** a soft ding when someone queues at your office, with an on/off switch.
+8. [ ] **Day and night** following the real clock: the office darkens at night and the lamps turn on.
+9. [ ] **Code signing** for DevRoom.exe so Windows SmartScreen stops warning. Needs a paid certificate, so it is optional.
