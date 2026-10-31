@@ -30,8 +30,11 @@ const fn parse_u64(s: &str) -> u64 {
     n
 }
 
-struct Upd { ui: Option<(u64, String)>, exe_ready: Option<u64>, note: String }
-static STATE: Mutex<Upd> = Mutex::new(Upd { ui: None, exe_ready: None, note: String::new() });
+struct Upd { ui: Option<(u64, String)>, exe_ready: Option<u64>, note: String, latest: Option<Value> }
+static STATE: Mutex<Upd> = Mutex::new(Upd { ui: None, exe_ready: None, note: String::new(), latest: None });
+
+/// The newest release info seen (build, api, apk), passed on to the Android app.
+pub fn latest() -> Value { STATE.lock().ok().and_then(|s| s.latest.clone()).unwrap_or(Value::Null) }
 
 fn ui_dir() -> PathBuf { crate::server::data_dir().join("ui") }
 
@@ -65,6 +68,7 @@ fn load_cache() {
 fn check_once() -> Result<(), String> {
     let v: Value = serde_json::from_slice(&get(&format!("{BASE}version.json"), 64 * 1024)?).map_err(|e| e.to_string())?;
     let (build, api) = (v["build"].as_u64().unwrap_or(0), v["api"].as_u64().unwrap_or(0));
+    if let Ok(mut s) = STATE.lock() { s.latest = Some(v.clone()); }
     if build <= BUILD { return Ok(()); }
     // 1. UI hot update (only when the server API it needs is the same as ours)
     if api == API && ui_build() < build {

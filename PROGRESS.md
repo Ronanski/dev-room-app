@@ -35,8 +35,11 @@ Mockup only. There is no real app yet.
   - The app installs the hooks itself, keeping a backup of `settings.json`.
 - Phones on the same Wi-Fi open the same office by scanning a QR code that carries a pairing token.
 - The GitHub Action **Windows app** builds the exe and publishes it to the `dev-room-latest` pre-release.
+- **Android app (`mobile/`):** a Capacitor app that shows the office from the PC.
+  - It pairs through `devroom://pair` from the QR page.
+  - A foreground service polls the PC every 15 seconds and sends a notification when a session needs you.
+  - It offers its own updates from the same release, and is signed with a fixed key kept in repo secrets.
 - Next steps:
-  - An Android APK wrapper.
   - Replying from the app.
   - Cloud sessions through a public relay.
 

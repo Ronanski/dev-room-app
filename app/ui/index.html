@@ -87,6 +87,8 @@ h1{font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1;mar
 .bub.fail{background:#efd2c8}
 .bub.npc{background:#efe2c4}
 .bub.talk{background:#fffaf0}
+a.btn{text-decoration:none;display:inline-block;color:inherit}
+a.btn.primary{color:var(--panel)}
 .updbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;padding:6px 10px;border-radius:10px;margin-bottom:8px;background:color-mix(in srgb,var(--work) 14%,var(--panel));border:1px solid color-mix(in srgb,var(--work) 45%,transparent);flex:none}
 .bub.boss{background:#2b211b;color:#f7f0e3}
 .tag{font-family:var(--f-mono);font-size:calc(8px * var(--zs,1) * var(--bs,1.3));font-weight:600;background:rgba(43,33,27,.82);color:#f7f0e3;padding:0 4px;border-radius:3px;white-space:nowrap}
@@ -721,7 +723,8 @@ function setConn(){
     (mode==='live'?'<button type="button" class="btn" data-act="team">Piliin ang team</button>':'')+
     (isLocal&&hooksOk===false?'<button type="button" class="btn primary" data-act="hooks">I-set up ang hooks</button>':'')+
     (isLocal&&hooksOk?'<button type="button" class="btn" data-act="hooks">Hooks: OK</button>':'')+
-    (isLocal&&mode==='live'?'<button type="button" class="btn" data-act="pair">I-connect ang phone</button>':'');
+    (isLocal&&mode==='live'?'<button type="button" class="btn" data-act="pair">I-connect ang phone</button>':'')+
+    (!isLocal&&mode==='live'&&TOKEN&&window.top===window&&/Android/i.test(navigator.userAgent)?`<a class="btn primary" href="devroom://pair?u=${encodeURIComponent(location.origin)}&t=${encodeURIComponent(TOKEN)}">Buksan sa Dev Room app</a><a class="btn" href="https://github.com/Ronanski/dev-room-app/releases/download/dev-room-latest/DevRoom.apk">I-download ang app</a>`:'');
 }
 async function poll(){
   try{
@@ -757,7 +760,7 @@ async function installHooks(){
 function openPair(){
   const el=$('teamPanel');
   el.innerHTML=`<div class="tp-card" role="dialog" aria-label="I-connect ang phone"><h2>I-connect ang phone</h2>
-  <p class="hint">Dapat nasa parehong Wi-Fi ang phone at ang PC na ito. I-scan ang QR code gamit ang camera ng phone, at bubukas ang Dev Room sa browser. Para maging app, piliin ang Add to Home screen sa menu ng Chrome.</p>
+  <p class="hint">Dapat nasa parehong Wi-Fi ang phone at ang PC na ito. I-scan ang QR code gamit ang camera ng phone, at bubukas ang Dev Room sa browser. Kung naka-install ang Dev Room app (APK), pindutin doon ang Buksan sa Dev Room app para makatanggap ka ng notification kapag may naghihintay sa iyo.</p>
   <div class="qr"><img src="/pair.svg?ts=${Date.now()}" alt="QR code para sa phone"></div>
   <p class="hint">Kung magtanong ang Windows Firewall, payagan ang Dev Room sa Private networks. Huwag i-share ang QR code na ito, dahil sinumang may hawak nito ay makakakita ng sessions mo.</p>
   <div class="row"><span style="flex:1"></span><button type="button" class="btn primary" data-act="team-cancel">Isara</button></div></div>`;

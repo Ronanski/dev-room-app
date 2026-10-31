@@ -324,7 +324,9 @@ fn header(k: &str, v: &str) -> Header { Header::from_bytes(k.as_bytes(), v.as_by
 fn respond_json(req: Request, code: u16, v: &Value) {
     let r = Response::from_data(serde_json::to_vec(v).unwrap_or_default()).with_status_code(StatusCode(code))
         .with_header(header("Content-Type", "application/json; charset=utf-8"))
-        .with_header(header("Cache-Control", "no-store"));
+        .with_header(header("Cache-Control", "no-store"))
+        // The Android app's shell (http://localhost) reads /api/state; the pairing token guards the data.
+        .with_header(header("Access-Control-Allow-Origin", "*"));
     let _ = req.respond(r);
 }
 
@@ -370,7 +372,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
             if !token_ok { return respond_json(req, 401, &json!({"error": "pairing"})); }
             let since: u64 = q.get("v").and_then(|v| v.parse().ok()).unwrap_or(0);
             let s = st.lock().unwrap();
-            if since == s.version { drop(s); let _ = req.respond(Response::empty(204)); return; }
+            if since == s.version { drop(s); let _ = req.respond(Response::empty(204).with_header(header("Access-Control-Allow-Origin", "*"))); return; }
             let names = s.team.get("names").cloned().unwrap_or(json!({}));
             let mut list: Vec<Value> = s.sessions.values().map(|x| record(x, &names)).collect();
             list.sort_by_key(|r| std::cmp::Reverse(r.get("updated_at").and_then(|t| t.as_u64()).unwrap_or(0)));
@@ -380,7 +382,8 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
                 "settings_path": if local { json!(claude_settings_path().display().to_string()) } else { Value::Null },
                 "lan_url": lan,
                 "app_build": crate::updater::BUILD, "ui_build": crate::updater::ui_build(),
-                "update_ready": crate::updater::exe_ready(), "update_note": crate::updater::note()});
+                "update_ready": crate::updater::exe_ready(), "update_note": crate::updater::note(),
+                "latest": crate::updater::latest()});
             drop(s);
             respond_json(req, 200, &body);
         }

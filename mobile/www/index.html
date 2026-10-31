@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="fil">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2a201a">
+<title>Dev Room</title>
+<style>
+:root{--bg:#efe7da;--panel:#f8f3ea;--ink:#2a201a;--muted:#6e5f52;--line:#dccfbd;--accent:#6b4a35;--work:#5f7d4e;--need:#b24a32}
+@media (prefers-color-scheme: dark){:root{--bg:#1c1613;--panel:#26201b;--ink:#efe6d8;--muted:#a99886;--line:#3a2f27;--accent:#c9a27e;--work:#8fae7a;--need:#e07a5f}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif}
+#office{position:fixed;inset:0;width:100%;height:100%;border:0;display:none;background:var(--bg)}
+.pair{max-width:520px;margin:0 auto;padding:calc(24px + env(safe-area-inset-top)) 16px 24px;display:flex;flex-direction:column;gap:14px}
+h1{font-size:24px;margin:0}
+ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+input{width:100%;font:inherit;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+button{font:inherit;padding:10px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--panel);cursor:pointer}
+button.ghost{background:none;color:var(--ink);border-color:var(--line)}
+.hint{color:var(--muted);font-size:13px;margin:0}
+.err{color:var(--need);font-weight:700;margin:0}
+.bar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:5;display:none;gap:10px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--work);border-left:5px solid var(--work);border-radius:10px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:14px}
+.bar span{flex:1;min-width:160px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<iframe id="office" title="Dev Room office" allow="fullscreen"></iframe>
+
+<section class="pair" id="pair" hidden>
+  <h1>Dev Room</h1>
+  <p class="hint">Ikonekta ang app sa Dev Room na bukas sa PC mo. Dapat nasa parehong Wi-Fi ang phone at ang PC.</p>
+  <div class="card">
+    <ol>
+      <li>Sa PC, buksan ang Dev Room at pindutin ang <b>I-connect ang phone</b>.</li>
+      <li>I-scan ang QR code gamit ang camera ng phone na ito.</li>
+      <li>Sa bubukas na page, pindutin ang <b>Buksan sa Dev Room app</b>.</li>
+    </ol>
+  </div>
+  <div class="card">
+    <p class="hint" style="margin-bottom:8px">Kung hindi gumana ang pag-scan, i-paste dito ang buong link mula sa QR code.</p>
+    <input id="link" inputmode="url" placeholder="http://192.168.1.10:4317/?t=..." aria-label="Link mula sa QR code">
+    <div class="row" style="margin-top:10px"><button id="go">Ikonekta</button></div>
+  </div>
+  <p class="err" id="err" hidden></p>
+</section>
+
+<div class="bar" id="bar"></div>
+
+<script src="build.js"></script>
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+const C=window.Capacitor;
+const DevRoom=C&&C.registerPlugin?C.registerPlugin('DevRoom'):null;
+const App=C&&C.registerPlugin?C.registerPlugin('App'):null;
+const APK_URL='https://github.com/Ronanski/dev-room-app/releases/download/dev-room-latest/DevRoom.apk';
+const store={get(k){try{return localStorage.getItem(k);}catch(e){return null;}},set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v);}catch(e){}}};
+let myBuild=Number(window.APK_BUILD||0);
+
+function parseLink(s){
+  s=String(s||'').trim();
+  try{
+    if(s.startsWith('devroom://')){const u=new URL(s.replace('devroom://','http://x/'));return{url:u.searchParams.get('u'),token:u.searchParams.get('t')};}
+    const u=new URL(s);const t=u.searchParams.get('t');if(!t)return null;return{url:u.origin,token:t};
+  }catch(e){return null;}
+}
+function save(p){store.set('devroom.url',p.url);store.set('devroom.token',p.token);}
+function showPair(msg){
+  $('office').style.display='none';$('pair').hidden=false;
+  const e=$('err');e.hidden=!msg;e.textContent=msg||'';
+}
+async function showOffice(){
+  const url=store.get('devroom.url'),token=store.get('devroom.token');
+  if(!url||!token){showPair();return;}
+  $('pair').hidden=true;
+  const f=$('office');f.style.display='block';
+  f.src=`${url}/?t=${encodeURIComponent(token)}`;
+  try{if(DevRoom)await DevRoom.startWatch({url,token});}catch(e){}
+  checkUpdate();
+}
+async function checkUpdate(){
+  const url=store.get('devroom.url'),token=store.get('devroom.token');if(!url)return;
+  try{
+    const r=await fetch(`${url}/api/state?t=${encodeURIComponent(token)}`,{cache:'no-store'});
+    if(r.status===401){showPair('Hindi na tinatanggap ng PC ang pairing na ito. I-scan ulit ang QR code.');return;}
+    const j=await r.json();const latest=j.latest&&j.latest.apk||0;
+    if(latest>myBuild&&store.get('devroom.skip')!==String(latest)){
+      const b=$('bar');b.style.display='flex';
+      b.innerHTML='<span>May bagong bersyon ng Dev Room app. I-download at i-install ito, at mananatili ang pairing mo.</span><button id="upd">I-update</button><button class="ghost" id="later">Mamaya</button>';
+      $('upd').onclick=()=>{DevRoom?DevRoom.openExternal({url:APK_URL}):location.assign(APK_URL);};
+      $('later').onclick=()=>{store.set('devroom.skip',String(latest));b.style.display='none';};
+    }
+  }catch(e){}
+}
+function handleUrl(u){const p=parseLink(u);if(p&&p.url&&p.token){save(p);showOffice();}}
+$('go').onclick=()=>{const p=parseLink($('link').value);if(!p){showPair('Hindi tama ang link. Kopyahin ang buong link mula sa QR code, kasama ang ?t= sa dulo.');return;}save(p);showOffice();};
+
+(async()=>{
+  try{if(DevRoom){const i=await DevRoom.info();if(i&&i.versionCode)myBuild=Math.max(myBuild,Number(i.versionCode));}}catch(e){}
+  if(App){
+    App.addListener('appUrlOpen',e=>handleUrl(e.url));
+    App.addListener('resume',()=>checkUpdate());
+    try{const l=await App.getLaunchUrl();if(l&&l.url){handleUrl(l.url);return;}}catch(e){}
+  }
+  showOffice();
+  setInterval(checkUpdate,10*60*1000);
+})();
+})();
+</script>
+</body>
+</html>
