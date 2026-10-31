@@ -54,16 +54,20 @@ h1{font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1;mar
 .seg button{border:0;background:none;padding:6px 12px;font-size:13px}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
 
-.body{display:grid;grid-template-columns:minmax(0,1fr) 380px;grid-template-areas:"office chat" "dock dock";gap:16px}
+.body{display:grid;grid-template-columns:minmax(0,1fr) clamp(300px,36%,390px);grid-template-areas:"office chat" "dock dock";gap:16px}
 .pane[data-pane="office"]{grid-area:office;min-width:0}
 .pane[data-pane="chat"]{grid-area:chat;min-width:0;position:relative;min-height:540px}
 .dockwrap{grid-area:dock;min-width:0}
 
 .mapwrap{position:relative;border-radius:10px;overflow:hidden;border:3px solid var(--frame);background:#2a201a}
-#map{display:block;width:100%;height:auto;image-rendering:pixelated;cursor:pointer}
+#map{display:block;width:100%;height:auto;image-rendering:pixelated;cursor:grab;touch-action:none}
+#map.drag{cursor:grabbing}
+.zoom{position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:3}
+.zoom button{border:1px solid #2b211b;background:#f7f0e3;color:#2b211b;border-radius:6px;font-size:13px;min-width:30px;height:30px;padding:0 8px;font-weight:700}
+.zoom button:hover{background:#efe2c4}
 .overlay{position:absolute;inset:0;pointer-events:none}
 .ent{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;gap:2px;width:0}
-.bub{font-size:11px;line-height:1.25;background:#f7f0e3;color:#2b211b;border:2px solid #2b211b;padding:2px 7px;border-radius:7px;width:max-content;max-width:150px;text-align:center;white-space:normal}
+.bub{font-size:calc(11px * var(--zs,1));line-height:1.25;background:#f7f0e3;color:#2b211b;border:2px solid #2b211b;padding:2px 7px;border-radius:7px;width:max-content;max-width:150px;text-align:center;white-space:normal}
 .bub:empty{display:none}
 .bub.need{background:#b24a32;border-color:#5a2216;color:#fff;font-weight:700;animation:bob .9s ease-in-out infinite}
 .bub.sleep{background:#e3ddd2;color:#5b5348}
@@ -71,7 +75,7 @@ h1{font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1;mar
 .bub.fail{background:#efd2c8}
 .bub.npc{background:#efe2c4}
 .bub.boss{background:#2b211b;color:#f7f0e3}
-.tag{font-family:var(--f-mono);font-size:9px;font-weight:600;background:rgba(43,33,27,.82);color:#f7f0e3;padding:0 4px;border-radius:3px;white-space:nowrap}
+.tag{font-family:var(--f-mono);font-size:calc(9px * var(--zs,1));font-weight:600;background:rgba(43,33,27,.82);color:#f7f0e3;padding:0 4px;border-radius:3px;white-space:nowrap}
 .tag.sel{background:#c9a27e;color:#2b211b}
 .tag.you{background:#f7f0e3;color:#2b211b;border:1px solid #2b211b}
 @keyframes bob{50%{transform:translateY(-3px)}}
@@ -143,8 +147,10 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .toast .ti{font-family:var(--f-mono);font-size:10px;color:var(--muted)}
 .tabs{display:none}
 
+@container app (max-width: 980px){.feed{display:none}}
+
 /* ---------- Phone layout ---------- */
-@container app (max-width: 820px){
+@container app (max-width: 640px){
   .top{gap:10px;padding-bottom:10px;margin-bottom:10px}
   .counts{margin-left:0;width:100%}
   .controls{width:100%}
@@ -198,9 +204,10 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
     <main class="body">
       <section class="pane" data-pane="office" aria-label="Office">
         <div class="mapwrap">
-          <canvas id="map" width="480" height="288" aria-label="Café-style office map with session characters"></canvas>
+          <canvas id="map" width="960" height="576" aria-label="Café-style office map with session characters"></canvas>
           <div class="overlay" id="overlay"></div>
           <div class="feed" id="feed" aria-live="polite"></div>
+          <div class="zoom"><button type="button" id="zOut" aria-label="Zoom out">−</button><button type="button" id="zIn" aria-label="Zoom in">+</button><button type="button" id="zFit">Buong office</button></div>
         </div>
         <div class="legend">
           <span><i class="dot" style="background:var(--work)"></i>Nagtatrabaho sa PC</span>
@@ -210,7 +217,7 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
           <span><i class="dot" style="background:var(--done)"></i>Tapos na</span>
           <span><i class="dot" style="background:var(--fail)"></i>May error</span>
         </div>
-        <p class="rule">Kapag may tanong ang isang session, pupunta siya sa harap ng opisina mo at magtataas ng kamay. Kapag idle nang hanggang 10 minuto, nagkakape, nag-CR, o naglalakad-lakad siya. Mula 10 hanggang 30 minuto, nakikipagkwentuhan o kumakain siya. Lampas 30 minuto, natutulog na siya sa lounge. I-click ang character para makausap siya sa kanan.</p>
+        <p class="rule">Kapag may tanong ang isang session, pupunta siya sa harap ng opisina mo at magtataas ng kamay. Kapag idle nang hanggang 10 minuto, nagkakape, nag-CR, o naglalakad-lakad siya. Mula 10 hanggang 30 minuto, nakikipagkwentuhan o kumakain siya. Lampas 30 minuto, natutulog na siya sa lounge. I-click ang character para makausap siya sa chat panel. I-drag ang map para gumalaw, at gamitin ang + at − o ang scroll wheel para mag-zoom.</p>
       </section>
 
       <section class="pane" data-pane="chat" aria-label="Chat">
@@ -581,9 +588,11 @@ function bubbleFor(e,t){
   return['',''];
 }
 function updateOverlay(t){
+  overlay.style.setProperty('--zs',Math.max(.85,Math.min(1.3,.7+cam.z*.25)).toFixed(2));
   for(const e of PEOPLE()){
     const n=node(e);const off=e.pose==='sleep'?11:e.pose==='sit'?15:18;
-    n.style.left=(e.x/W*100)+'%';n.style.top=((e.y-off)/H*100)+'%';
+    const lx=(e.x-cam.x)*cam.z/W*100,ly=(e.y-off-cam.y)*cam.z/H*100;
+    n.style.left=lx+'%';n.style.top=ly+'%';n.style.display=(lx<-8||lx>108||ly<-5||ly>115)?'none':'';
     const[b,c]=bubbleFor(e,t);
     if(b!==n._bt){n._b.textContent=b;n._bt=b;}
     if(c!==n._bc){n._b.className='bub '+c;n._bc=c;}
@@ -591,6 +600,23 @@ function updateOverlay(t){
     n._t.className='tag'+(e.boss?' you':'')+(e.id&&e.id===selected?' sel':'');
   }
 }
+
+/* ---------- camera ---------- */
+const RES=2;
+const cam={x:0,y:0,z:1.8,tx:0,ty:0,follow:null};
+function clampCam(){const vw=W/cam.z,vh=H/cam.z;cam.tx=Math.max(0,Math.min(W-vw,cam.tx));cam.ty=Math.max(0,Math.min(H-vh,cam.ty));}
+function centerOn(x,y){cam.tx=x-W/cam.z/2;cam.ty=y-H/cam.z/2;clampCam();}
+function updateCam(dt){
+  if(cam.follow)centerOn(cam.follow.x,cam.follow.y-8);
+  const a=Math.min(1,dt*5);cam.x+=(cam.tx-cam.x)*a;cam.y+=(cam.ty-cam.y)*a;
+}
+function setZoom(z,ax,ay){
+  const vw=W/cam.z,vh=H/cam.z;ax=ax??cam.tx+vw/2;ay=ay??cam.ty+vh/2;
+  const fx=(ax-cam.tx)/vw,fy=(ay-cam.ty)/vh;
+  cam.z=Math.max(1,Math.min(3,z));
+  cam.tx=ax-fx*W/cam.z;cam.ty=ay-fy*H/cam.z;clampCam();
+}
+centerOn(20*T,6.5*T);cam.x=cam.tx;cam.y=cam.ty;
 
 /* ---------- loop ---------- */
 let last=performance.now();
@@ -603,6 +629,9 @@ function frame(ts){
         else{e.x+=dx/d*sp;e.y+=dy/d*sp;e.pose='walk';}}
     }
   }
+  updateCam(dt);
+  ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#2a201a';ctx.fillRect(0,0,cv.width,cv.height);
+  const k=RES*cam.z;ctx.setTransform(k,0,0,k,-cam.x*k,-cam.y*k);ctx.imageSmoothingEnabled=false;
   ctx.drawImage(bg,0,0);
   DESKS.forEach(d=>drawMonitor(d,d.owner,t));drawMonitor(LEAD_DESK,sessions.find(s=>s.lead),t);
   const all=PEOPLE().sort((a,b)=>a.y-b.y);
@@ -639,7 +668,7 @@ setInterval(()=>{
 
 /* ---------- UI ---------- */
 var ptab='chat',chatKey='';
-const compact=()=>$('app').clientWidth<=820;
+const compact=()=>$('app').clientWidth<=640;
 function stColor(s){return s.status==='idle'&&s.idle==='sleep'?'--sleep':ST[s.status].c;}
 function stLabel(s){return s.status==='idle'?(IDLE_LBL[s.idle]||'Naka-break'):ST[s.status].label;}
 function actText(s){
@@ -750,7 +779,7 @@ function toast(s){
   clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.hidden=true,6000);
 }
 function openChat(id){
-  selected=id;ptab='chat';chatKey='';
+  selected=id;ptab='chat';chatKey='';const fs=sessions.find(x=>x.id===id);if(fs){cam.follow=fs;if(cam.z<1.6)setZoom(1.8);}
   if(compact()){$('app').dataset.tab='chat';document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab==='chat'));}
   render();
 }
@@ -768,11 +797,25 @@ document.addEventListener('click',e=>{
 });
 $('composer').addEventListener('submit',e=>{e.preventDefault();const s=sel();const v=$('msgInput').value;if(!v.trim())return;$('msgInput').value='';answer(s,v,'text');});
 $('msgInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('composer').requestSubmit();}});
-cv.addEventListener('click',e=>{
-  const r=cv.getBoundingClientRect();const x=(e.clientX-r.left)/r.width*W,y=(e.clientY-r.top)/r.height*H;
-  let best=null,bd=16;for(const s of sessions){const d=Math.hypot(s.x-x,s.y-8-y);if(d<bd){bd=d;best=s;}}
-  if(best){selected=best.id;ptab='chat';chatKey='';render();}
+let drag=null;
+const toWorld=(e)=>{const r=cv.getBoundingClientRect();return{x:cam.x+(e.clientX-r.left)/r.width*W/cam.z,y:cam.y+(e.clientY-r.top)/r.height*H/cam.z,r};};
+cv.addEventListener('pointerdown',e=>{drag={sx:e.clientX,sy:e.clientY,cx:cam.tx,cy:cam.ty,moved:false};cv.setPointerCapture(e.pointerId);});
+cv.addEventListener('pointermove',e=>{
+  if(!drag)return;const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;
+  if(!drag.moved&&Math.hypot(dx,dy)<5)return;
+  drag.moved=true;cv.classList.add('drag');cam.follow=null;
+  const r=cv.getBoundingClientRect();cam.tx=drag.cx-dx/r.width*W/cam.z;cam.ty=drag.cy-dy/r.height*H/cam.z;clampCam();cam.x=cam.tx;cam.y=cam.ty;
 });
+cv.addEventListener('pointerup',e=>{
+  cv.classList.remove('drag');const d=drag;drag=null;if(!d||d.moved)return;
+  const p=toWorld(e);
+  let best=null,bd=14;for(const s of sessions){const dd=Math.hypot(s.x-p.x,s.y-8-p.y);if(dd<bd){bd=dd;best=s;}}
+  if(best){selected=best.id;cam.follow=best;ptab='chat';chatKey='';render();}
+});
+cv.addEventListener('wheel',e=>{e.preventDefault();const p=toWorld(e);cam.follow=null;setZoom(cam.z*(e.deltaY<0?1.15:1/1.15),p.x,p.y);},{passive:false});
+$('zIn').addEventListener('click',()=>setZoom(cam.z*1.25));
+$('zOut').addEventListener('click',()=>setZoom(cam.z/1.25));
+$('zFit').addEventListener('click',()=>{cam.follow=null;setZoom(1);});
 $('pauseBtn').addEventListener('click',()=>{
   if(!paused){paused=true;pauseAt=performance.now();$('pauseBtn').textContent='Ituloy';}
   else{pausedAcc+=performance.now()-pauseAt;paused=false;$('pauseBtn').textContent='Pause';}
