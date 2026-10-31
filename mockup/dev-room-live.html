@@ -21,16 +21,18 @@
   --work:#8fae7a; --need:#e07a5f; --idle:#d2a75a; --sleep:#a4a2c0; --done:#87aab6; --fail:#d07060; --frame:#0e0b09; color-scheme:dark}
 
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px}
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:8px}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 [hidden]{display:none!important}
 
-.stage{max-width:1280px;margin:0 auto}
+.stage{max-width:none;margin:0}
+.stage[data-device="desktop"] .app{height:calc(100dvh - 16px);display:flex;flex-direction:column}
+.app:fullscreen{height:100vh!important;padding:10px;box-sizing:border-box}
 .app{container-type:inline-size;container-name:app;position:relative;background:var(--bg)}
 .statusbar{display:none}
 
-.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding-bottom:8px;border-bottom:1px solid var(--line);margin-bottom:8px;flex:none}
 .brand{display:flex;align-items:center;gap:10px;min-width:0}
 .logo{width:28px;height:28px;flex:none;background:
   linear-gradient(var(--accent),var(--accent)) 5px 10px/15px 13px no-repeat,
@@ -54,13 +56,16 @@ h1{font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1;mar
 .seg button{border:0;background:none;padding:6px 12px;font-size:13px}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
 
-.body{display:grid;grid-template-columns:minmax(0,1fr) clamp(300px,36%,390px);grid-template-areas:"office chat" "dock dock";gap:16px}
+.body{display:grid;grid-template-columns:minmax(0,1fr) clamp(300px,28%,380px);grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"office chat" "dock dock";gap:10px;flex:1;min-height:0}
+.app.nochat .body{grid-template-columns:minmax(0,1fr) 0}
+.app.nochat .pane[data-pane="chat"]{display:none}
+.pane[data-pane="office"]{display:flex;flex-direction:column;min-height:0}
 .pane[data-pane="office"]{grid-area:office;min-width:0}
 .pane[data-pane="chat"]{grid-area:chat;min-width:0;position:relative;min-height:540px}
 .dockwrap{grid-area:dock;min-width:0}
 
-.mapwrap{position:relative;border-radius:10px;overflow:hidden;border:3px solid var(--frame);background:#2a201a}
-#map{display:block;width:100%;height:auto;image-rendering:pixelated;cursor:grab;touch-action:none}
+.mapwrap{position:relative;border-radius:10px;overflow:hidden;border:3px solid var(--frame);background:#1c140f;flex:1;min-height:320px}
+#map{display:block;position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;cursor:grab;touch-action:none}
 #map.drag{cursor:grabbing}
 .zoom{position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:3}
 .zoom button{border:1px solid #2b211b;background:#f7f0e3;color:#2b211b;border-radius:6px;font-size:13px;min-width:30px;height:30px;padding:0 8px;font-weight:700}
@@ -134,7 +139,7 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 
 /* session dock */
 .dock{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px}
-.dcard{flex:none;width:214px;display:grid;grid-template-columns:34px minmax(0,1fr);gap:6px 10px;align-content:start;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+.dcard{flex:none;width:200px;display:grid;grid-template-columns:34px minmax(0,1fr);gap:4px 10px;align-content:start;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
 .dcard.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .dcard.needcard{border-color:var(--need);background:color-mix(in srgb,var(--need) 6%,var(--panel))}
 .dcard .nm{font-weight:700;font-size:13px;line-height:1.2}
@@ -150,7 +155,7 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 @container app (max-width: 980px){.feed{display:none}}
 
 /* live connection bar + team picker */
-.conn{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:12px}
+.conn{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px;padding:5px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:8px;flex:none}
 .conn .dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
 .conn[data-mode="live"] .dot{background:var(--work)}
 .conn[data-mode="stale"] .dot{background:var(--idle)}
@@ -167,6 +172,10 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 
 /* ---------- Phone layout ---------- */
 @container app (max-width: 640px){
+  .mapwrap{flex:none;height:52vh;min-height:260px}
+  .mlegend{display:none}
+  .app[data-tab] .pane,.app[data-tab] .dockwrap{flex:none}
+  #fsBtn,#chatToggle{display:none}
   .top{gap:10px;padding-bottom:10px;margin-bottom:10px}
   .counts{margin-left:0;width:100%}
   .controls{width:100%}
@@ -196,7 +205,10 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .stage[data-device="android"] .top{padding:4px 14px 10px;flex:none}
 .stage[data-device="android"] .body{flex:1;overflow:auto;padding:0 12px 12px}
 .stage[data-device="android"] .tabs{position:static;margin-top:0;flex:none}
-.devnote{max-width:1280px;margin:12px auto 0;font-size:12px;color:var(--muted);text-align:center}
+.devnote{display:none}
+.mlegend{position:absolute;right:8px;bottom:8px;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px 10px;max-width:60%;background:rgba(30,22,18,.8);color:#efe6d8;font-size:10.5px;padding:4px 8px;border-radius:6px;pointer-events:none}
+.mlegend span{display:flex;align-items:center;gap:4px}
+@container app (max-width: 640px){.mlegend{display:none}}
 </style>
 
 <div class="stage" id="stage" data-device="desktop">
@@ -224,17 +236,10 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
           <canvas id="map" width="2240" height="1260" aria-label="Isometric café-style office map with session characters"></canvas>
           <div class="overlay" id="overlay"></div>
           <div class="feed" id="feed" aria-live="polite"></div>
-          <div class="zoom"><button type="button" id="zOut" aria-label="Zoom out">−</button><button type="button" id="zIn" aria-label="Zoom in">+</button><button type="button" id="zFit">Buong office</button></div>
+          <div class="zoom"><button type="button" id="zOut" aria-label="Zoom out">−</button><button type="button" id="zIn" aria-label="Zoom in">+</button><button type="button" id="zFit">Buong office</button><button type="button" id="fsBtn">Fullscreen</button><button type="button" id="chatToggle">Itago ang chat</button></div>
+          <div class="mlegend"><span><i class="dot" style="background:var(--work)"></i>Nagtatrabaho</span><span><i class="dot" style="background:var(--need)"></i>Kailangan ka</span><span><i class="dot" style="background:var(--idle)"></i>Naka-break</span><span><i class="dot" style="background:var(--sleep)"></i>Tulog</span><span><i class="dot" style="background:var(--done)"></i>Pa-review</span><span><i class="dot" style="background:var(--fail)"></i>May error</span></div>
         </div>
-        <div class="legend">
-          <span><i class="dot" style="background:var(--work)"></i>Nagtatrabaho sa PC</span>
-          <span><i class="dot" style="background:var(--need)"></i>Nakapila sa opisina mo</span>
-          <span><i class="dot" style="background:var(--idle)"></i>Naka-break</span>
-          <span><i class="dot" style="background:var(--sleep)"></i>Natutulog</span>
-          <span><i class="dot" style="background:var(--done)"></i>Tapos na</span>
-          <span><i class="dot" style="background:var(--fail)"></i>May error</span>
-        </div>
-        <p class="rule">Kapag may tanong ang isang session, pupunta siya sa harap ng opisina mo at magtataas ng kamay. Kapag idle nang hanggang 10 minuto, nagkakape, nag-CR, o naglalakad-lakad siya. Mula 10 hanggang 30 minuto, nakikipagkwentuhan o kumakain siya. Lampas 30 minuto, natutulog na siya sa lounge. I-click ang character para makausap siya sa chat panel. I-drag ang map para gumalaw, at gamitin ang + at − o ang scroll wheel para mag-zoom.</p>
+
       </section>
 
       <section class="pane" data-pane="chat" aria-label="Chat">
@@ -551,7 +556,7 @@ function setConn(){
 let unwatch=null;
 async function connect(){
   let mcp=null;try{mcp=window.claude&&window.claude.use?await window.claude.use('mcp'):null;}catch(e){mcp=null;}
-  if(!mcp){mode='sample';connMsg='';applyRecords(sampleRecords());setConn();return;}
+  if(!mcp){mode='sample';connMsg='Hindi magamit ng page na ito ang Claude Code Remote sa view na ito. Kadalasan, dahil ibang account ang may-ari ng page, o hindi ito nakabukas sa claude.ai o sa Claude app.';applyRecords(sampleRecords());setConn();return;}
   MCP=mcp;setConn();
   try{
     unwatch=mcp.watchTool(SERVER,'list_sessions',{limit:50},ev=>{
@@ -604,9 +609,9 @@ function box(g,u,v,w,d,h,col,z0,opt){
 function flat(g,u,v,w,d,col,stroke){poly(g,[iso(u,v),iso(u+w,v),iso(u+w,v+d),iso(u,v+d)],col,stroke);}
 
 /* static floor + back walls */
-const bg=document.createElement('canvas');bg.width=SW*RES;bg.height=SH*RES;
+const BGRES=3;const bg=document.createElement('canvas');bg.width=SW*BGRES;bg.height=SH*BGRES;
 (function drawBG(){
-  const g=bg.getContext('2d');g.scale(RES,RES);
+  const g=bg.getContext('2d');g.scale(BGRES,BGRES);
   const room=(u0,v0,w,d,a,b,style)=>{for(let u=u0;u<u0+w;u++)for(let v=v0;v<v0+d;v++){
     const c=style==='tile'?((u+v)%2?a:b):(v%2?a:b);flat(g,u,v,1,1,c);
     if(style!=='tile'){g.strokeStyle='rgba(36,24,15,.16)';g.lineWidth=.6;const m1=iso(u,v+.5),m2=iso(u+1,v+.5);g.beginPath();g.moveTo(m1.x,m1.y);g.lineTo(m2.x,m2.y);g.stroke();}}};
@@ -775,8 +780,8 @@ function updateOverlay(t){
   overlay.style.setProperty('--zs',Math.max(.9,Math.min(1.15,.8+cam.z*.15)).toFixed(2));
   for(const e of PEOPLE()){
     const n=node(e);const p=isoP(e);const off=e.pose==='sleep'?18:e.pose==='sit'?32:38;
-    const lx=(p.x-cam.x)*cam.z/SW*100,ly=(p.y-off-cam.y)*cam.z/SH*100;
-    n.style.left=lx+'%';n.style.top=ly+'%';n.style.display=(lx<-8||lx>108||ly<-5||ly>115)?'none':'';
+    const k=kc(),lx=(p.x-cam.x)*k,ly=(p.y-off-cam.y)*k;
+    n.style.left=lx+'px';n.style.top=ly+'px';n.style.display=(lx<-60||lx>VW+60||ly<-20||ly>VH+60)?'none':'';
     const[b,c]=bubbleFor(e,t);
     if(b!==n._bt){n._b.textContent=b;n._bt=b;}
     if(c!==n._bc){n._b.className='bub '+c;n._bc=c;}
@@ -786,20 +791,32 @@ function updateOverlay(t){
 }
 
 /* ---------- camera (screen space) ---------- */
-const cam={x:0,y:0,z:1.4,tx:0,ty:0,follow:null};
-function clampCam(){const vw=SW/cam.z,vh=SH/cam.z;cam.tx=Math.max(0,Math.min(SW-vw,cam.tx));cam.ty=Math.max(0,Math.min(SH-vh,cam.ty));}
-function centerOn(x,y){cam.tx=x-SW/cam.z/2;cam.ty=y-SH/cam.z/2;clampCam();}
+const cam={x:0,y:0,z:1.25,tx:0,ty:0,follow:null};
+let VW=SW,VH=SH,BASE=1,DPR=1;
+const kc=()=>BASE*cam.z;
+const viewW=()=>VW/kc(),viewH=()=>VH/kc();
+function resizeMap(){
+  const r=cv.parentElement.getBoundingClientRect();if(!r.width||!r.height)return;
+  DPR=Math.min(2,window.devicePixelRatio||1);VW=r.width;VH=r.height;
+  cv.width=Math.round(VW*DPR);cv.height=Math.round(VH*DPR);
+  BASE=Math.min(VW/SW,VH/SH);
+  const narrow=VW<560;if(narrow!==resizeMap.narrow){resizeMap.narrow=narrow;cam.z=narrow?2.6:1.25;const p=cam.follow?isoP(cam.follow):iso(22,7);centerOn(p.x,p.y);}
+  clampCam();cam.x=cam.tx;cam.y=cam.ty;
+}
+function clampCam(){const vw=viewW(),vh=viewH();cam.tx=vw>=SW?(SW-vw)/2:Math.max(0,Math.min(SW-vw,cam.tx));cam.ty=vh>=SH?(SH-vh)/2:Math.max(0,Math.min(SH-vh,cam.ty));}
+function centerOn(x,y){cam.tx=x-viewW()/2;cam.ty=y-viewH()/2;clampCam();}
 function updateCam(dt){
   if(cam.follow){const p=isoP(cam.follow);centerOn(p.x,p.y-20);}
   const a=Math.min(1,dt*5);cam.x+=(cam.tx-cam.x)*a;cam.y+=(cam.ty-cam.y)*a;
 }
 function setZoom(z,ax,ay){
-  const vw=SW/cam.z,vh=SH/cam.z;ax=ax??cam.tx+vw/2;ay=ay??cam.ty+vh/2;
+  const vw=viewW(),vh=viewH();ax=ax??cam.tx+vw/2;ay=ay??cam.ty+vh/2;
   const fx=(ax-cam.tx)/vw,fy=(ay-cam.ty)/vh;
-  cam.z=Math.max(1,Math.min(3,z));
-  cam.tx=ax-fx*SW/cam.z;cam.ty=ay-fy*SH/cam.z;clampCam();
+  cam.z=Math.max(1,Math.min(4,z));
+  cam.tx=ax-fx*viewW();cam.ty=ay-fy*viewH();clampCam();
 }
-{const p=iso(21,7);centerOn(p.x,p.y);cam.x=cam.tx;cam.y=cam.ty;}
+resizeMap();{const p=iso(21,7);centerOn(p.x,p.y);cam.x=cam.tx;cam.y=cam.ty;}
+if(window.ResizeObserver)new ResizeObserver(()=>resizeMap()).observe(cv.parentElement);else window.addEventListener('resize',resizeMap);
 
 /* ---------- loop ---------- */
 let last=performance.now();
@@ -814,7 +831,7 @@ function frame(ts){
   }
   updateCam(dt);
   ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#1c140f';ctx.fillRect(0,0,cv.width,cv.height);
-  const k=RES*cam.z;ctx.setTransform(k,0,0,k,-cam.x*k,-cam.y*k);ctx.imageSmoothingEnabled=false;
+  const k=kc()*DPR;ctx.setTransform(k,0,0,k,-cam.x*k,-cam.y*k);ctx.imageSmoothingEnabled=false;
   ctx.drawImage(bg,0,0,SW,SH);
   const items=objs.slice();
   for(const e of PEOPLE())items.push({d:e.x/T+e.y/T+.05,e});
@@ -973,7 +990,7 @@ function toast(s){
   clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.hidden=true,6000);
 }
 function openChat(id){
-  selected=id;ptab='chat';chatKey='';const fs=sessions.find(x=>x.id===id);if(fs){cam.follow=fs;if(cam.z<1.6)setZoom(1.8);}
+  selected=id;ptab='chat';chatKey='';const fs=sessions.find(x=>x.id===id);if(fs){cam.follow=fs;if(cam.z<1.5)setZoom(1.8);}
   if(compact()){$('app').dataset.tab='chat';document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab==='chat'));}
   render();
 }
@@ -1001,13 +1018,13 @@ document.addEventListener('click',e=>{
 $('composer').addEventListener('submit',e=>{e.preventDefault();const s=sel();const v=$('msgInput').value;if(!v.trim())return;$('msgInput').value='';answer(s,v,'text');});
 $('msgInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('composer').requestSubmit();}});
 let drag=null;
-const toScreen=(e)=>{const r=cv.getBoundingClientRect();return{x:cam.x+(e.clientX-r.left)/r.width*SW/cam.z,y:cam.y+(e.clientY-r.top)/r.height*SH/cam.z};};
+const toScreen=(e)=>{const r=cv.getBoundingClientRect();return{x:cam.x+(e.clientX-r.left)/kc(),y:cam.y+(e.clientY-r.top)/kc()};};
 cv.addEventListener('pointerdown',e=>{drag={sx:e.clientX,sy:e.clientY,cx:cam.tx,cy:cam.ty,moved:false};cv.setPointerCapture(e.pointerId);});
 cv.addEventListener('pointermove',e=>{
   if(!drag)return;const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;
   if(!drag.moved&&Math.hypot(dx,dy)<5)return;
   drag.moved=true;cv.classList.add('drag');cam.follow=null;
-  const r=cv.getBoundingClientRect();cam.tx=drag.cx-dx/r.width*SW/cam.z;cam.ty=drag.cy-dy/r.height*SH/cam.z;clampCam();cam.x=cam.tx;cam.y=cam.ty;
+  cam.tx=drag.cx-dx/kc();cam.ty=drag.cy-dy/kc();clampCam();cam.x=cam.tx;cam.y=cam.ty;
 });
 cv.addEventListener('pointerup',e=>{
   cv.classList.remove('drag');const d=drag;drag=null;if(!d||d.moved)return;
@@ -1019,6 +1036,11 @@ cv.addEventListener('wheel',e=>{e.preventDefault();const q=toScreen(e);cam.follo
 $('zIn').addEventListener('click',()=>setZoom(cam.z*1.25));
 $('zOut').addEventListener('click',()=>setZoom(cam.z/1.25));
 $('zFit').addEventListener('click',()=>{cam.follow=null;setZoom(1);});
+{const fb=$('fsBtn');const app=$('app');
+ if(!(document.fullscreenEnabled&&app.requestFullscreen))fb.hidden=true;
+ fb.addEventListener('click',()=>{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});else app.requestFullscreen().catch(()=>{fb.hidden=true;});});
+ document.addEventListener('fullscreenchange',()=>{fb.textContent=document.fullscreenElement?'Lumabas sa fullscreen':'Fullscreen';});}
+$('chatToggle').addEventListener('click',()=>{const a=$('app');a.classList.toggle('nochat');$('chatToggle').textContent=a.classList.contains('nochat')?'Ipakita ang chat':'Itago ang chat';});
 $('pauseBtn').addEventListener('click',()=>{
   if(!paused){paused=true;pauseAt=Date.now();$('pauseBtn').textContent='Ituloy';}
   else{pausedAcc+=Date.now()-pauseAt;paused=false;$('pauseBtn').textContent='Pause';}
