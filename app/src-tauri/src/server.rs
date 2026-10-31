@@ -381,7 +381,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
                 "hooks_installed": if local { json!(hooks_installed(port)) } else { Value::Null },
                 "settings_path": if local { json!(claude_settings_path().display().to_string()) } else { Value::Null },
                 "lan_url": lan,
-                "app_build": crate::updater::BUILD, "ui_build": crate::updater::ui_build(),
+                "app_build": crate::updater::BUILD, "app_version": crate::updater::VERSION, "ui_build": crate::updater::ui_build(),
                 "update_ready": crate::updater::exe_ready(), "update_note": crate::updater::note(),
                 "latest": crate::updater::latest()});
             drop(s);

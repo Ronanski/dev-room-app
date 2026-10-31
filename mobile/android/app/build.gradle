@@ -9,7 +9,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         // CI sets DEVROOM_BUILD to the workflow run number, so every build is a newer version.
         versionCode((System.getenv("DEVROOM_BUILD") ?: "1").toInteger())
-        versionName "1." + (System.getenv("DEVROOM_BUILD") ?: "0")
+        versionName System.getenv("DEVROOM_VERSION") ?: "0.0.0-dev"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

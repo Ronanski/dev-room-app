@@ -44,6 +44,7 @@ button.ghost{background:none;color:var(--ink);border-color:var(--line)}
     <div class="row" style="margin-top:10px"><button id="go">Ikonekta</button></div>
   </div>
   <p class="err" id="err" hidden></p>
+  <p class="hint" id="ver"></p>
 </section>
 
 <div class="bar" id="bar"></div>
@@ -58,6 +59,7 @@ const App=C&&C.registerPlugin?C.registerPlugin('App'):null;
 const APK_URL='https://github.com/Ronanski/dev-room-app/releases/download/dev-room-latest/DevRoom.apk';
 const store={get(k){try{return localStorage.getItem(k);}catch(e){return null;}},set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v);}catch(e){}}};
 let myBuild=Number(window.APK_BUILD||0);
+$('ver').textContent=`Dev Room app v${window.APK_VERSION||'dev'} (build ${myBuild})`;
 
 function parseLink(s){
   s=String(s||'').trim();
@@ -88,7 +90,7 @@ async function checkUpdate(){
     const j=await r.json();const latest=j.latest&&j.latest.apk||0;
     if(latest>myBuild&&store.get('devroom.skip')!==String(latest)){
       const b=$('bar');b.style.display='flex';
-      b.innerHTML='<span>May bagong bersyon ng Dev Room app. I-download at i-install ito, at mananatili ang pairing mo.</span><button id="upd">I-update</button><button class="ghost" id="later">Mamaya</button>';
+      b.innerHTML=`<span>May bagong bersyon ng Dev Room app${j.latest.version?' (v'+j.latest.version+')':''}. I-download at i-install ito, at mananatili ang pairing mo.</span>`+'<button id="upd">I-update</button><button class="ghost" id="later">Mamaya</button>';
       $('upd').onclick=()=>{DevRoom?DevRoom.openExternal({url:APK_URL}):location.assign(APK_URL);};
       $('later').onclick=()=>{store.set('devroom.skip',String(latest));b.style.display='none';};
     }

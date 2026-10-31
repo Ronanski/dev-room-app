@@ -237,7 +237,7 @@ body{margin:0}
     <header class="top">
       <div class="brand">
         <span class="logo" aria-hidden="true"></span>
-        <div><h1>Dev Room</h1><p class="sub">Live mula sa PC mo · <span class="clock" id="clock"></span></p></div>
+        <div><h1>Dev Room</h1><p class="sub">Live mula sa PC mo · <span id="ver"></span><span class="clock" id="clock"></span></p></div>
       </div>
       <div class="counts" id="counts"></div>
       <div class="controls">
@@ -744,9 +744,10 @@ async function poll(){
 }
 let uiBuild=null;
 function updates(j){
+  if(j.app_version){const v=$('ver');const t=`v${j.app_version} (build ${j.app_build}) · `;if(v.textContent!==t)v.textContent=t;}
   if(j.ui_build!=null){if(uiBuild===null)uiBuild=j.ui_build;else if(j.ui_build!==uiBuild){location.reload();return;}}
   const el=$('updbar');if(!el)return;
-  if(j.update_ready&&j.local){el.hidden=false;el.innerHTML='<span>May bagong bersyon ng Dev Room app. Na-download na ito.</span><button type="button" class="btn primary" data-act="restart">I-restart ngayon</button>';}
+  if(j.update_ready&&j.local){el.hidden=false;el.innerHTML=`<span>Na-download na ang bagong bersyon ng Dev Room app${j.latest&&j.latest.version?' (v'+j.latest.version+')':''}.</span>`+'<button type="button" class="btn primary" data-act="restart">I-restart ngayon</button>';}
   else el.hidden=true;
 }
 async function restartApp(){try{await fetch('/api/restart',{method:'POST'});}catch(e){}$('updbar').innerHTML='<span>Nagre-restart ang Dev Room. Bubukas ulit ito sa loob ng ilang segundo.</span>';}

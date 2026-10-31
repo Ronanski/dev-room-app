@@ -17,6 +17,10 @@ pub const BUILD: u64 = match option_env!("DEVROOM_BUILD") {
     Some(b) => parse_u64(b),
     None => 0,
 };
+pub const VERSION: &str = match option_env!("DEVROOM_VERSION") {
+    Some(v) => v,
+    None => "dev",
+};
 pub const API: u64 = parse_u64(include_str!("../../api-version.txt"));
 const BASE: &str = "https://github.com/Ronanski/dev-room-app/releases/download/dev-room-latest/";
 

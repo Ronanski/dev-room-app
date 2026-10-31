@@ -19,6 +19,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Version
+        shell: bash
+        run: echo "DEVROOM_VERSION=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -29,6 +32,12 @@ jobs:
       - name: Install Tauri CLI
         working-directory: app
         run: npm install
+      - name: Stamp version into the exe
+        shell: bash
+        working-directory: app
+        run: |
+          node -e "const f='src-tauri/tauri.conf.json',c=JSON.parse(require('fs').readFileSync(f));c.version=process.env.DEVROOM_VERSION;require('fs').writeFileSync(f,JSON.stringify(c,null,2))"
+          sed -i "0,/^version = .*/s//version = \"$DEVROOM_VERSION\"/" src-tauri/Cargo.toml
       - name: Build portable exe
         working-directory: app
         env:
@@ -50,6 +59,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Version
+        shell: bash
+        run: echo "DEVROOM_VERSION=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -61,7 +73,7 @@ jobs:
       - name: Sync web shell into the Android project
         working-directory: mobile
         run: |
-          echo "window.APK_BUILD=${{ github.run_number }};" > www/build.js
+          echo "window.APK_BUILD=${{ github.run_number }};window.APK_VERSION='$DEVROOM_VERSION';" > www/build.js
           npm install
           npx cap sync android
       - name: Signing key
@@ -93,6 +105,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Version
+        shell: bash
+        run: echo "DEVROOM_VERSION=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@v4
         with:
           path: dl
@@ -100,13 +115,13 @@ jobs:
       - name: Version file for the in-app updaters
         run: |
           API=$(tr -dc '0-9' < app/api-version.txt)
-          printf '{"build": %s, "api": %s, "apk": %s, "commit": "%s"}\n' "${{ github.run_number }}" "$API" "${{ github.run_number }}" "${{ github.sha }}" > dl/version.json
+          printf '{"version": "%s", "build": %s, "api": %s, "apk": %s, "commit": "%s"}\n' "$DEVROOM_VERSION" "${{ github.run_number }}" "$API" "${{ github.run_number }}" "${{ github.sha }}" > dl/version.json
           ls -la dl && cat dl/version.json
       - name: Publish to the "dev-room-latest" pre-release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: dev-room-latest
-          name: Dev Room (latest build)
+          name: Dev Room v${{ env.DEVROOM_VERSION }} (build ${{ github.run_number }}, latest)
           target_commitish: ${{ github.sha }}
           prerelease: true
           body: |
@@ -119,3 +134,21 @@ jobs:
             dl/DevRoom.apk
             dl/index.html
             dl/version.json
+      - name: Is this version already released?
+        id: tag
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v$DEVROOM_VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "exists=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Publish the versioned release
+        if: github.ref == 'refs/heads/main' && steps.tag.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.DEVROOM_VERSION }}
+          name: Dev Room v${{ env.DEVROOM_VERSION }}
+          target_commitish: ${{ github.sha }}
+          body_path: CHANGELOG.md
+          files: |
+            dl/DevRoom.exe
+            dl/DevRoom.apk
