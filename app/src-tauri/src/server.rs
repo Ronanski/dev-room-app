@@ -73,7 +73,7 @@ impl State {
     }
 }
 
-fn data_dir() -> PathBuf {
+pub fn data_dir() -> PathBuf {
     std::env::var_os("APPDATA").map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
         .unwrap_or_else(|| PathBuf::from("."))
@@ -242,6 +242,7 @@ fn apply_hook(st: &mut State, v: &Value) {
             s.insert("status".into(), json!("working"));
             s.insert("ask".into(), json!(""));
             s.insert("short".into(), json!("Nagbabasa ng utos."));
+            s.insert("prompt_at".into(), json!(now));
             let p = v.get("prompt").and_then(|x| x.as_str()).unwrap_or("");
             s.insert("detail".into(), json!(format!("Inutusan: {}", clip(p, 140))));
         }
@@ -305,6 +306,7 @@ fn record(s: &Value, names: &Value) -> Value {
         "updated_at": s.get("updated_at").cloned().unwrap_or(json!(0)),
         "environment_kind": "bridge", "origin": "local_pc", "cwd": cwd,
         "short": s.get("short").cloned().unwrap_or(json!("")),
+        "prompt_at": s.get("prompt_at").cloned().unwrap_or(json!(0)),
         "post_turn_summary": {
             "status_detail": s.get("detail").cloned().unwrap_or(json!("")),
             "recent_action": s.get("recent").cloned().unwrap_or(json!("")),
@@ -346,7 +348,8 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
     };
     match (req.method().clone(), path.as_str()) {
         (Method::Get, "/") | (Method::Get, "/index.html") => {
-            let r = Response::from_string(INDEX_HTML).with_header(header("Content-Type", "text/html; charset=utf-8")).with_header(header("Cache-Control", "no-store"));
+            let html = crate::updater::ui_html().unwrap_or_else(|| INDEX_HTML.to_string());
+            let r = Response::from_string(html).with_header(header("Content-Type", "text/html; charset=utf-8")).with_header(header("Cache-Control", "no-store"));
             let _ = req.respond(r);
         }
         (Method::Get, "/manifest.json") => {
@@ -375,7 +378,9 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
             let body = json!({"version": s.version, "sessions": list, "team": s.team, "local": local,
                 "hooks_installed": if local { json!(hooks_installed(port)) } else { Value::Null },
                 "settings_path": if local { json!(claude_settings_path().display().to_string()) } else { Value::Null },
-                "lan_url": lan});
+                "lan_url": lan,
+                "app_build": crate::updater::BUILD, "ui_build": crate::updater::ui_build(),
+                "update_ready": crate::updater::exe_ready(), "update_note": crate::updater::note()});
             drop(s);
             respond_json(req, 200, &body);
         }
@@ -407,6 +412,11 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
                 .dark_color(qrcode::render::svg::Color("#2a201a")).light_color(qrcode::render::svg::Color("#ffffff")).build()).unwrap_or_default();
             let _ = req.respond(Response::from_string(svg).with_header(header("Content-Type", "image/svg+xml")).with_header(header("Cache-Control", "no-store")));
         }
+        (Method::Post, "/api/restart") => {
+            if !local { return respond_json(req, 403, &json!({"error": "loopback only"})); }
+            respond_json(req, 200, &json!({"ok": true}));
+            crate::updater::restart();
+        }
         (Method::Get, "/pair.json") => {
             if !local { return respond_json(req, 403, &json!({"error": "loopback only"})); }
             let token = st.lock().unwrap().token.clone();
@@ -420,7 +430,11 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
 /// Start the server on a background thread. Returns the port, or None if it is already taken
 /// (for example a second copy of Dev Room is running; the window then shows that one).
 pub fn start(port: u16) -> Option<u16> {
-    let server = Server::http(("0.0.0.0", port)).ok()?;
+    let mut server = None;
+    for _ in 0..40 {
+        match Server::http(("0.0.0.0", port)) { Ok(s) => { server = Some(s); break } Err(_) => std::thread::sleep(std::time::Duration::from_millis(250)) }
+    }
+    let server = server?;
     let st = Arc::new(Mutex::new(State::load(data_dir())));
     std::thread::spawn(move || {
         for req in server.incoming_requests() { handle(req, &st, port); }

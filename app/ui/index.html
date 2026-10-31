@@ -79,15 +79,17 @@ h1{font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1;mar
 .zoom button:hover{background:#efe2c4}
 .overlay{position:absolute;inset:0;pointer-events:none}
 .ent{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;gap:2px;width:0}
-.bub{font-size:calc(9px * var(--zs,1));line-height:1.2;background:#f7f0e3;color:#2b211b;border:1.5px solid #2b211b;padding:1px 5px;border-radius:5px;width:max-content;max-width:120px;text-align:center;white-space:normal}
+.bub{font-size:calc(9px * var(--zs,1) * var(--bs,1.3));line-height:1.25;background:#f7f0e3;color:#2b211b;border:1.5px solid #2b211b;padding:1px 5px;border-radius:5px;width:max-content;max-width:calc(130px * var(--bs,1.3));text-align:center;white-space:normal}
 .bub:empty{display:none}
 .bub.need{background:#b24a32;border-color:#5a2216;color:#fff;font-weight:700;animation:bob .9s ease-in-out infinite}
 .bub.sleep{background:#e3ddd2;color:#5b5348}
 .bub.done{background:#dfe6cf}
 .bub.fail{background:#efd2c8}
 .bub.npc{background:#efe2c4}
+.bub.talk{background:#fffaf0}
+.updbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;padding:6px 10px;border-radius:10px;margin-bottom:8px;background:color-mix(in srgb,var(--work) 14%,var(--panel));border:1px solid color-mix(in srgb,var(--work) 45%,transparent);flex:none}
 .bub.boss{background:#2b211b;color:#f7f0e3}
-.tag{font-family:var(--f-mono);font-size:calc(8px * var(--zs,1));font-weight:600;background:rgba(43,33,27,.82);color:#f7f0e3;padding:0 4px;border-radius:3px;white-space:nowrap}
+.tag{font-family:var(--f-mono);font-size:calc(8px * var(--zs,1) * var(--bs,1.3));font-weight:600;background:rgba(43,33,27,.82);color:#f7f0e3;padding:0 4px;border-radius:3px;white-space:nowrap}
 .tag.sel{background:#c9a27e;color:#2b211b}
 .tag.you{background:#f7f0e3;color:#2b211b;border:1px solid #2b211b}
 @keyframes bob{50%{transform:translateY(-3px)}}
@@ -193,9 +195,8 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
   .pane[data-pane="chat"]{min-height:0}
   .chatpanel{position:static;height:min(620px,72vh)}
   .feed,.rule{display:none}
-  .bub{font-size:8.5px;max-width:84px;padding:1px 4px;border-width:1.5px}
-  .bub.minor{display:none}
-  .tag{font-size:7.5px;padding:0 3px}
+  .bub{font-size:calc(8.5px * var(--bs,1.3));max-width:calc(100px * var(--bs,1.3));padding:1px 4px;border-width:1.5px}
+  .tag{font-size:calc(7.5px * var(--bs,1.3));padding:0 3px}
   .dcard{width:180px}
   .tabs{display:grid;grid-template-columns:repeat(2,1fr);position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line);margin-top:12px;z-index:4}
   .tabs button{border:0;background:none;padding:10px 4px 12px;font-size:12.5px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);position:relative}
@@ -246,6 +247,7 @@ body{margin:0}
       </div>
     </header>
 
+    <div class="updbar" id="updbar" hidden></div>
     <div class="conn" id="conn" data-mode="connecting"></div>
     <main class="body">
       <section class="pane" data-pane="office" aria-label="Office">
@@ -253,7 +255,7 @@ body{margin:0}
           <canvas id="map" width="2240" height="1260" aria-label="Isometric café-style office map with session characters"></canvas>
           <div class="overlay" id="overlay"></div>
           <div class="feed" id="feed" aria-live="polite"></div>
-          <div class="zoom"><button type="button" id="zOut" aria-label="Zoom out">−</button><button type="button" id="zIn" aria-label="Zoom in">+</button><button type="button" id="zFit">Buong office</button><button type="button" id="fsBtn">Fullscreen</button><button type="button" id="chatToggle">Itago ang chat</button></div>
+          <div class="zoom"><button type="button" id="zOut" aria-label="Zoom out">−</button><button type="button" id="zIn" aria-label="Zoom in">+</button><button type="button" id="bsDown" aria-label="Paliitin ang text ng bubbles">A−</button><button type="button" id="bsUp" aria-label="Palakihin ang text ng bubbles">A+</button><button type="button" id="zFit">Buong office</button><button type="button" id="fsBtn">Fullscreen</button><button type="button" id="chatToggle">Itago ang chat</button></div>
           <div class="mlegend"><span><i class="dot" style="background:var(--work)"></i>Nagtatrabaho</span><span><i class="dot" style="background:var(--need)"></i>Kailangan ka</span><span><i class="dot" style="background:var(--idle)"></i>Naka-break</span><span><i class="dot" style="background:var(--sleep)"></i>Tulog</span><span><i class="dot" style="background:var(--done)"></i>Pa-review</span><span><i class="dot" style="background:var(--fail)"></i>May error</span></div>
         </div>
 
@@ -335,9 +337,9 @@ const ASKS={
  DATA:'Isasama ko ba ang mga test account sa export?'};
 const CHISMIS=['Alam mo ba yung bagong task?','Talaga? Sino nagsabi?','Grabe yung merge conflict kanina.','Kain tayo mamaya.','Sino kaya ang nag-push sa main?','Hindi nga? Seryoso?'];
 const ST={working:{label:'Nagtatrabaho',c:'--work'},needs:{label:'Kailangan ka',c:'--need'},idle:{label:'Naka-break',c:'--idle'},done:{label:'Tapos na',c:'--done'},failed:{label:'May error',c:'--fail'}};
-const IDLE_LBL={coffee:'Nagkakape',wander:'Naglalakad',chismis:'Nakikipagkwentuhan',eat:'Kumakain',cr:'Nasa CR',sleep:'Natutulog'};
-const IDLE_SENT={coffee:'Nagkakape muna sa coffee bar.',wander:'Naglalakad-lakad sa hallway.',chismis:'Nakikipagkwentuhan sa may water cooler.',eat:'Kumakain sa coffee bar.',cr:'Pumunta muna sa CR.',sleep:'Natutulog na sa lounge.'};
-const IDLE_PLACE={coffee:'Coffee bar',eat:'Coffee bar',chismis:'Water cooler',cr:'CR',sleep:'Lounge',wander:'Hallway'};
+const IDLE_LBL={coffee:'Nagkakape',wander:'Naglalakad',chismis:'Nakikipagkwentuhan',eat:'Kumakain',cr:'Nasa CR',sleep:'Natutulog',desk:'Nasa desk',check:'Nagche-check',tv:'Nanonood ng TV',billiards:'Nagbi-billiards',chess:'Nagche-chess',darts:'Nagda-darts',stretch:'Nag-i-stretch',phone:'Nagse-cellphone',rounds:'Nag-iikot',doze:'Nakaidlip'};
+const IDLE_SENT={coffee:'Nagkakape muna sa coffee bar.',wander:'Naglalakad-lakad sa hallway.',chismis:'Nakikipagkwentuhan sa may water cooler.',eat:'Kumakain sa coffee bar.',cr:'Pumunta muna sa CR.',sleep:'Natutulog na sa lounge.',desk:'Nasa desk pa, hinihintay ang susunod na utos.',check:'Bumalik sa desk para tingnan kung may bagong task.',tv:'Nanonood ng TV sa lounge.',billiards:'Naglalaro ng billiards sa lounge.',chess:'Naglalaro ng chess sa HR room.',darts:'Naglalaro ng darts sa lounge.',stretch:'Nag-i-stretch sa hallway.',phone:'Nagse-cellphone muna.',rounds:'Isa-isang sinisilip ang team.',doze:'Nakaidlip sa desk.'};
+const IDLE_PLACE={coffee:'Coffee bar',eat:'Coffee bar',chismis:'Water cooler',cr:'CR',sleep:'Lounge',wander:'Hallway',desk:'Desk niya',check:'Desk niya',tv:'Lounge',billiards:'Lounge',chess:'HR room',darts:'Lounge',stretch:'Hallway',phone:'Hallway',rounds:'Work floor',doze:'Desk niya'};
 const ORDER={needs:0,failed:1,done:2,working:3,idle:4};
 
 const DESKS=[[2,2],[6,2],[10,2],[14,2],[2,5],[6,5],[10,5],[14,5]].map(([x,y],i)=>({i,x,y,w:2,seat:{x:x*T+T,y:y*T+T+13},owner:null}));
@@ -349,7 +351,12 @@ const SPOTS={
  eat:[{x:23.2*T,y:13.9*T},{x:25.4*T,y:13.9*T},{x:26.5*T,y:13.9*T},{x:28.7*T,y:13.9*T}],
  chismis:[{x:16.3*T,y:9.7*T},{x:17.9*T,y:9.7*T},{x:17.1*T,y:9.95*T}],
  coffee:[{x:23.6*T,y:16.4*T},{x:24.9*T,y:16.4*T}],
- cr:[{x:8.6*T,y:13.4*T},{x:9.9*T,y:13.4*T}]};
+ cr:[{x:8.6*T,y:13.4*T},{x:9.9*T,y:13.4*T}],
+ tv:[{x:1.9*T,y:13.3*T},{x:3.1*T,y:13.5*T}],
+ billiards:[{x:3.3*T,y:12.5*T},{x:6.6*T,y:12.5*T}],
+ darts:[{x:5.5*T,y:16.8*T}],
+ chess:[{x:18.15*T,y:16.5*T},{x:19.95*T,y:15.7*T}]};
+const BOSS_SEAT={x:27*T,y:3.95*T},BOSS_MEET={x:27*T,y:6.7*T};
 const taken={};
 function claim(kind,s){const arr=SPOTS[kind];for(let i=0;i<arr.length;i++){const k=kind+i;if(!taken[k]||taken[k]===s.id){taken[k]=s.id;s.spot=k;return arr[i];}}return null;}
 function release(s){if(s.spot){delete taken[s.spot];s.spot=null;}}
@@ -388,8 +395,8 @@ function place(e,p){e.x=p.x;e.y=p.y;e.path=[];}
 /* ---------- status logic ---------- */
 function seatOf(s){return s.lead?LEAD_DESK.seat:s.desk.seat;}
 function applyStatus(s,instant){
-  release(s);s.idle=null;s.errand=null;s.errandMsg=null;
-  if(s.status==='idle'){pickIdle(s,instant);return;}
+  release(s);s.idle=null;s.errand=null;s.errandMsg=null;s.rounds=null;
+  if(s.status==='idle'){startIdle(s,instant);return;}
   if(s.status==='needs'){
     const q=claim('queue',s)||{x:rand(24.5,29)*T,y:9.2*T};
     const arrive=()=>{s.pose='stand';s.raise=true;};
@@ -399,22 +406,73 @@ function applyStatus(s,instant){
   if(instant){place(s,seatOf(s));arrive();}else goTo(s,seatOf(s),arrive);
 }
 function wanderSpot(){return{x:rand(2,23)*T,y:rand(8.6,9.6)*T};}
+const idleMins=s=>(now()-s.idleStart)/MIN;
+function sitAtDesk(s,instant,kind){
+  release(s);s.idle=kind;
+  const arrive=()=>{s.pose='sit';s.typing=false;};
+  if(instant||(Math.abs(s.x-seatOf(s).x)<2&&Math.abs(s.y-seatOf(s).y)<2)){place(s,seatOf(s));arrive();}else goTo(s,seatOf(s),arrive);
+}
+// After a turn: stay at the desk for a few minutes. The leader stays seated unless idle for long.
+function startIdle(s,instant){
+  if(!s.lingerMs)s.lingerMs=rand(2,5)*MIN;
+  const el=now()-s.idleStart;
+  if(s.lead){sitAtDesk(s,instant,idleMins(s)>60&&Math.random()<.5?'doze':'desk');s.idleUntil=now()+(el<s.lingerMs?s.lingerMs-el:rand(2,4)*MIN);return;}
+  if(el<s.lingerMs){sitAtDesk(s,instant,'desk');s.idleUntil=s.idleStart+s.lingerMs;return;}
+  pickIdle(s,instant);
+}
+const SIT_ACTS={tv:1,chess:1};
 function pickIdle(s,instant){
+  const m=idleMins(s),was=s.idle;
   release(s);
-  const mins=(now()-s.idleStart)/MIN;
-  let opts=mins<10?['coffee','wander','cr','coffee']:mins<30?['chismis','eat','chismis','wander','cr']:['sleep'];
-  if(mins>=30&&!SPOTS.couch.some((_,i)=>!taken['couch'+i]||taken['couch'+i]===s.id))opts=['eat'];
-  if(s.forceIdle){opts=[s.forceIdle];s.forceIdle=null;}
+  // now and then, come back to the desk to see if something new arrived
+  if(!instant&&was&&was!=='desk'&&was!=='check'&&m<120&&Math.random()<.3){sitAtDesk(s,false,'check');s.idleUntil=now()+rand(40,75)*1000;return;}
+  const waiting=['billiards','chess'].filter(k=>taken[k+'0']&&!taken[k+'1']&&taken[k+'0']!==s.id);
+  let opts;
+  if(waiting.length&&Math.random()<.75)opts=waiting;
+  else opts=m<10?['coffee','cr','stretch','phone','chismis','wander','darts','coffee','billiards']
+    :m<30?['tv','billiards','chess','eat','chismis','darts','phone','coffee','stretch','tv']
+    :['sleep','sleep','tv','phone','chess','eat','tv'];
   let act=pick(opts),spot=null;
-  if(act==='wander')spot=wanderSpot();
-  else{spot=claim(act==='sleep'?'couch':act,s);if(!spot){act='wander';spot=wanderSpot();}}
-  s.idle=act;s.idleUntil=now()+rand(8,13)*1000;
-  const arrive=()=>{s.pose=act==='sleep'?'sleep':'stand';};
+  if(act===was&&Math.random()<.7)act=pick(opts);
+  if(act==='wander'||act==='stretch'||act==='phone')spot=wanderSpot();
+  else{spot=claim(act==='sleep'?'couch':act,s);if(!spot){act=pick(['wander','phone','stretch']);spot=wanderSpot();}}
+  s.idle=act;s.idleUntil=now()+(act==='sleep'?rand(4,8)*MIN:rand(60,150)*1000);
+  const arrive=()=>{s.pose=act==='sleep'?'sleep':SIT_ACTS[act]?'sit':'stand';};
   if(instant){place(s,spot);arrive();}else goTo(s,spot,arrive);
+}
+function leadIdle(s){
+  const m=idleMins(s);
+  if(m>=8&&Math.random()<.55){startRounds(s);return;}
+  if(m>=25&&Math.random()<.25){release(s);const sp=claim('coffee',s)||wanderSpot();s.idle='coffee';s.idleUntil=now()+rand(60,120)*1000;goTo(s,sp,()=>{s.pose='stand';});return;}
+  sitAtDesk(s,false,m>60&&Math.random()<.5?'doze':'desk');s.idleUntil=now()+rand(3,6)*MIN;
+}
+const taskShort=o=>{const t=String(o.task||'').split(/[,;(:]/)[0].trim().toLowerCase().split(/\s+/).slice(0,5).join(' ');return t||'task mo';};
+function replyFor(o){
+  if(o.status==='working')return o.detail&&o.detail.length<=80?`Ayos naman, Lead. ${sent(o.detail)}`:'Ayos naman, Lead. Tuloy-tuloy ang trabaho ko.';
+  if(o.status==='needs')return'Hinihintay ko pa ang sagot ni boss, Lead.';
+  if(o.status==='done')return'Tapos na ako, Lead. Pa-review na lang kay boss.';
+  return pick(['Tapos na ako, naghihintay ng susunod na task.','Naka-break lang ako saglit, Lead.','Wala pang bagong utos, Lead.','Ready na ako sa susunod, Lead.']);
+}
+function startRounds(s){
+  const list=sessions.filter(o=>!o.lead&&o.desk);
+  if(!list.length){s.idleUntil=now()+rand(3,6)*MIN;return;}
+  release(s);s.idle='rounds';s.rounds=list.map(o=>o.id);s.idleUntil=Infinity;nextRound(s);
+}
+function nextRound(s){
+  if(s.status!=='idle'||!s.rounds)return;
+  const o=sessions.find(x=>x.id===s.rounds.shift());
+  if(!o){if(s.rounds.length)return nextRound(s);s.rounds=null;sitAtDesk(s,false,'desk');s.idleUntil=now()+rand(4,7)*MIN;talk(s,'Ayos, okay naman ang lahat.');return;}
+  const seated=o.pose==='sit'&&!o.path.length&&o.status!=='needs'&&!SIT_ACTS[o.idle];
+  const at=seated?{x:seatOf(o).x+T*1.2,y:seatOf(o).y-2}:{x:o.x+T*1.1,y:o.y};
+  goTo(s,at,()=>{s.pose='stand';
+    talk(s,`${o.short}, kamusta ang ${taskShort(o)}?`);
+    setTimeout(()=>{if(sessions.includes(o))talk(o,replyFor(o));},2400);
+    setTimeout(()=>nextRound(s),8000);});
 }
 function setStatus(s,st,why){
   const prev=s.status;s.status=st;s.since=s.at||now();
-  if(st==='idle'&&prev!=='idle')s.idleStart=s.since;
+  if(st==='idle'&&prev!=='idle'){s.idleStart=s.since;s.lingerMs=rand(2,5)*MIN;}
+  s.talk=null;s.talkNext=now()+1500;
   log(s.short,why||statusLine(s),s);
   addChatFor(s,st,why);
   if(st==='needs')toast(s);
@@ -431,11 +489,58 @@ function nextStatus(s){
 }
 
 /* ---------- NPCs and you ---------- */
-const boss={npc:true,boss:true,name:'Ikaw',pal:{hair:'#1e1712',skin:'#c9946a',shirt:'#3d3a36',pants:'#2a2624'},x:BOSS_POS.x,y:BOSS_POS.y,path:[],pose:'stand',seed:3,bubble:'',bUntil:0};
-const guard={npc:true,name:'Guard',code:'GUARD',pal:{hair:'#1f2229',skin:'#b98256',shirt:'#2f3540',pants:'#1f2226'},x:12.6*T,y:14.2*T,path:[],pose:'stand',seed:1,bubble:'',bUntil:0};
-const hr={npc:true,name:'HR',pal:{hair:'#3b2316',skin:'#e6bb94',shirt:'#8c6a72',pants:'#3a3236'},x:19.5*T,y:13.9*T,path:[],pose:'stand',seed:2,bubble:'',bUntil:0,home:{x:19.5*T,y:13.9*T},next:0};
+const boss={id:-1,npc:true,boss:true,name:'Ikaw (Boss)',pal:{hair:'#1e1712',skin:'#c9946a',shirt:'#3d3a36',pants:'#2a2624'},x:BOSS_SEAT.x,y:BOSS_SEAT.y,path:[],pose:'sitf',seed:3,bubble:'',bUntil:0,mode:'desk',until:0,seen:null};
+const guard={id:-2,npc:true,name:'Guard',code:'GUARD',look:{hs:'ponytail',bottom:'pants'},pal:{hair:'#1f2229',skin:'#b98256',shirt:'#2f3540',pants:'#1f2226'},x:12.6*T,y:14.2*T,path:[],pose:'sitf',seed:1,bubble:'',bUntil:0,state:'ml',next:0};
+const hr={id:-3,npc:true,name:'HR',look:{hs:'bun',bottom:'skirt'},pal:{hair:'#3b2316',skin:'#e6bb94',shirt:'#8c6a72',pants:'#3a3236'},x:19.5*T,y:13.9*T,path:[],pose:'stand',seed:2,bubble:'',bUntil:0,home:{x:19.5*T,y:13.9*T},next:0};
 const PEOPLE=()=>[...sessions,guard,hr,boss];
-function say(e,text,ms){e.bubble=text;e.bUntil=now()+(ms||3500);}
+const readMs=t=>Math.max(6000,1800+String(t).length*90);
+function say(e,text,ms){e.bubble=text;e.bUntil=now()+Math.max(ms||0,readMs(text));}
+function talk(e,text){e.talk={text,until:now()+readMs(text)};e.talkNext=e.talk.until+rand(4,10)*1000;}
+const lc1=x=>x?x[0].toLowerCase()+x.slice(1):x;
+const POOL={
+ working:{all:['Konting tiis na lang dito.','Teka, babasahin ko ulit ito.','Mukhang gagana na ito.','Isa pang check bago ko i-commit.','Ang dami palang kailangang ayusin dito.','Focus muna ako, boss.','Ayos, pumasa na ang isang test.','Bakit kaya ganito ang output?','Kaunting linis pa sa code.','Sinusundan ko ang utos ni boss.'],
+  LEAD:['Sino kaya ang uunahin ko?','Nire-review ko ang mga PR ng team.','Hinahati ko ang mga susunod na task.','I-a-update ko si boss mamaya.','Kailangan nating matapos ito bago ang beta.'],
+  FIX:['Nahanap ko na yata ang bug.','Inaayos ko ang logic ng engine.','Isa pang edge case, tapos na ito.','Tinitingnan ko ang plant model.'],
+  TEST:['Isa pang retest, tapos report na.','Tinitingnan ko kung stable ang plant.','Naka-log na ang resulta ng test.','Cold start-up ulit, from the top.'],
+  DOCS:['Inaayos ko ang wording ng docs.','Dapat malinaw ito para sa susunod.','Idinadagdag ko sa handoff notes.'],
+  UX:['Masyadong maliit ang button na ito.','Mas maganda kung pantay ang spacing.','Sinusubukan ko ang bagong layout.'],
+  HMI:['Pinapaganda ko ang faceplate.','Isang style lang dapat sa lahat ng screen.','Inaayos ko ang mga kulay ng alarm.']},
+ needs:['Boss, may tanong ako.','Boss, hinihintay ko po ang sagot ninyo.','Pasensya na po, kailangan ko ang desisyon ninyo.','Boss, saglit lang po.','Hindi ako makakatuloy hangga\'t wala kayong sagot.'],
+ done:['Tapos na ako. Pa-review po.','Boss, pakitingnan po ang ginawa ko.','Handa na po para sa review.'],
+ failed:['May error ang huling run ko.','Inaayos ko pa ang error.','Kailangan kong ulitin ang test.'],
+ desk:['Hinihintay ko ang susunod na utos.','Baka may bagong task na.','Tapos na ako sa huling utos.','Ire-review ko muna ang ginawa ko.','Mag-aayos muna ako ng mesa.','Pahinga muna ang mata ko.'],
+ doze:['Zzz'],
+ check:['Wala pa ring bagong task.','Tingnan ko lang kung may bago.','Wala pa rin pala. Break ulit.'],
+ rounds:['Iikot muna ako sa team.'],
+ coffee:['Kape muna ako bago bumalik.','Ang sarap ng kape ngayon.','Isa pang tasa, please.','Three-in-one lang sapat na.'],
+ eat:['Kain muna tayo.','Ang sarap ng ulam ngayon.','Busog na ako.','Sino ang may baon?'],
+ cr:['Saglit lang, nasa CR ako.','Babalik din ako agad.'],
+ wander:['Lakad-lakad muna para hindi antukin.','Ang ganda ng araw ngayon.','Hinahanap ko ang charger ko.'],
+ stretch:['Ang sakit ng likod ko.','Stretch muna, ang tagal kong nakaupo.','Ayan, gumaan ang pakiramdam ko.'],
+ phone:['Nagsi-scroll lang ako saglit.','Nakakatawa ang meme na ito.','May nag-chat sa akin.','Nag-o-order ako ng milk tea.'],
+ chismis:['Alam mo ba ang bagong task?','Talaga? Sino ang nagsabi?','Grabe ang merge conflict kanina.','Kain tayo mamaya.','Sino kaya ang nag-push sa main?','Hindi nga? Seryoso ka?','Ang bilis ng Lead mag-review ngayon.','Sana pumasa na ang beta.'],
+ tv:['Ang ganda ng palabas.','Ilipat mo nga ang channel.','Replay ba ito?','Ang ganda ng eksena na iyan.','Teleserye na naman.'],
+ billiards:['Stripes ako ngayon.','Corner pocket iyan.','Ay, sablay!','Ikaw na ang tira.','Pasok!','Wala bang kalaro?'],
+ chess:['Check.','Teka, iniisip ko pa ang tira ko.','Ang tagal mo namang tumira.','Nakuha mo ang queen ko!','Draw na lang tayo?'],
+ darts:['Bullseye!','Muntik na.','Isa pang tira.','Ang hirap pala nito.'],
+ sleep:['Zzz','Zzz. Isang minuto pa.']};
+function lineFor(s){
+  const real=[];let pool;
+  if(s.status==='working'){pool=(POOL.working[s.code]||[]).concat(POOL.working.all);if(s.detail&&s.detail.length<=110)real.push(sent(s.detail),sent(s.detail));}
+  else if(s.status==='needs'){pool=POOL.needs;if(s.ask)real.push(s.ask,s.ask);}
+  else if(s.status==='done'||s.status==='failed')pool=POOL[s.status];
+  else{pool=POOL[s.idle]||POOL.desk;if(s.idle==='desk'&&s.recent&&s.recent.length<=110)real.push('Tapos ko na: '+lc1(sent(s.recent)));}
+  const fresh=real.concat(pool).filter(x=>!(s.lastLines||[]).includes(x));
+  const line=pick(fresh.length?fresh:pool);
+  s.lastLines=[line,...(s.lastLines||[])].slice(0,5);
+  return line;
+}
+function chatter(s){
+  if(s.path.length||(s.talk&&now()<s.talk.until)||now()<(s.talkNext||0))return;
+  if(s.idle==='rounds')return;
+  talk(s,lineFor(s));
+  if(s.status!=='needs')s.talkNext+=rand(2,8)*1000;
+}
 function hrThink(){
   if(hr.path.length||now()<hr.next)return;
   hr.next=now()+rand(9,15)*1000;
@@ -449,6 +554,56 @@ function hrThink(){
   goTo(hr,wanderSpot(),()=>{hr.pose='stand';setTimeout(()=>goTo(hr,hr.home,()=>{hr.pose='stand';}),2500);});
 }
 function leadThink(){}
+const ML=['Push! Push!','Savage! Grabe ako.','Bakit ako na-gank?','Isa pang game, last na talaga.','Ang lag ng Wi-Fi.','Konti na lang, Mythic na ako.','Tank ka naman, please.'];
+function guardThink(){
+  guard.sleepy=guard.state==='doze';
+  if(guard.path.length||now()<guard.next)return;
+  if(guard.state==='alert'){guard.state='ml';}
+  if(guard.state==='ml'){
+    if(Math.random()<.22){guard.state='doze';say(guard,'Zzz',9000);guard.next=now()+rand(40,90)*1000;}
+    else{say(guard,pick(ML));guard.next=now()+rand(9,18)*1000;}
+  }else{
+    if(Math.random()<.5){guard.state='ml';say(guard,pick(['Ay, nakatulog ako. Laro ulit.','Hindi ako natutulog, nagme-meditate lang.','Gising ako, gising!']));guard.next=now()+rand(10,18)*1000;}
+    else{say(guard,'Zzz',9000);guard.next=now()+rand(20,40)*1000;}
+  }
+}
+function guardWake(){guard.state='alert';guard.sleepy=false;guard.next=now()+12000;}
+const lastPromptAt=()=>Math.max(0,...sessions.map(s=>s.prompt_at||0));
+function bossToDesk(){boss.mode='desk';boss.until=now()+rand(2,4)*MIN;goTo(boss,BOSS_SEAT,()=>{boss.pose='sitf';});}
+function bossThink(){
+  if(boss.seen===null){boss.seen=lastPromptAt();return;}
+  const free=!boss.path.length;
+  const needs=sessions.filter(s=>s.status==='needs'&&!s.path.length);
+  if(needs.length){
+    if(boss.mode!=='meet'){release(boss);boss.mode='meet';goTo(boss,BOSS_MEET,()=>{boss.pose='stand';});return;}
+    if(free&&now()>boss.bUntil+2500)say(boss,pick([`Ano iyon, ${needs[0].short}?`,'Sige, isa-isa lang tayo.','Teka, babasahin ko muna.','Sandali, sasagutin ko kayo.']));
+    return;
+  }
+  if(boss.mode==='meet'){bossToDesk();return;}
+  const lp=lastPromptAt();
+  if(lp>boss.seen){
+    boss.seen=lp;const tgt=sessions.find(s=>s.prompt_at===lp);
+    if(tgt&&(tgt.desk||tgt.lead)){release(boss);boss.mode='watch';boss.watch=tgt.id;boss.until=now()+rand(60,100)*1000;const st=seatOf(tgt);
+      goTo(boss,{x:st.x-T*1.1,y:st.y-2},()=>{boss.pose='stand';say(boss,pick(['Tingnan natin kung paano mo gagawin.','Sige, ituloy mo lang.','Ayos iyan, ganyan nga.']));});return;}
+  }
+  if(boss.mode==='watch'){
+    if(now()>boss.until&&free){say(boss,'Sige, babalik na ako sa opisina.');bossToDesk();}
+    else if(free&&now()>boss.bUntil+5000&&Math.random()<.15)say(boss,pick(['Interesante.','Ang bilis niya.','Huwag kalimutan ang tests.','Ayos, malinis ang gawa.']));
+    return;
+  }
+  if(boss.mode==='break'){if(now()>boss.until&&free){release(boss);bossToDesk();}return;}
+  if(boss.mode==='desk'&&free&&now()>boss.until){
+    if(now()-lp>15*MIN){
+      const act=pick(['coffee','cr','stretch','wander','coffee']);release(boss);
+      const sp=act==='coffee'||act==='cr'?(claim(act,boss)||wanderSpot()):wanderSpot();
+      boss.mode='break';boss.idle=act;boss.until=now()+rand(60,120)*1000;
+      goTo(boss,sp,()=>{boss.pose='stand';say(boss,pick({coffee:['Kape muna ako.','Ang tahimik ng office ngayon.'],cr:['CR lang ako saglit.'],stretch:['Stretch muna, ang tagal kong nakaupo.'],wander:['Silip lang ako sa team.']}[act]));});
+      return;
+    }
+    boss.until=now()+rand(2,4)*MIN;
+  }
+  if(boss.mode==='desk'&&free&&boss.pose==='sitf'&&now()>boss.bUntil+20000&&Math.random()<.03)say(boss,pick(['Sino kaya ang uunahin ko?','Tingnan ko ang PRs.','Tahimik pa ang team.']));
+}
 
 /* ---------- live data from the Dev Room app on your PC ---------- */
 const ROLE_WORDS=[[/^(lead|leader)$/i,'LEAD','Team Lead','Lead','LEAD'],[/ui\/?ux|frontend|design/i,'UX','UI/UX Designer','UI/UX','FE'],[/hmi/i,'HMI','HMI Builder','HMI','OPS'],
@@ -470,18 +625,22 @@ function infoOf(r){
   const src=['PC mo',r.cwd?baseName(r.cwd):'Claude Code'];
   const url=(((sc.sources||[])[0]||{}).git_repository||{}).url||'';const repo=url.replace(/^https:\/\/github\.com\//,'');
   const br=em.current_branches||{};
-  const o={status:BUCKET[r.status_bucket]||'idle',at:(typeof r.updated_at==='number'?r.updated_at:Date.parse(r.updated_at))||now(),cwd:r.cwd||'',act:r.short||'',ask:sent(p.needs_action),detail:p.status_detail||r.task_summary||'',recent:p.recent_action||'',
+  const o={status:BUCKET[r.status_bucket]||'idle',at:(typeof r.updated_at==='number'?r.updated_at:Date.parse(r.updated_at))||now(),cwd:r.cwd||'',act:r.short||'',prompt_at:r.prompt_at||0,ask:sent(p.needs_action),detail:p.status_detail||r.task_summary||'',recent:p.recent_action||'',
     source:src[0],host:src[1],archived:r.session_status==='SESSION_STATUS_ARCHIVED'};
   if(repo)o.repo=repo;if(repo&&(br[repo]||br['']))o.branch=br[repo]||br[''];
   if(sc.model)o.model=sc.model;if(em.context_usage)o.ctx=em.context_usage;if(em.artifacts)o.artifacts=em.artifacts;
   return o;
 }
+const LOOKS=['long','ponytail','bob','bun'];
+function hashStr(t){let x=7;for(const c of String(t))x=(x*31+c.charCodeAt(0))>>>0;return x;}
+function lookFor(id,code){const x=hashStr(id+'|'+code);return{hs:LOOKS[x%4],bottom:['skirt','dress','skirt','pants','dress'][(x>>4)%5]};}
 function mkLive(r,desk,isLead){
   const p=parseTitle(r.title,isLead),i=infoOf(r);
   const s=Object.assign({id:uid++,sid:r.id,name:r.title||r.id,code:p.code,role:p.role,short:p.short,task:p.task,
     since:i.at,idleStart:i.at,idle:null,idleUntil:0,history:[],chat:[],pal:PAL[p.pal]||PAL.BE,
     seed:Math.random()*4,desk,x:0,y:0,path:[],pose:'stand',typing:false,raise:false,lead:!!isLead,artifacts:[]},i);
   s.activity=[i.act||'Nagtatrabaho.',sent(i.detail||i.recent||'Nagtatrabaho sa task niya')];
+  s.look=lookFor(r.id,p.code);
   if(desk)desk.owner=s;return s;
 }
 function statusLine(s){
@@ -496,9 +655,16 @@ const freeDesk=()=>DESKS.find(d=>!d.owner);
 let TEAM={lead:null,ids:[],names:{}};
 let allRecords=[],mode='connecting',connMsg='',lastSync=0,firstLoad=true,version=0,isLocal=false,hooksOk=null,settingsPath='',lanUrl='';
 const MAXN=DESKS.length;
+// The main session is the one without "ROLE:" in its name (or whose name says lead, main or project).
+function autoLead(rs){
+  const roled=rs.filter(r=>/^[^:]+:\s*\S/.test(r.title||'')),cands=rs.filter(r=>!/:/.test(r.title||''));
+  const named=cands.filter(r=>/lead|main|project|orchestr/i.test(r.title||''));
+  const pool=named.length?named:(roled.length?cands:[]);
+  return pool.sort((a,b)=>(b.updated_at||0)-(a.updated_at||0))[0]||null;
+}
 function pickTeam(records){
-  if(TEAM.ids&&TEAM.ids.length){const list=records.filter(r=>TEAM.ids.includes(r.id));return{lead:TEAM.lead,list};}
-  const lead=TEAM.lead&&records.find(r=>r.id===TEAM.lead);
+  if(TEAM.ids&&TEAM.ids.length){const list=records.filter(r=>TEAM.ids.includes(r.id));const l=TEAM.lead||(autoLead(list)||{}).id||null;return{lead:l,list};}
+  const lead=(TEAM.lead&&records.find(r=>r.id===TEAM.lead))||autoLead(records);
   const rest=records.filter(r=>r!==lead).slice(0,MAXN);
   return{lead:lead?lead.id:null,list:lead?[lead,...rest]:rest};
 }
@@ -517,7 +683,7 @@ function applyRecords(records){
       const desk=isLead?null:freeDesk();if(!isLead&&!desk)continue;
       s=mkLive(r,desk,isLead);sessions.push(s);seedChat(s);
       if(firstLoad)applyStatus(s,true);
-      else{place(s,{x:14.5*T,y:H+12});say(guard,`Magandang araw, ${s.short}! Pirma po muna sa logbook.`,4500);log('Guard',`May bagong session na pumasok: ${s.name}.`);applyStatus(s,false);}
+      else{place(s,{x:14.5*T,y:H+12});guardWake();say(guard,`Magandang araw, ${s.short}! Pirma po muna sa logbook.`,6000);log('Guard',`May bagong session na pumasok: ${s.name}.`);applyStatus(s,false);}
       continue;
     }
     const prev=s.status,prevAt=s.at,prevDetail=s.detail+'|'+s.recent+'|'+s.ask;
@@ -565,6 +731,7 @@ async function poll(){
     else if(r.ok){
       const j=await r.json();
       const teamChanged=JSON.stringify(j.team)!==JSON.stringify(TEAM);
+      updates(j);
       version=j.version;TEAM=j.team||TEAM;isLocal=!!j.local;hooksOk=j.hooks_installed;settingsPath=j.settings_path||'';lanUrl=j.lan_url||'';
       mode='live';lastSync=Date.now();
       if(teamChanged&&!firstLoad){allRecords=j.sessions;rebuildTeam();}else applyRecords(j.sessions);
@@ -572,6 +739,14 @@ async function poll(){
   }catch(e){mode='offline';}
   setConn();setTimeout(poll,mode==='live'?1000:3000);
 }
+let uiBuild=null;
+function updates(j){
+  if(j.ui_build!=null){if(uiBuild===null)uiBuild=j.ui_build;else if(j.ui_build!==uiBuild){location.reload();return;}}
+  const el=$('updbar');if(!el)return;
+  if(j.update_ready&&j.local){el.hidden=false;el.innerHTML='<span>May bagong bersyon ng Dev Room app. Na-download na ito.</span><button type="button" class="btn primary" data-act="restart">I-restart ngayon</button>';}
+  else el.hidden=true;
+}
+async function restartApp(){try{await fetch('/api/restart',{method:'POST'});}catch(e){}$('updbar').innerHTML='<span>Nagre-restart ang Dev Room. Bubukas ulit ito sa loob ng ilang segundo.</span>';}
 async function installHooks(){
   if(!confirm(`Idadagdag ng Dev Room ang hooks sa ${settingsPath||'settings.json ng Claude'}. Gagawa muna ito ng backup. Ituloy?`))return;
   try{const r=await fetch('/api/install-hooks',{method:'POST'});const j=await r.json();
@@ -687,8 +862,8 @@ DESKS.forEach(d=>addDesk(d,()=>d.owner));
 addDesk(LEAD_DESK,()=>sessions.find(s=>s.lead));
 // your office: chair, desk, laptop, mug, bookshelf
 add(26.7+.3+3.7+.2,g=>{box(g,26.7,3.7,.6,.4,7,'#2a201a');box(g,26.7,3.7,.6,.12,18,'#2a201a',7);});
-add(27+4.65,(g,t)=>{box(g,25.5,4.3,3,.7,9,'#6b4a35',0,{top:'#7d5840'});box(g,26.7,4.42,.6,.08,9,'#9a9086',9);box(g,25.8,4.5,.18,.18,4,'#efe6d8',9);box(g,27.9,4.5,.4,.3,1,'#d9cfbd',9);
-  if(Math.floor(t*1.5)%2){const p=iso(25.9,4.6,15);g.fillStyle='rgba(239,230,216,.7)';g.fillRect(p.x,p.y,1,3);}});
+add(27+4.65,(g,t)=>{box(g,25.5,4.3,3,.7,9,'#6b4a35',0,{top:'#7d5840'});box(g,25.7,4.42,.6,.08,9,'#9a9086',9);box(g,28.2,4.5,.18,.18,4,'#efe6d8',9);box(g,26.6,4.55,.5,.3,1,'#d9cfbd',9);
+  if(Math.floor(t*1.5)%2){const p=iso(28.3,4.6,15);g.fillStyle='rgba(239,230,216,.7)';g.fillRect(p.x,p.y,1,3);}});
 add(29.1+1.2+.5,g=>{box(g,29.1,1.2,.7,2.6,30,'#4a3122');for(let i=0;i<3;i++)box(g,29.15,1.4+i*.8,.1,.6,5,['#7d8a6a','#9a6450','#c9a27e'][i],8+i*8);});
 // plants
 const plant=(u,v)=>add(u+v+.5,g=>{box(g,u,v,.5,.5,6,'#7a5338');box(g,u+.05,v+.05,.4,.4,10,'#5f7a4f',6,{top:'#7a9466'});});
@@ -697,10 +872,15 @@ const plant=(u,v)=>add(u+v+.5,g=>{box(g,u,v,.5,.5,6,'#7a5338');box(g,u+.05,v+.05
 add(16.8+7.5+.4,g=>{box(g,16.8,7.5,.4,.4,14,'#e6e0d4');box(g,16.85,7.55,.3,.3,7,'#bcd3d6',14);});
 addBox(24.4,8.05,5.2,.3,5,'#5e3f2b');
 // lounge
-addBox(1.4,10.2,3,.4,14,'#4a3122');
+let tvCh=0;const TVC=['#6f8fb0','#b08a5f','#7fa07a','#a06f8a','#c9b27a'];
+add(1.2+.3+10.3+.25,(g,t)=>{box(g,1.2,10.3,2.6,.5,6,'#4a3122');const on=sessions.some(s=>s.idle==='tv'&&!s.path.length);
+  const c=on?(Math.floor(t*2)%2?TVC[tvCh%TVC.length]:shade(TVC[tvCh%TVC.length],.85)):'#25282c';box(g,1.45,10.35,2.1,.14,10,'#1d1d22',6,{front:c});});
 addBox(1.2,14.3,4,.3,13,'#5e3f2b',0,null,1.2+14.3);
 addBox(1.2,14.6,4,.8,6,'#7a5338',0,{top:'#8a6448'},1.2+14.6);
-addBox(5,11.4,.8,.7,8,'#8a5a40');
+add(3.9+1.2+11.7+.65,g=>{box(g,4.0,11.8,.25,.25,6,'#3a2a20');box(g,6.0,11.8,.25,.25,6,'#3a2a20');box(g,4.0,12.8,.25,.25,6,'#3a2a20');box(g,6.0,12.8,.25,.25,6,'#3a2a20');
+  box(g,3.9,11.7,2.4,1.3,2,'#5e3f2b',6,{top:'#4f7a52'});box(g,4.5,12.1,.12,.12,1,'#efe6d8',8);box(g,5.3,12.3,.12,.12,1,'#b03a2e',8);box(g,5.6,12.0,.12,.12,1,'#e2c08d',8);});
+add(6.84+16.2+.5,g=>{box(g,6.8,16.0,.06,.7,6,'#2a201a',5,{front:'#b03a2e'});box(g,6.79,16.25,.06,.2,2,'#efe6d8',7);});
+add(18.5+15.4+.9,g=>{box(g,18.85,15.75,.2,.2,6,'#3a2a20');box(g,18.5,15.4,.9,.9,1.5,'#5e3f2b',6,{top:'#d9cfbd'});for(let i=0;i<4;i++)box(g,18.6+(i%2)*.4,15.5+(i>>1)*.4,.12,.12,1.5,i%3?'#2a201a':'#efe6d8',7.5);});
 // CR
 addBox(7.3,11,.6,.4,8,'#f2ede4');
 addBox(7.4,15.4,1.3,2.3,9,'#b9b0a2');addBox(9.2,15.4,1.3,2.3,9,'#b9b0a2');
@@ -721,25 +901,52 @@ addBox(29,13.6,.12,1,18,'#2f3a33');
 const spr=document.createElement('canvas');spr.width=20;spr.height=24;const sg=spr.getContext('2d');
 const sil=document.createElement('canvas');sil.width=20;sil.height=24;const lg=sil.getContext('2d');
 function sprite(e,t){
-  const g=sg,p=e.pal,x=10,y=22;const px=(a,b,w,h,c)=>{g.fillStyle=c;g.fillRect(a,b,w,h);};
+  const g=sg,p=e.pal,x=10,y=22,L=e.look;const px=(a,b,w,h,c)=>{g.fillStyle=c;g.fillRect(a,b,w,h);};
   g.clearRect(0,0,20,24);
-  if(e.pose==='sleep'){px(x-8,y-6,4,4,p.hair);px(x-7,y-5,3,3,p.skin);px(x-4,y-6,12,5,'#c9b896');px(x-4,y-6,12,1,'#ddd0b4');return;}
+  const hair=p.hair,skin=p.skin,shirt=p.shirt,low=L&&L.bottom==='dress'?shirt:p.pants;
+  if(e.pose==='sleep'){px(x-8,y-6,4,4,hair);px(x-7,y-5,3,3,skin);if(L&&L.hs==='long')px(x-9,y-5,2,5,hair);px(x-4,y-6,12,5,'#c9b896');px(x-4,y-6,12,1,'#ddd0b4');return;}
   if(e.pose==='sit'){
-    const ty=y-14;px(x-4,ty,8,6,p.hair);px(x-3,ty+6,6,1,p.skin);px(x-5,ty+7,10,6,p.shirt);
+    const ty=y-14;
+    if(L&&L.hs==='bun')px(x-2,ty-2,4,2,hair);
+    px(x-4,ty,8,6,hair);px(x-5,ty+7,10,6,shirt);
+    if(L){if(L.hs==='long')px(x-4,ty+6,8,5,hair);else if(L.hs==='ponytail')px(x-1,ty+6,2,5,hair);else px(x-4,ty+6,8,1,hair);}
+    else px(x-3,ty+6,6,1,skin);
     const k=e.typing?(Math.floor(t*9+e.seed)%2):0;
-    px(x-6,ty+6-k,2,4,p.shirt);px(x+4,ty+6-(e.typing?1-k:0),2,4,p.shirt);return;}
-  const y0=y-15,moving=e.pose==='walk',f=moving?Math.floor(t*6+e.seed)%2:0,bob=moving&&f?1:0;
-  px(x-3,y0+bob,6,2,p.hair);px(x-4,y0+1+bob,8,2,p.hair);
-  px(x-3,y0+3+bob,6,4,p.skin);px(x-4,y0+3+bob,1,2,p.hair);px(x+3,y0+3+bob,1,2,p.hair);
-  if(((t+e.seed)%4)>.14){px(x-2,y0+4+bob,1,1,'#1b1612');px(x+1,y0+4+bob,1,1,'#1b1612');}
-  px(x-4,y0+7+bob,8,5,p.shirt);
-  if(e===guard){px(x-4,y0+bob,8,1,'#14171c');px(x+1,y0+8+bob,2,2,'#c9a85a');}
-  if(e.raise){const w=Math.floor(t*4)%2;px(x+4,y0+1+w,2,7,p.shirt);px(x+4,y0-1+w,2,2,p.skin);}else px(x+4,y0+8+bob,1,4,p.shirt);
-  px(x-5,y0+8+bob,1,4,p.shirt);
-  if(e.idle==='eat'&&!moving){px(x-7,y0+9,5,3,'#efe6d8');px(x-6,y0+8,3,1,'#c9a27e');}
-  if(e.idle==='coffee'&&!moving){px(x+4,y0+9,3,3,'#efe6d8');px(x+4,y0+9,3,1,'#5e3f2b');}
-  px(x-3,y0+12,6,1,p.pants);
-  px(x-3,y0+13,2,moving&&f?1:2,p.pants);px(x+1,y0+13,2,moving&&!f?1:2,p.pants);
+    px(x-6,ty+6-k,2,4,shirt);px(x+4,ty+6-(e.typing?1-k:0),2,4,shirt);return;}
+  const front=e.pose==='sitf';
+  const y0=y-15+(front?4:0),moving=e.pose==='walk',f=moving?Math.floor(t*6+e.seed)%2:0,bob=moving&&f?1:0;
+  if(L&&L.hs==='long')px(x-5,y0+2+bob,10,8,hair);
+  if(L&&L.hs==='ponytail')px(x+4,y0+1+bob,2,6,hair);
+  if(L&&L.hs==='bun')px(x-2,y0-2+bob,4,2,hair);
+  px(x-3,y0+bob,6,2,hair);px(x-4,y0+1+bob,8,2,hair);
+  px(x-3,y0+3+bob,6,4,skin);
+  if(L){const side=L.hs==='bob'?4:3;px(x-4,y0+3+bob,1,side,hair);px(x+3,y0+3+bob,1,side,hair);if(L.hs!=='bun')px(x-3,y0+3+bob,2,1,hair);}
+  else{px(x-4,y0+3+bob,1,2,hair);px(x+3,y0+3+bob,1,2,hair);}
+  const ec='#1b1612',shut=e.sleepy||((t+e.seed)%4)<=.14;
+  if(shut){px(x-3,y0+5+bob,2,1,ec);px(x+1,y0+5+bob,2,1,ec);}
+  else{px(x-2,y0+4+bob,1,2,ec);px(x+1,y0+4+bob,1,2,ec);if(L){px(x-3,y0+4+bob,1,1,ec);px(x+2,y0+4+bob,1,1,ec);}}
+  if(L){px(x-3,y0+6+bob,1,1,'#d98a7e');px(x+2,y0+6+bob,1,1,'#d98a7e');px(x-1,y0+6+bob,2,1,'#b45a52');}
+  px(x-4,y0+7+bob,8,L&&L.bottom!=='pants'?4:5,shirt);
+  if(e===guard){px(x-4,y0+bob,8,1,'#14171c');px(x-4,y0-1+bob,6,1,'#14171c');px(x+1,y0+8+bob,2,2,'#c9a85a');}
+  if(e===hr){px(x-1,y0+7+bob,2,1,'#efe6d8');}
+  const act=!moving&&(e.idle||'');
+  if(act==='stretch'){const w=Math.floor(t*1.5+e.seed)%2;px(x-5,y0-1+w,1,8,shirt);px(x+4,y0-1+w,1,8,shirt);px(x-5,y0-2+w,1,1,skin);px(x+4,y0-2+w,1,1,skin);}
+  else if(e.raise){const w=Math.floor(t*4)%2;px(x+4,y0+1+w,2,7,shirt);px(x+4,y0-1+w,2,2,skin);px(x-5,y0+8+bob,1,4,shirt);}
+  else if(act==='darts'){const w=Math.floor(t*1.2+e.seed)%3===0;px(x+4,y0+(w?0:4),2,w?8:4,shirt);px(x+5,y0+(w?-1:3),1,1,'#b03a2e');px(x-5,y0+8,1,4,shirt);}
+  else{px(x+4,y0+8+bob,1,4,shirt);px(x-5,y0+8+bob,1,4,shirt);}
+  if(act==='eat'){px(x-7,y0+9,5,3,'#efe6d8');px(x-6,y0+8,3,1,'#c9a27e');}
+  if(act==='coffee'){px(x+4,y0+9,3,3,'#efe6d8');px(x+4,y0+9,3,1,'#5e3f2b');}
+  if(act==='billiards'){for(let i=0;i<9;i++)px(x+4+(i>>2),y0+3+i,1,1,'#c9a27e');}
+  if(act==='phone'||(e===guard&&guard.state==='ml')){px(x-1,y0+9+bob,3,2,'#1d1d22');px(x-1,y0+9+bob,3,1,Math.floor(t*3)%2?'#9fd3ff':'#d6ecff');}
+  if(front)return;
+  if(L&&L.bottom!=='pants'){
+    px(x-4,y0+11+bob,8,1,low);px(x-5,y0+12+bob,10,1,low);
+    px(x-3,y0+13,2,moving&&f?1:2,skin);px(x+1,y0+13,2,moving&&!f?1:2,skin);
+    px(x-3,y0+14,2,1,'#3a2a20');px(x+1,y0+14,2,1,'#3a2a20');
+  }else{
+    px(x-3,y0+12,6,1,p.pants);
+    px(x-3,y0+13,2,moving&&f?1:2,p.pants);px(x+1,y0+13,2,moving&&!f?1:2,p.pants);
+  }
 }
 const CS=2;
 function drawChar(e,t){
@@ -759,20 +966,11 @@ const overlay=$('overlay');const nodes=new Map();
 function node(e){let n=nodes.get(e);if(!n){n=document.createElement('div');n.className='ent';n.innerHTML='<div class="bub"></div><div class="tag"></div>';overlay.appendChild(n);nodes.set(e,n);n._b=n.firstChild;n._t=n.lastChild;n._bt=null;n._bc=null;}return n;}
 function bubbleFor(e,t){
   if(e.npc)return[now()<e.bUntil?e.bubble:'',e.boss?'boss':'npc'];
-  if(e.errandMsg)return[e.errandMsg,'npc'];
-  if(e.path.length)return['',''];
-  switch(e.status){
-    case'working':return[e.activity[0],'minor'];
-    case'needs':return['Boss, may tanong ako.','need'];
-    case'done':return['Tapos na ako. Pa-review po.','done'];
-    case'failed':return['May error ang tests.','fail'];
-    case'idle':
-      if(e.idle==='sleep')return['Zzz','sleep'];
-      if(e.idle==='chismis'){const grp=sessions.filter(o=>o.status==='idle'&&o.idle==='chismis'&&!o.path.length);const k=Math.floor(t/2.8);if(grp[k%grp.length]!==e)return['',''];return[CHISMIS[k%CHISMIS.length],'minor'];}
-      if(e.idle==='eat')return['Kumakain muna ako.','minor'];
-      if(e.idle==='coffee')return['Kape muna ako.','minor'];
-      if(e.idle==='cr')return['Saglit lang, nasa CR ako.','minor'];
-      return['',''];}
+  const tk=e.talk&&now()<e.talk.until?e.talk.text:'';
+  if(e.path.length)return tk?[tk,'talk']:['',''];
+  if(e.status==='needs')return[tk||'Boss, may tanong ako.','need'];
+  if(tk)return[tk,e.status==='done'?'done':e.status==='failed'?'fail':(tk==='Zzz'||tk.startsWith('Zzz'))?'sleep':'talk'];
+  if(e.idle==='sleep'||e.idle==='doze')return['Zzz','sleep'];
   return['',''];
 }
 function updateOverlay(t){
@@ -784,7 +982,7 @@ function updateOverlay(t){
     const[b,c]=bubbleFor(e,t);
     if(b!==n._bt){n._b.textContent=b;n._bt=b;}
     if(c!==n._bc){n._b.className='bub '+c;n._bc=c;}
-    const tag=e.npc?e.name:e.short;if(n._t.textContent!==tag)n._t.textContent=tag;
+    const tag=e.npc?e.name:e.short;n._t.title=e.npc?e.name:e.role;if(n._t.textContent!==tag)n._t.textContent=tag;
     n._t.className='tag'+(e.boss?' you':'')+(e.id&&e.id===selected?' sel':'');
   }
 }
@@ -846,22 +1044,22 @@ function frame(ts){
   requestAnimationFrame(frame);
 }
 
-/* ---------- tick: cosmetic idle moves only; statuses come from real data ---------- */
+/* ---------- tick: office life; statuses come from real data ---------- */
 setInterval(()=>{
   if(paused)return;
   for(const s of sessions){
-    if(s.status==='idle'&&now()>s.idleUntil&&!s.path.length){
-      const prev=s.idle;pickIdle(s,false);
-    }
+    if(s.status==='idle'&&now()>s.idleUntil&&!s.path.length&&!s.rounds){if(s.lead)leadIdle(s);else pickIdle(s,false);}
+    chatter(s);
   }
-  hrThink();
+  if(Math.random()<.02){const w=sessions.filter(s=>s.idle==='tv'&&!s.path.length);if(w.length){tvCh++;talk(pick(w),'Ilipat ko na ang channel.');}}
+  hrThink();guardThink();bossThink();
   render();
 },1000);
 
 /* ---------- UI ---------- */
 var ptab='chat',chatKey='';
 const compact=()=>$('app').clientWidth<=640;
-function stColor(s){return s.status==='idle'&&s.idle==='sleep'?'--sleep':ST[s.status].c;}
+function stColor(s){return s.status==='idle'&&(s.idle==='sleep'||s.idle==='doze')?'--sleep':ST[s.status].c;}
 function stLabel(s){return s.status==='idle'?(IDLE_LBL[s.idle]||'Naka-break'):ST[s.status].label;}
 function actText(s){
   if(s.status==='needs')return s.ask||'May tanong siya sa iyo.';
@@ -954,7 +1152,7 @@ function dockCard(s){
 }
 function render(){
   const by=st=>sessions.filter(s=>s.status===st).length;
-  const sleepN=sessions.filter(s=>s.status==='idle'&&s.idle==='sleep').length;
+  const sleepN=sessions.filter(s=>s.status==='idle'&&(s.idle==='sleep'||s.idle==='doze')).length;
   const needN=by('needs');
   $('counts').innerHTML=`
     <span class="count"><i class="dot" style="background:var(--work)"></i><b>${by('working')}</b> nagtatrabaho</span>
@@ -989,6 +1187,7 @@ document.addEventListener('click',e=>{
   if(e.target.closest('[data-act="add"]')){addSession();return;}
   if(e.target.closest('[data-act="team"]')){openTeam();return;}
   if(e.target.closest('[data-act="hooks"]')){installHooks();return;}
+  if(e.target.closest('[data-act="restart"]')){restartApp();return;}
   if(e.target.closest('[data-act="pair"]')){openPair();return;}
   if(e.target.closest('[data-act="team-cancel"]')){$('teamPanel').hidden=true;return;}
   if(e.target.closest('[data-act="team-reset"]')){saveTeam({lead:null,ids:[],names:TEAM.names||{}});$('teamPanel').hidden=true;return;}
@@ -1025,6 +1224,11 @@ cv.addEventListener('wheel',e=>{e.preventDefault();const q=toScreen(e);cam.follo
 $('zIn').addEventListener('click',()=>setZoom(cam.z*1.25));
 $('zOut').addEventListener('click',()=>setZoom(cam.z/1.25));
 $('zFit').addEventListener('click',()=>{cam.follow=null;setZoom(1);});
+const BS=[1,1.3,1.6,2,2.5];let bsI=1;try{const v=localStorage.getItem('devroom.bubble');if(v!==null&&+v>=0&&+v<BS.length)bsI=+v;}catch(e){}
+function applyBS(){overlay.style.setProperty('--bs',BS[bsI]);$('bsDown').disabled=bsI===0;$('bsUp').disabled=bsI===BS.length-1;try{localStorage.setItem('devroom.bubble',String(bsI));}catch(e){}}
+$('bsUp').addEventListener('click',()=>{bsI=Math.min(BS.length-1,bsI+1);applyBS();});
+$('bsDown').addEventListener('click',()=>{bsI=Math.max(0,bsI-1);applyBS();});
+applyBS();
 {const fb=$('fsBtn');const app=$('app');
  if(!(document.fullscreenEnabled&&app.requestFullscreen))fb.hidden=true;
  fb.addEventListener('click',()=>{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});else app.requestFullscreen().catch(()=>{fb.hidden=true;});});
@@ -1035,7 +1239,7 @@ $('pauseBtn').addEventListener('click',()=>{
   else{pausedAcc+=Date.now()-pauseAt;paused=false;$('pauseBtn').textContent='Pause';}
 });
 function addSession(){
-  say(guard,'Wala pang bagong dumarating, boss.',3000);
+  guardWake();say(guard,'Wala pang bagong dumarating, boss.');
   log('Guard','Kapag nagsimula o nag-prompt ka ng session sa Claude, papasok siya rito agad. Puwede mo rin siyang idagdag sa Piliin ang team.');
 }
 render();renderLog();requestAnimationFrame(frame);setConn();poll();

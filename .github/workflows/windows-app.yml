@@ -2,8 +2,14 @@ name: Windows app
 
 on:
   push:
+    branches: [main, ccr-c1736103-c42su6]
     paths: ["app/**", ".github/workflows/windows-app.yml"]
   workflow_dispatch:
+
+# One publish at a time, so the release always holds one matching set of files.
+concurrency:
+  group: dev-room-release
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -25,14 +31,25 @@ jobs:
         run: npm install
       - name: Build portable exe
         working-directory: app
+        env:
+          DEVROOM_BUILD: ${{ github.run_number }}
+          DEVROOM_COMMIT: ${{ github.sha }}
         run: npx tauri build --no-bundle
       - name: Rename
         shell: bash
-        run: cp app/src-tauri/target/release/dev-room.exe DevRoom.exe
+        run: |
+          cp app/src-tauri/target/release/dev-room.exe DevRoom.exe
+          cp app/ui/index.html index.html
+          API=$(tr -dc '0-9' < app/api-version.txt)
+          printf '{"build": %s, "api": %s, "commit": "%s"}\n' "${{ github.run_number }}" "$API" "${{ github.sha }}" > version.json
+          cat version.json
       - uses: actions/upload-artifact@v4
         with:
           name: DevRoom-windows
-          path: DevRoom.exe
+          path: |
+            DevRoom.exe
+            index.html
+            version.json
       - name: Publish to the "dev-room-latest" pre-release
         uses: softprops/action-gh-release@v2
         with:
@@ -42,5 +59,9 @@ jobs:
           prerelease: true
           body: |
             Portable Windows app. Download DevRoom.exe and run it; no install needed.
+            The app updates itself from this release: index.html and version.json are for the in-app updater.
             Built from ${{ github.ref_name }} at ${{ github.sha }}.
-          files: DevRoom.exe
+          files: |
+            DevRoom.exe
+            index.html
+            version.json

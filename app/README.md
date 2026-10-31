@@ -25,6 +25,30 @@ Phone on the same Wi-Fi  (http://<PC IP>:4317/?t=<pairing token>, from the QR co
 - **Phone:** **I-connect ang phone** shows a QR code with a pairing token. Without the token, other devices on the network get nothing. Hooks are accepted only from the PC itself.
 - **State** (team, names, last known sessions, token) lives in `%APPDATA%\DevRoom\state.json`.
 
+## Office life
+
+- **Characters:** every session is a woman with her own hairstyle (long, ponytail, bob or bun) and outfit (skirt, dress or pants), picked from her session id.
+- **Seats:**
+  - Working means seated at the PC.
+  - After a turn ends, a session stays at her desk for 2 to 5 minutes before taking a break.
+  - On break, she comes back to her desk now and then to check for new work.
+- **Break activities:**
+  - Under 10 minutes: coffee, CR, stretching, phone, chatting, darts and billiards.
+  - Longer breaks add TV, chess and eating.
+  - After 30 minutes she naps in the lounge.
+  - Billiards and chess pair players up.
+- **The leader:**
+  - Stays seated at the LEAD desk.
+  - After a long idle, she walks the floor checking on each agent ("Kamusta ang ...?") and they answer.
+  - When she needs you, she goes to OPISINA MO.
+- **You (Boss):**
+  - Sit at your desk.
+  - Walk out to meet anyone who needs you.
+  - After you give a session a prompt, go and watch her work for a minute or so.
+  - After 15 minutes with no prompt: coffee, CR or stretching.
+- **The guard** plays ML on her phone, dozes off sometimes, and wakes up to greet new sessions.
+- **Bubbles** stay up for at least 6 seconds, longer for long text. Lines come from large pools per state and role, plus the session's real task, with no immediate repeats. The A− and A+ buttons set the text size per device.
+
 ## Limits of this version
 
 - Replying from Dev Room is not possible yet. Hooks cannot inject messages into a running session, so answer in the Claude desktop app.
@@ -45,4 +69,14 @@ npx tauri build --no-bundle
 
 The exe needs the WebView2 runtime, which ships with Windows 10 and 11.
 
-`ui/index.html` is generated from `mockup/dev-room-live.html`, so keep the two in step when changing the office view.
+`ui/index.html` is the app's UI and is now edited directly; it started from `mockup/dev-room-live.html`.
+
+## Auto update
+
+Every push to `main` (and, until `main` exists, to this PR's branch) builds and publishes `DevRoom.exe`, `index.html` and `version.json` to the `dev-room-latest` release.
+
+The running app checks `version.json` every 3 minutes.
+- **UI update:** when the UI's API version (`api-version.txt`) is unchanged, the new `index.html` is cached in `%APPDATA%\DevRoom\ui` and served at once. Open windows and paired phones reload themselves.
+- **App update:** the new `DevRoom.exe` is downloaded next to the running one and swapped in, and the old copy becomes `DevRoom.old.exe`. A green bar then offers **I-restart ngayon**.
+
+Bump `api-version.txt` whenever the UI starts depending on a server change. An older exe then waits for its own update instead of loading a UI it cannot serve.
