@@ -120,9 +120,10 @@ jobs:
       - name: Publish to the "dev-room-latest" pre-release
         uses: softprops/action-gh-release@v2
         with:
+          # The update channel keeps its tag where it is; only the files and notes change.
+          # (Moving an existing release's tag is refused for the workflow token.)
           tag_name: dev-room-latest
           name: Dev Room v${{ env.DEVROOM_VERSION }} (build ${{ github.run_number }}, latest)
-          target_commitish: ${{ github.sha }}
           prerelease: true
           body: |
             - **Windows:** download DevRoom.exe and run it; no install needed.
