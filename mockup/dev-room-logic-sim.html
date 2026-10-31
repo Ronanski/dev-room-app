@@ -248,7 +248,7 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 <button type="button" class="toast" id="toast" hidden></button>
   </div>
 </div>
-<p class="devnote">Totoong data ito ng LOGIC_SIM_PROJECT team mo mula sa claude.ai/code, kinuha noong 31 Okt 2026, 8:24 PM UTC. Snapshot pa lang ito, kaya hindi pa ito nag-a-update nang kusa at hindi pa naipapadala ang mga mensahe mo. Sa live app, ipapasa ng server ang bagong records sa <code>devRoomApply()</code>.</p>
+<p class="devnote">Totoong data ito ng LOGIC_SIM_PROJECT team mo mula sa claude.ai/code, kinuha noong 31 Okt 2026, 9:15 PM UTC. Snapshot pa lang ito, kaya hindi pa ito nag-a-update nang kusa at hindi pa naipapadala ang mga mensahe mo. Sa live app, ipapasa ng server ang bagong records sa <code>devRoomApply()</code>.</p>
 
 <script>
 (()=>{
@@ -427,18 +427,18 @@ function leadThink(s){
 }
 
 /* ---------- initial scene: real LOGIC_SIM_PROJECT sessions ---------- */
-// Snapshot from claude.ai/code (list_sessions + get_session), 2026-10-31 20:24 UTC.
+// Snapshot from claude.ai/code (list_sessions + get_session), 2026-10-31 21:15 UTC.
 // Records keep the API's field names, so the real app can pass fresh ones to devRoomApply().
 const TEAM={name:'LOGIC_SIM_PROJECT',lead:'session_011XJn782r9nJAYUT3aYAUhf',
   ids:['session_011XJn782r9nJAYUT3aYAUhf','session_011XJn7AF8P9ydV97v7G2Ygn','session_011XJn77vJFajZpWPEq5hmdt','session_011XJn775X6mDNwi1c1mk9Zg','session_011XJn79wRmNpELhTDGVKVxY','session_011XJn77J4QZrzZkq7EhmHny']};
 const REPO='Ronanski/icms-master-tool';
 const art=(title,id,at)=>({title,url:'https://claude.ai/artifact/'+id,updated_at:at});
 const SNAPSHOT=[
- {id:'session_011XJn782r9nJAYUT3aYAUhf',title:'LOGIC_SIM_PROJECT',status_bucket:'SESSION_STATUS_BUCKET_REVIEW_READY',origin:'desktop_app',environment_kind:'bridge',
-  created_at:'2026-10-30T13:21:20Z',updated_at:'2026-10-31T20:24:06Z',
-  post_turn_summary:{status_category:'review_ready',status_detail:'condenser diagram v3: fixing 4 layout issues before resend',recent_action:'',needs_action:''},
+ {id:'session_011XJn782r9nJAYUT3aYAUhf',title:'LOGIC_SIM_PROJECT',status_bucket:'SESSION_STATUS_BUCKET_BLOCKED',origin:'desktop_app',environment_kind:'bridge',
+  created_at:'2026-10-30T13:21:20Z',updated_at:'2026-10-31T21:10:31Z',
+  post_turn_summary:{status_category:'need_input',status_detail:'paused; awaiting your word to resume (PR #90 needs GO BETA)',recent_action:'',needs_action:'say when to resume; reply "GO BETA" for PR #90'},
   session_context:{model:'claude-opus-5-5'},
-  external_metadata:{context_usage:{used_tokens:624942,max_tokens:1000000},artifacts:[art('028 Style A','TgGwNDcSAe81o69MipPHwr','2026-10-31T19:37:48Z'),art('028 Style B','RpVLFGZdZnW9M4be1aGJv5','2026-10-31T19:37:49Z'),art('028 Style C','Y59WmaEmf4kYK1JY4qSorP','2026-10-31T19:37:51Z'),art('028 Condensate System','W7v6ii79i7KHsCaK4qTnbF','2026-10-31T18:30:57Z')],artifact_count:13}},
+  external_metadata:{context_usage:{used_tokens:481421,max_tokens:1000000},artifacts:[art('028 Style A','TgGwNDcSAe81o69MipPHwr','2026-10-31T19:37:48Z'),art('028 Style B','RpVLFGZdZnW9M4be1aGJv5','2026-10-31T19:37:49Z'),art('028 Style C','Y59WmaEmf4kYK1JY4qSorP','2026-10-31T19:37:51Z'),art('028 Condensate System','W7v6ii79i7KHsCaK4qTnbF','2026-10-31T18:30:57Z')],artifact_count:13}},
  {id:'session_011XJn7AF8P9ydV97v7G2Ygn',title:'LIVE TESTER: COLD START-UP TO FULL LOAD (BETA.76)',status_bucket:'SESSION_STATUS_BUCKET_BLOCKED',origin:'claude_code_cli',environment_kind:'bridge',
   created_at:'2026-10-30T14:39:17Z',updated_at:'2026-10-31T18:48:27Z',
   post_turn_summary:{status_category:'need_input',status_detail:'on standby; plant at H16, retest H3-H16 in artifact v27',recent_action:'',needs_action:'tell me when to resume (standing by until then)'},
