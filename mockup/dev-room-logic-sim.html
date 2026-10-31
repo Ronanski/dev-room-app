@@ -1,0 +1,918 @@
+<title>Dev Room Logic Sim</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&family=Pixelify+Sans:wght@500;700&display=swap">
+<style>
+/* Layout: the café-office is a game window on the left, the operator sidebar on the right; under 820px it folds into a 3-tab phone app */
+:root{
+  --bg:#efe7da; --panel:#f8f3ea; --ink:#2a201a; --muted:#6e5f52; --line:#dccfbd; --accent:#6b4a35; --chip:#e8dece;
+  --work:#5f7d4e; --need:#b24a32; --idle:#a67c2e; --sleep:#6c6a80; --done:#4f6f7a; --fail:#8a3a30;
+  --frame:#2a201a;
+  --f-display:"Pixelify Sans","Courier New",monospace;
+  --f-body:"Atkinson Hyperlegible",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#1c1613; --panel:#26201b; --ink:#efe6d8; --muted:#a99886; --line:#3a2f27; --accent:#c9a27e; --chip:#2f2721;
+  --work:#8fae7a; --need:#e07a5f; --idle:#d2a75a; --sleep:#a4a2c0; --done:#87aab6; --fail:#d07060; --frame:#0e0b09; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1c1613; --panel:#26201b; --ink:#efe6d8; --muted:#a99886; --line:#3a2f27; --accent:#c9a27e; --chip:#2f2721;
+  --work:#8fae7a; --need:#e07a5f; --idle:#d2a75a; --sleep:#a4a2c0; --done:#87aab6; --fail:#d07060; --frame:#0e0b09; color-scheme:dark}
+
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+[hidden]{display:none!important}
+
+.stage{max-width:1280px;margin:0 auto}
+.app{container-type:inline-size;container-name:app;position:relative;background:var(--bg)}
+.statusbar{display:none}
+
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.logo{width:28px;height:28px;flex:none;background:
+  linear-gradient(var(--accent),var(--accent)) 5px 10px/15px 13px no-repeat,
+  linear-gradient(var(--accent),var(--accent)) 20px 13px/4px 6px no-repeat,
+  linear-gradient(var(--line),var(--line)) 8px 2px/2px 6px no-repeat,
+  linear-gradient(var(--line),var(--line)) 13px 3px/2px 5px no-repeat,
+  linear-gradient(var(--ink),var(--ink)) 3px 24px/20px 2px no-repeat}
+h1{font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1;margin:0;letter-spacing:.5px}
+.sub{margin:3px 0 0;color:var(--muted);font-size:12px}
+.clock{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.counts{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+.count{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--chip);font-size:12.5px;font-variant-numeric:tabular-nums}
+.count b{font-family:var(--f-mono)}
+.count.need.on{background:var(--need);color:#fff}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.controls{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--panel);padding:6px 12px;border-radius:8px;font-size:13px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:none;padding:6px 12px;font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+
+.body{display:grid;grid-template-columns:minmax(0,1fr) clamp(300px,36%,390px);grid-template-areas:"office chat" "dock dock";gap:16px}
+.pane[data-pane="office"]{grid-area:office;min-width:0}
+.pane[data-pane="chat"]{grid-area:chat;min-width:0;position:relative;min-height:540px}
+.dockwrap{grid-area:dock;min-width:0}
+
+.mapwrap{position:relative;border-radius:10px;overflow:hidden;border:3px solid var(--frame);background:#2a201a}
+#map{display:block;width:100%;height:auto;image-rendering:pixelated;cursor:grab;touch-action:none}
+#map.drag{cursor:grabbing}
+.zoom{position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:3}
+.zoom button{border:1px solid #2b211b;background:#f7f0e3;color:#2b211b;border-radius:6px;font-size:13px;min-width:30px;height:30px;padding:0 8px;font-weight:700}
+.zoom button:hover{background:#efe2c4}
+.overlay{position:absolute;inset:0;pointer-events:none}
+.ent{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;gap:2px;width:0}
+.bub{font-size:calc(11px * var(--zs,1));line-height:1.25;background:#f7f0e3;color:#2b211b;border:2px solid #2b211b;padding:2px 7px;border-radius:7px;width:max-content;max-width:150px;text-align:center;white-space:normal}
+.bub:empty{display:none}
+.bub.need{background:#b24a32;border-color:#5a2216;color:#fff;font-weight:700;animation:bob .9s ease-in-out infinite}
+.bub.sleep{background:#e3ddd2;color:#5b5348}
+.bub.done{background:#dfe6cf}
+.bub.fail{background:#efd2c8}
+.bub.npc{background:#efe2c4}
+.bub.boss{background:#2b211b;color:#f7f0e3}
+.tag{font-family:var(--f-mono);font-size:calc(9px * var(--zs,1));font-weight:600;background:rgba(43,33,27,.82);color:#f7f0e3;padding:0 4px;border-radius:3px;white-space:nowrap}
+.tag.sel{background:#c9a27e;color:#2b211b}
+.tag.you{background:#f7f0e3;color:#2b211b;border:1px solid #2b211b}
+@keyframes bob{50%{transform:translateY(-3px)}}
+@media (prefers-reduced-motion:reduce){.bub.need{animation:none}}
+.feed{position:absolute;left:8px;bottom:8px;display:flex;flex-direction:column;gap:4px;max-width:min(55%,340px);pointer-events:none}
+.feed div{background:rgba(30,22,18,.84);color:#efe6d8;font-size:11px;padding:4px 8px;border-radius:6px;line-height:1.3}
+.feed b{color:#e2c08d}
+
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:12px;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:6px}
+.rule{margin:6px 0 0;font-size:12px;color:var(--muted);max-width:75ch}
+
+h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4px;margin:0 0 8px;display:flex;align-items:center;gap:8px}
+.empty{font-size:12.5px;color:var(--muted);padding:10px 12px;border:1px dashed var(--line);border-radius:10px;margin:0}
+.av{width:34px;height:34px;flex:none;border-radius:6px;display:grid;place-items:center;font-family:var(--f-mono);font-size:10px;font-weight:600;color:#f7f0e3;position:relative;overflow:hidden}
+.av::before{content:"";position:absolute;inset:0 0 auto;height:9px;background:var(--hair)}
+.av span{position:relative;margin-top:8px}
+.raw{font-family:var(--f-mono);font-size:10.5px;color:var(--muted);overflow-wrap:anywhere}
+.pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;color:var(--st);background:color-mix(in srgb,var(--st) 14%,transparent);border:1px solid color-mix(in srgb,var(--st) 40%,transparent)}
+.pill.solid{background:var(--st);color:#fff;border-color:var(--st)}
+.dur{font-family:var(--f-mono);font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.src{font-family:var(--f-mono);font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px;white-space:nowrap}
+
+/* chat panel */
+.chatpanel{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.cp-head{display:flex;gap:10px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
+.cp-head .who{min-width:0;flex:1}
+.cp-head .nm{font-weight:700;font-size:14px;line-height:1.2}
+.cp-head .side{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.cp-tabs{display:flex;border-bottom:1px solid var(--line)}
+.cp-tabs button{flex:1;border:0;background:none;padding:9px 6px;font-size:12.5px;color:var(--muted);border-bottom:2px solid transparent}
+.cp-tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:700}
+.cp-body{flex:1;min-height:0;overflow:auto;padding:12px 14px}
+.msgs{display:flex;flex-direction:column;gap:10px}
+.msg{max-width:86%;padding:8px 11px;border-radius:12px;font-size:13px;line-height:1.4;overflow-wrap:anywhere}
+.msg.agent{align-self:flex-start;background:var(--chip);border-bottom-left-radius:4px}
+.msg.you{align-self:flex-end;background:var(--accent);color:var(--panel);border-bottom-right-radius:4px}
+.msg.sys{align-self:center;color:var(--muted);font-size:11.5px;text-align:center;padding:0;max-width:100%}
+.msg.asking{border:2px solid var(--need);background:color-mix(in srgb,var(--need) 8%,var(--panel))}
+.msg.asking b{color:var(--need)}
+.msg time{display:block;font-family:var(--f-mono);font-size:10px;opacity:.7;margin-top:3px}
+.msg .row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.info dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 12px;margin:0 0 14px;font-size:12.5px}
+.info dt{color:var(--muted)}
+.info dd{margin:0;overflow-wrap:anywhere}
+.tl{list-style:none;margin:0;padding:0;font-size:12.5px;display:flex;flex-direction:column;gap:5px}
+.tl li{display:grid;grid-template-columns:64px minmax(0,1fr);gap:8px}
+.tl time{font-family:var(--f-mono);font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tl .w{font-weight:700}
+.sub2{font-size:12px;color:var(--muted);margin:0 0 6px}
+.composer{border-top:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.composer textarea{width:100%;box-sizing:border-box;resize:none;min-height:58px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;font-size:13px;padding:8px 10px}
+.composer textarea:focus{outline:2px solid var(--accent);outline-offset:0}
+.composer .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.hint{font-size:11.5px;color:var(--muted)}
+
+/* session dock */
+.dock{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px}
+.dcard{flex:none;width:214px;display:grid;grid-template-columns:34px minmax(0,1fr);gap:6px 10px;align-content:start;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+.dcard.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.dcard.needcard{border-color:var(--need);background:color-mix(in srgb,var(--need) 6%,var(--panel))}
+.dcard .nm{font-weight:700;font-size:13px;line-height:1.2}
+.dcard .rl{font-size:11.5px;color:var(--muted);overflow-wrap:anywhere;line-height:1.3}
+.dcard .ft{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.addcard{flex:none;width:150px;border:1px dashed var(--line);border-radius:10px;background:none;color:var(--muted);font-size:13px;padding:10px}
+.addcard:hover{border-color:var(--accent);color:var(--ink)}
+
+.toast{position:absolute;top:12px;right:12px;z-index:5;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--need);border-radius:10px;padding:10px 12px;box-shadow:0 8px 24px rgba(42,32,26,.2);font-size:13px;max-width:320px;display:flex;gap:10px;align-items:flex-start;text-align:left;cursor:pointer}
+.toast .ti{font-family:var(--f-mono);font-size:10px;color:var(--muted)}
+.tabs{display:none}
+
+@container app (max-width: 980px){.feed{display:none}}
+
+/* ---------- Phone layout ---------- */
+@container app (max-width: 640px){
+  .top{gap:10px;padding-bottom:10px;margin-bottom:10px}
+  .counts{margin-left:0;width:100%}
+  .controls{width:100%}
+  .body{display:flex;flex-direction:column;gap:12px}
+  .pane,.dockwrap{display:none}
+  .app[data-tab="office"] .pane[data-pane="office"],.app[data-tab="office"] .dockwrap,
+  .app[data-tab="chat"] .pane[data-pane="chat"]{display:block}
+  .pane[data-pane="chat"]{min-height:0}
+  .chatpanel{position:static;height:min(620px,72vh)}
+  .feed,.rule{display:none}
+  .bub{font-size:8.5px;max-width:84px;padding:1px 4px;border-width:1.5px}
+  .bub.minor{display:none}
+  .tag{font-size:7.5px;padding:0 3px}
+  .dcard{width:180px}
+  .tabs{display:grid;grid-template-columns:repeat(2,1fr);position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line);margin-top:12px;z-index:4}
+  .tabs button{border:0;background:none;padding:10px 4px 12px;font-size:12.5px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);position:relative}
+  .tabs button[aria-selected="true"]{color:var(--accent);font-weight:700}
+  .tabs i{width:18px;height:3px;border-radius:2px;background:currentColor;opacity:.6}
+  .tabs .badge{position:absolute;top:6px;left:calc(50% + 12px);background:var(--need);color:#fff;font-size:10px;font-family:var(--f-mono);border-radius:999px;padding:0 5px}
+  .toast{left:10px;right:10px;max-width:none;top:8px}
+}
+
+/* ---------- Android preview frame ---------- */
+.stage[data-device="android"]{display:flex;justify-content:center}
+.stage[data-device="android"] .app{width:min(392px,100%);height:min(820px,88vh);border:11px solid var(--frame);border-radius:40px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(42,32,26,.3)}
+.stage[data-device="android"] .statusbar{display:flex;justify-content:space-between;padding:8px 18px 4px;font-family:var(--f-mono);font-size:11px;color:var(--muted);flex:none}
+.stage[data-device="android"] .top{padding:4px 14px 10px;flex:none}
+.stage[data-device="android"] .body{flex:1;overflow:auto;padding:0 12px 12px}
+.stage[data-device="android"] .tabs{position:static;margin-top:0;flex:none}
+.devnote{max-width:1280px;margin:12px auto 0;font-size:12px;color:var(--muted);text-align:center}
+</style>
+
+<div class="stage" id="stage" data-device="desktop">
+  <div class="app" id="app" data-tab="office">
+    <div class="statusbar"><span id="sbClock">9:41</span><span>5G · 82%</span></div>
+    <header class="top">
+      <div class="brand">
+        <span class="logo" aria-hidden="true"></span>
+        <div><h1>Dev Room</h1><p class="sub">LOGIC_SIM_PROJECT · totoong sessions mo · <span class="clock" id="clock">Lunes, 9:00 AM</span></p></div>
+      </div>
+      <div class="counts" id="counts"></div>
+      <div class="controls">
+        <div class="seg" role="group" aria-label="Preview">
+          <button type="button" id="devDesktop" data-device="desktop" aria-pressed="true">Desktop</button>
+          <button type="button" id="devAndroid" data-device="android" aria-pressed="false">Android</button>
+        </div>
+        <button type="button" class="btn" id="pauseBtn">Pause</button>
+      </div>
+    </header>
+
+    <main class="body">
+      <section class="pane" data-pane="office" aria-label="Office">
+        <div class="mapwrap">
+          <canvas id="map" width="960" height="576" aria-label="Café-style office map with session characters"></canvas>
+          <div class="overlay" id="overlay"></div>
+          <div class="feed" id="feed" aria-live="polite"></div>
+          <div class="zoom"><button type="button" id="zOut" aria-label="Zoom out">−</button><button type="button" id="zIn" aria-label="Zoom in">+</button><button type="button" id="zFit">Buong office</button></div>
+        </div>
+        <div class="legend">
+          <span><i class="dot" style="background:var(--work)"></i>Nagtatrabaho sa PC</span>
+          <span><i class="dot" style="background:var(--need)"></i>Nakapila sa opisina mo</span>
+          <span><i class="dot" style="background:var(--idle)"></i>Naka-break</span>
+          <span><i class="dot" style="background:var(--sleep)"></i>Natutulog</span>
+          <span><i class="dot" style="background:var(--done)"></i>Tapos na</span>
+          <span><i class="dot" style="background:var(--fail)"></i>May error</span>
+        </div>
+        <p class="rule">Kapag may tanong ang isang session, pupunta siya sa harap ng opisina mo at magtataas ng kamay. Kapag idle nang hanggang 10 minuto, nagkakape, nag-CR, o naglalakad-lakad siya. Mula 10 hanggang 30 minuto, nakikipagkwentuhan o kumakain siya. Lampas 30 minuto, natutulog na siya sa lounge. I-click ang character para makausap siya sa chat panel. I-drag ang map para gumalaw, at gamitin ang + at − o ang scroll wheel para mag-zoom.</p>
+      </section>
+
+      <section class="pane" data-pane="chat" aria-label="Chat">
+        <div class="chatpanel">
+          <div class="cp-head" id="cpHead"></div>
+          <div class="cp-tabs" role="tablist">
+            <button type="button" role="tab" data-ptab="chat" aria-selected="true">Chat</button>
+            <button type="button" role="tab" data-ptab="info" aria-selected="false">Detalye</button>
+            <button type="button" role="tab" data-ptab="log" aria-selected="false">Lahat ng activity</button>
+          </div>
+          <div class="cp-body" id="cpBody"></div>
+          <form class="composer" id="composer">
+            <label for="msgInput" class="hint" id="msgLabel">Mensahe</label>
+            <textarea id="msgInput" rows="2" placeholder="Ano ang gusto mong ipagawa?"></textarea>
+            <div class="row"><span class="hint">Pindutin ang Enter para ipadala.</span><button type="submit" class="btn primary">Ipadala</button></div>
+          </form>
+        </div>
+      </section>
+
+      <div class="dockwrap"><div class="dock" id="dock"></div></div>
+    </main>
+
+    <nav class="tabs" role="tablist">
+      <button type="button" role="tab" data-tab="office" aria-selected="true"><i></i>Office</button>
+      <button type="button" role="tab" data-tab="chat" aria-selected="false"><i></i>Chat<span class="badge" id="tabBadge" hidden>0</span></button>
+    </nav>
+    
+<button type="button" class="toast" id="toast" hidden></button>
+  </div>
+</div>
+<p class="devnote">Totoong data ito ng LOGIC_SIM_PROJECT team mo mula sa claude.ai/code, kinuha noong 31 Okt 2026, 8:24 PM UTC. Snapshot pa lang ito, kaya hindi pa ito nag-a-update nang kusa at hindi pa naipapadala ang mga mensahe mo. Sa live app, ipapasa ng server ang bagong records sa <code>devRoomApply()</code>.</p>
+
+<script>
+(()=>{
+const T=16,W=480,H=288,CORR=144;
+const cv=document.getElementById('map'),ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+const rand=(a,b)=>a+Math.random()*(b-a);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+let paused=false,pausedAcc=0,pauseAt=0;
+const now=()=>paused?pauseAt-pausedAcc:Date.now()-pausedAcc;
+const MIN=60000;
+
+/* ---------- data ---------- */
+const ROLES={LEAD:'Team Lead',BE:'Backend',FE:'Frontend',QA:'QA Tester',OPS:'DevOps',DOCS:'Docs Writer',SEC:'Security',DATA:'Data'};
+const SHORT={LEAD:'Lead',BE:'Backend',FE:'Frontend',QA:'QA',OPS:'DevOps',DOCS:'Docs',SEC:'Security',DATA:'Data'};
+const PAL={
+ LEAD:{hair:'#2b1d14',skin:'#d9a47a',shirt:'#4f5d6b',pants:'#2e2a28'},
+ BE:{hair:'#1e1712',skin:'#b88458',shirt:'#6f7d5c',pants:'#3b3532'},
+ FE:{hair:'#6a3a22',skin:'#e6bb94',shirt:'#9a6450',pants:'#35302d'},
+ QA:{hair:'#3a2a1a',skin:'#a97650',shirt:'#a88a4e',pants:'#3a3532'},
+ OPS:{hair:'#57514c',skin:'#dcae88',shirt:'#6a5f74',pants:'#2e2b2a'},
+ DOCS:{hair:'#9a6c3a',skin:'#e8c4a2',shirt:'#5f7c78',pants:'#403a36'},
+ SEC:{hair:'#1a1614',skin:'#9c6844',shirt:'#7a4a42',pants:'#2b2826'},
+ DATA:{hair:'#3f2a32',skin:'#e0b08c',shirt:'#7d7458',pants:'#33302d'}};
+// [bubble text, full description]
+const ACTS={
+ LEAD:[['Nagpaplano.','Pinaplano ang mga milestone ng v2 release.'],['Nagre-review.','Nire-review ang diff ng Backend.'],['Nagme-message.','Nagpapadala ng instructions sa Frontend session.'],['Nagbabasa.','Binabasa ang PR checklist.']],
+ BE:[['Nagko-code.','Ine-edit ang payments.ts.'],['Nagte-test.','Pinapatakbo ang npm test.'],['Nagbabasa.','Binabasa ang schema.prisma.'],['Naghahanap.','Hinahanap kung saan ginagamit ang refund.'],['Nagko-code.','Ine-edit ang webhook.ts.']],
+ FE:[['Nagko-code.','Ine-edit ang Checkout.tsx.'],['Nagbu-build.','Pinapatakbo ang npm run build.'],['Nagbabasa.','Binabasa ang tokens.css.'],['Nagko-code.','Ine-edit ang Button.tsx.']],
+ QA:[['Nagte-test.','Pinapatakbo ang Playwright tests.'],['Nagbabasa.','Binabasa ang checkout.spec.ts.'],['Nagko-code.','Ine-edit ang fixtures.json.']],
+ OPS:[['Nagko-code.','Ine-edit ang ci.yml.'],['Nagbu-build.','Pinapatakbo ang docker build.'],['Nagbabasa.','Binabasa ang cache.log.']],
+ DOCS:[['Nagsusulat.','Isinusulat ang api-reference.md.'],['Nagbabasa.','Binabasa ang openapi.yaml.'],['Nagsusulat.','Ina-update ang changelog.md.']],
+ SEC:[['Naghahanap.','Hinahanap ang lahat ng gumagamit ng jwt.sign.'],['Nagbabasa.','Binabasa ang auth.ts.'],['Nagte-test.','Pinapatakbo ang npm audit.']],
+ DATA:[['Nagbabasa.','Binabasa ang events.sql.'],['Nagpapatakbo.','Pinapatakbo ang export.py.'],['Nagko-code.','Ine-edit ang dashboard.json.']]};
+const ASKS={
+ LEAD:'Handa nang i-merge ang v2 branch. Itutuloy ko na ba?',
+ BE:'Pwede ko bang tanggalin ang lumang refunds table?',
+ FE:'Aprubado mo ba ang bagong color tokens ng checkout?',
+ QA:'May tatlong flaky tests. Ise-skip ko muna, o aayusin ko na?',
+ OPS:'Kailangan ko ng permiso para mag-docker push sa registry.',
+ DOCS:'English ba o Taglish ang tono ng docs?',
+ SEC:'May nakalantad na API key sa .env.example. Ire-rotate ko ba?',
+ DATA:'Isasama ko ba ang mga test account sa export?'};
+const CHISMIS=['Alam mo ba yung bagong task?','Talaga? Sino nagsabi?','Grabe yung merge conflict kanina.','Kain tayo mamaya.','Sino kaya ang nag-push sa main?','Hindi nga? Seryoso?'];
+const ST={working:{label:'Nagtatrabaho',c:'--work'},needs:{label:'Kailangan ka',c:'--need'},idle:{label:'Naka-break',c:'--idle'},done:{label:'Tapos na',c:'--done'},failed:{label:'May error',c:'--fail'}};
+const IDLE_LBL={coffee:'Nagkakape',wander:'Naglalakad',chismis:'Nakikipagkwentuhan',eat:'Kumakain',cr:'Nasa CR',sleep:'Natutulog'};
+const IDLE_SENT={coffee:'Nagkakape muna sa coffee bar.',wander:'Naglalakad-lakad sa hallway.',chismis:'Nakikipagkwentuhan sa may water cooler.',eat:'Kumakain sa coffee bar.',cr:'Pumunta muna sa CR.',sleep:'Natutulog na sa lounge.'};
+const IDLE_PLACE={coffee:'Coffee bar',eat:'Coffee bar',chismis:'Water cooler',cr:'CR',sleep:'Lounge',wander:'Hallway'};
+const ORDER={needs:0,failed:1,done:2,working:3,idle:4};
+
+const DESKS=[[2,2],[6,2],[10,2],[14,2],[2,5],[6,5],[10,5],[14,5]].map(([x,y],i)=>({i,x,y,w:2,seat:{x:x*T+T,y:y*T+T+13},owner:null}));
+const LEAD_DESK={x:20.5,y:3,w:2,seat:{x:21.5*T,y:4*T+13},owner:null};
+const BOSS_POS={x:27*T,y:4*T+3};
+const SPOTS={
+ queue:[{x:25*T,y:9.55*T},{x:26.6*T,y:9.55*T},{x:28.2*T,y:9.55*T}],
+ couch:[{x:2.3*T,y:15.1*T},{x:4.2*T,y:15.1*T}],
+ eat:[{x:23.2*T,y:13.9*T},{x:25.4*T,y:13.9*T},{x:26.5*T,y:13.9*T},{x:28.7*T,y:13.9*T}],
+ chismis:[{x:16.3*T,y:9.7*T},{x:17.9*T,y:9.7*T},{x:17.1*T,y:9.95*T}],
+ coffee:[{x:23.6*T,y:16.4*T},{x:24.9*T,y:16.4*T}],
+ cr:[{x:8.6*T,y:13.4*T},{x:9.9*T,y:13.4*T}]};
+const taken={};
+function claim(kind,s){const arr=SPOTS[kind];for(let i=0;i<arr.length;i++){const k=kind+i;if(!taken[k]||taken[k]===s.id){taken[k]=s.id;s.spot=k;return arr[i];}}return null;}
+function release(s){if(s.spot){delete taken[s.spot];s.spot=null;}}
+
+let uid=1;const sessions=[];const logs=[];let selected=0;
+function simLabel(ms){return new Date(ms).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});}
+function dayLabel(ms){const d=new Date(ms);return d.toLocaleDateString('fil-PH',{weekday:'long',month:'short',day:'numeric'});}
+function dur(ms){const m=Math.max(0,Math.floor(ms/MIN));if(m<60)return`${m} min`;const h=Math.floor(m/60);if(h<24)return`${h} oras ${m%60} min`;return`${Math.floor(h/24)} araw ${h%24} oras`;}
+function log(who,text,s,at){const t=at||now();logs.unshift({t,who,text});if(logs.length>40)logs.pop();if(s){s.history.unshift({t,text});if(s.history.length>6)s.history.pop();}renderLog();}
+
+function mkSession(name,source,host,status,minsAgo,desk){
+  const m=name.match(/^\[(\w+)\]\s*(.+)$/);const code=m?m[1]:'BE';
+  const s={id:uid++,name,code,role:ROLES[code]||code,short:SHORT[code]||code,task:m?m[2]:name,source,host,status,
+    since:now()-minsAgo*1000,idleStart:now()-minsAgo*1000,activity:pick(ACTS[code]),idle:null,idleUntil:0,history:[],chat:[],
+    nextChange:now()+rand(6,14)*1000,pal:PAL[code]||PAL.BE,seed:Math.random()*4,desk,x:0,y:0,path:[],pose:'stand',
+    typing:false,raise:false,lead:code==='LEAD'};
+  if(desk)desk.owner=s;
+  return s;
+}
+
+/* ---------- movement ---------- */
+function roomOf(p){if(p.y>H)return'out';if(p.y<8*T)return p.x<19*T?'work':p.x<24*T?'lead':'boss';if(p.y<10*T)return'corr';const tx=p.x/T;return tx<7?'lounge':tx<11?'cr':tx<17?'lobby':tx<22?'hr':'cafe';}
+function aisle(p){const g=[5,9,13,17].map(v=>v*T);let best=g[0];for(const x of g)if(Math.abs(x-p.x)<Math.abs(best-p.x))best=x;return{x:best,y:p.y};}
+function route(a,b){
+  const ra=roomOf(a),rb=roomOf(b);if(ra===rb&&ra!=='out'&&ra!=='work')return[b];
+  const cy=CORR-6+Math.random()*12;const pts=[];let sx=a.x;
+  if(ra==='work'){const q=aisle(a);pts.push(q);sx=q.x;}
+  if(ra!=='corr')pts.push({x:sx,y:cy});
+  if(rb==='work'){const q=aisle(b);pts.push({x:q.x,y:cy},q);}
+  else if(rb!=='corr')pts.push({x:b.x,y:cy});
+  pts.push(b);return pts;
+}
+function goTo(e,p,onArrive){e.path=route({x:e.x,y:e.y},p);e.onArrive=onArrive||null;e.pose='walk';e.typing=false;e.raise=false;}
+function place(e,p){e.x=p.x;e.y=p.y;e.path=[];}
+
+/* ---------- status logic ---------- */
+function seatOf(s){return s.lead?LEAD_DESK.seat:s.desk.seat;}
+function applyStatus(s,instant){
+  release(s);s.idle=null;s.errand=null;s.errandMsg=null;
+  if(s.status==='idle'){pickIdle(s,instant);return;}
+  if(s.status==='needs'){
+    const q=claim('queue',s)||{x:rand(24.5,29)*T,y:9.2*T};
+    const arrive=()=>{s.pose='stand';s.raise=true;};
+    if(instant){place(s,q);arrive();}else goTo(s,q,arrive);return;
+  }
+  const arrive=()=>{s.pose='sit';s.typing=s.status==='working';};
+  if(instant){place(s,seatOf(s));arrive();}else goTo(s,seatOf(s),arrive);
+}
+function wanderSpot(){return{x:rand(2,23)*T,y:rand(8.6,9.6)*T};}
+function pickIdle(s,instant){
+  release(s);
+  const mins=(now()-s.idleStart)/MIN;
+  let opts=mins<10?['coffee','wander','cr','coffee']:mins<30?['chismis','eat','chismis','wander','cr']:['sleep'];
+  if(mins>=30&&!SPOTS.couch.some((_,i)=>!taken['couch'+i]||taken['couch'+i]===s.id))opts=['eat'];
+  if(s.forceIdle){opts=[s.forceIdle];s.forceIdle=null;}
+  let act=pick(opts),spot=null;
+  if(act==='wander')spot=wanderSpot();
+  else{spot=claim(act==='sleep'?'couch':act,s);if(!spot){act='wander';spot=wanderSpot();}}
+  s.idle=act;s.idleUntil=now()+rand(8,13)*1000;
+  const arrive=()=>{s.pose=act==='sleep'?'sleep':'stand';};
+  if(instant){place(s,spot);arrive();}else goTo(s,spot,arrive);
+}
+function setStatus(s,st,why){
+  const prev=s.status;s.status=st;s.since=now();
+  if(st==='idle'&&prev!=='idle')s.idleStart=now();
+  if(st==='working'&&ACTS[s.code])s.activity=pick(ACTS[s.code]);
+  const dmap={working:[8,16],needs:[28,38],idle:[14,40],done:[10,16],failed:[8,12]};
+  s.nextChange=now()+rand(...dmap[st])*1000;
+  const msgs={working:`Bumalik sa PC. ${s.activity[1]}`,needs:`Pumila sa opisina mo. Tanong niya: "${(s.ask||ASKS[s.code]||'May tanong ako sa iyo.')}"`,idle:'Tapos na ang turn niya, kaya nag-break muna.',done:'Natapos na ang task at naghihintay ng review mo.',failed:sent(s.detail||'May nag-fail sa huling turn niya')};
+  log(s.short,why||msgs[st],s);
+  addChatFor(s,st,why);
+  if(st==='needs')toast(s);
+  applyStatus(s,false);render();
+}
+function nextStatus(s){
+  const r=Math.random();const needN=sessions.filter(x=>x.status==='needs').length;
+  switch(s.status){
+    case'working':if(r<.38)return'working';if(r<.58&&needN<3)return'needs';if(r<.82)return'idle';if(r<.94)return'done';return'failed';
+    case'needs':return'working';
+    case'idle':return r<.55?'working':'idle';
+    case'done':return r<.5?'idle':'working';
+    case'failed':return r<.7||needN>=3?'working':'needs';}
+}
+
+/* ---------- NPCs and you ---------- */
+const boss={npc:true,boss:true,name:'Ikaw',pal:{hair:'#1e1712',skin:'#c9946a',shirt:'#3d3a36',pants:'#2a2624'},x:BOSS_POS.x,y:BOSS_POS.y,path:[],pose:'stand',seed:3,bubble:'',bUntil:0};
+const guard={npc:true,name:'Guard',code:'GUARD',pal:{hair:'#1f2229',skin:'#b98256',shirt:'#2f3540',pants:'#1f2226'},x:12.6*T,y:14.2*T,path:[],pose:'stand',seed:1,bubble:'',bUntil:0};
+const hr={npc:true,name:'HR',pal:{hair:'#3b2316',skin:'#e6bb94',shirt:'#8c6a72',pants:'#3a3236'},x:19.5*T,y:13.9*T,path:[],pose:'stand',seed:2,bubble:'',bUntil:0,home:{x:19.5*T,y:13.9*T},next:0};
+const PEOPLE=()=>[...sessions,guard,hr,boss];
+function say(e,text,ms){e.bubble=text;e.bUntil=now()+(ms||3500);}
+function hrThink(){
+  if(hr.path.length||now()<hr.next)return;
+  hr.next=now()+rand(9,15)*1000;
+  const needs=sessions.filter(s=>s.status==='needs');
+  const grinders=sessions.filter(s=>s.status==='working'&&(now()-s.since)/MIN>40&&!s.path.length&&!s.lead);
+  const r=Math.random();
+  if(needs.length&&r<.35){const n=needs.length===1?'Isa':needs.length===2?'Dalawa':'Tatlo';say(hr,`Boss, ${n.toLowerCase()} ang naghihintay sa iyo.`,4000);log('HR',`${n} ang session na naghihintay ng sagot mo.`);return;}
+  if(grinders.length&&r<.75){const g=pick(grinders);const st=seatOf(g);
+    goTo(hr,{x:st.x+T*1.2,y:st.y-2},()=>{hr.pose='stand';const m=dur(now()-g.since);say(hr,`Magpahinga ka muna. ${m} ka nang tutok.`,3500);log('HR',`Pinagpahinga si ${g.short} dahil ${m} na siyang tuloy-tuloy.`);
+      setTimeout(()=>goTo(hr,hr.home,()=>{hr.pose='stand';}),3600);});return;}
+  goTo(hr,wanderSpot(),()=>{hr.pose='stand';setTimeout(()=>goTo(hr,hr.home,()=>{hr.pose='stand';}),2500);});
+}
+function leadThink(s){
+  if(!s.lead||s.status!=='working'||s.path.length||s.errand)return;
+  if(Math.random()>.06)return;
+  s.errand=true;
+  const back=()=>setTimeout(()=>{s.errandMsg=null;if(s.status==='working')goTo(s,seatOf(s),()=>{s.pose='sit';s.typing=true;s.errand=null;});else s.errand=null;},3400);
+  if(Math.random()<.35){
+    goTo(s,{x:27*T,y:6.3*T},()=>{s.pose='stand';s.errandMsg='Boss, update lang sa team.';say(boss,'Sige, salamat.',3000);log('Lead','Nag-report sa iyo ng update ng team.',s);back();});
+    return;
+  }
+  const others=sessions.filter(o=>!o.lead&&o.desk);if(!others.length){s.errand=null;return;}
+  const o=pick(others);const st=o.desk.seat;
+  goTo(s,{x:st.x+T*1.3,y:st.y},()=>{s.pose='stand';s.errandMsg=`${o.short}, ikaw na sa susunod na task.`;log('Lead',`Nag-delegate kay ${o.short} ng follow-up sa "${o.task}".`,s);back();});
+}
+
+/* ---------- initial scene: real LOGIC_SIM_PROJECT sessions ---------- */
+// Snapshot from claude.ai/code (list_sessions + get_session), 2026-10-31 20:24 UTC.
+// Records keep the API's field names, so the real app can pass fresh ones to devRoomApply().
+const TEAM={name:'LOGIC_SIM_PROJECT',lead:'session_011XJn782r9nJAYUT3aYAUhf',
+  ids:['session_011XJn782r9nJAYUT3aYAUhf','session_011XJn7AF8P9ydV97v7G2Ygn','session_011XJn77vJFajZpWPEq5hmdt','session_011XJn775X6mDNwi1c1mk9Zg','session_011XJn79wRmNpELhTDGVKVxY','session_011XJn77J4QZrzZkq7EhmHny']};
+const REPO='Ronanski/icms-master-tool';
+const art=(title,id,at)=>({title,url:'https://claude.ai/artifact/'+id,updated_at:at});
+const SNAPSHOT=[
+ {id:'session_011XJn782r9nJAYUT3aYAUhf',title:'LOGIC_SIM_PROJECT',status_bucket:'SESSION_STATUS_BUCKET_REVIEW_READY',origin:'desktop_app',environment_kind:'bridge',
+  created_at:'2026-10-30T13:21:20Z',updated_at:'2026-10-31T20:24:06Z',
+  post_turn_summary:{status_category:'review_ready',status_detail:'condenser diagram v3: fixing 4 layout issues before resend',recent_action:'',needs_action:''},
+  session_context:{model:'claude-opus-5-5'},
+  external_metadata:{context_usage:{used_tokens:624942,max_tokens:1000000},artifacts:[art('028 Style A','TgGwNDcSAe81o69MipPHwr','2026-10-31T19:37:48Z'),art('028 Style B','RpVLFGZdZnW9M4be1aGJv5','2026-10-31T19:37:49Z'),art('028 Style C','Y59WmaEmf4kYK1JY4qSorP','2026-10-31T19:37:51Z'),art('028 Condensate System','W7v6ii79i7KHsCaK4qTnbF','2026-10-31T18:30:57Z')],artifact_count:13}},
+ {id:'session_011XJn7AF8P9ydV97v7G2Ygn',title:'LIVE TESTER: COLD START-UP TO FULL LOAD (BETA.76)',status_bucket:'SESSION_STATUS_BUCKET_BLOCKED',origin:'claude_code_cli',environment_kind:'bridge',
+  created_at:'2026-10-30T14:39:17Z',updated_at:'2026-10-31T18:48:27Z',
+  post_turn_summary:{status_category:'need_input',status_detail:'on standby; plant at H16, retest H3-H16 in artifact v27',recent_action:'',needs_action:'tell me when to resume (standing by until then)'},
+  session_context:{model:'claude-opus-5-5',sources:[{git_repository:{url:'https://github.com/'+REPO}}]},
+  external_metadata:{current_branches:{[REPO]:'main'},context_usage:{used_tokens:102841,max_tokens:1000000},artifacts:[art('Live Retest beta.77','L8PGXXkK7us2NBApNLqwid','2026-10-31T18:42:42Z')]}},
+ {id:'session_011XJn77vJFajZpWPEq5hmdt',title:'DOCS: TEAM STRUCTURE, NEW ACCOUNT, USER DECISIONS',status_bucket:'SESSION_STATUS_BUCKET_BLOCKED',origin:'claude_code_cli',environment_kind:'bridge',
+  created_at:'2026-10-30T14:28:40Z',updated_at:'2026-10-31T14:18:19Z',
+  post_turn_summary:{status_category:'need_input',status_detail:'PR #90 docs pushed as draft; awaiting user GO BETA',recent_action:'COMMANDMENTS added to CLAUDE.md and docs/handoff in draft PR #90 (commit 1766f74)',needs_action:'GO BETA to merge PR #90'},
+  session_context:{model:'claude-sonnet-5-5',sources:[{git_repository:{url:'https://github.com/'+REPO}}]},
+  external_metadata:{current_branches:{[REPO]:'claude/docs-save-progress-beta77'},context_usage:{used_tokens:105117,max_tokens:1000000},artifacts:[]}},
+ {id:'session_011XJn775X6mDNwi1c1mk9Zg',title:'APP UI/UX: WHOLE APP LOOK AND USABILITY',status_bucket:'SESSION_STATUS_BUCKET_COMPLETED',origin:'claude_code_cli',environment_kind:'bridge',
+  created_at:'2026-10-31T03:56:19Z',updated_at:'2026-10-31T12:19:52Z',
+  post_turn_summary:{status_category:'completed',status_detail:'PR #87 dock fixes accepted by leader; now idle',recent_action:'Dock phase 2 fixes accepted by leader; PR #87 at commit 1a03fac',needs_action:''},
+  session_context:{model:'claude-opus-5-5',sources:[{git_repository:{url:'https://github.com/'+REPO}}]},
+  external_metadata:{current_branches:{[REPO]:'claude/app-uiux-853c3a'},context_usage:{used_tokens:735801,max_tokens:1000000},artifacts:[art('Training Dock Before After','X6XRGoK1hr5yumndTe5ZXz','2026-10-31T11:21:02Z'),art('Training Dock Mock-up','RLkA424UMUFb3FVZgoiVMw','2026-10-31T06:35:40Z')]}},
+ {id:'session_011XJn79wRmNpELhTDGVKVxY',title:'HMI: MOCKUP AND IMPLEMENTATION (ONE STYLE, HSYM)',status_bucket:'SESSION_STATUS_BUCKET_COMPLETED',origin:'claude_code_cli',environment_kind:'bridge',
+  created_at:'2026-10-31T03:56:19Z',updated_at:'2026-10-31T12:22:03Z',
+  post_turn_summary:{status_category:'completed',status_detail:"stopped all background drafters per leader's order",recent_action:"all background drafters/subagents stopped per leader's stop order",needs_action:''},
+  session_context:{model:'claude-opus-5-5',sources:[{git_repository:{url:'https://github.com/'+REPO}}]},
+  external_metadata:{current_branches:{[REPO]:'claude/hmi-81561e'},context_usage:{used_tokens:365839,max_tokens:1000000},artifacts:[art('APH Faceplate Mockup','Sgh9pfwVTGDPU17SY68Z6o','2026-10-31T06:11:24Z')]}},
+ {id:'session_011XJn77J4QZrzZkq7EhmHny',title:'CODE FIXER: LOGIC, ENGINE, PLANT MODEL',status_bucket:'SESSION_STATUS_BUCKET_COMPLETED',origin:'claude_code_cli',environment_kind:'bridge',
+  created_at:'2026-10-31T03:56:19Z',updated_at:'2026-10-31T12:17:03Z',
+  post_turn_summary:{status_category:'completed',status_detail:'draft PR #88 batch done at ed816c8; awaiting leader',recent_action:"Batch finished on draft PR #88 (ed816c8); no further changes, waiting for the leader's next instruction",needs_action:''},
+  session_context:{model:'claude-opus-5-5',sources:[{git_repository:{url:'https://github.com/'+REPO}}]},
+  external_metadata:{current_branches:{[REPO]:'claude/code-fixer-b7bfbb'},context_usage:{used_tokens:611800,max_tokens:1000000},artifacts:[]}}];
+
+// Session name format seen in this team: "ROLE: task". A name with no colon is the leader.
+const ROLE_WORDS=[[/^(lead|leader)$/i,'LEAD','Team Lead','Lead','LEAD'],[/ui\/?ux|frontend/i,'UX','UI/UX Designer','UI/UX','FE'],[/hmi/i,'HMI','HMI Builder','HMI','OPS'],
+  [/fix/i,'FIX','Code Fixer','Fixer','BE'],[/test|qa/i,'TEST','Live Tester','Tester','QA'],[/doc/i,'DOCS','Docs Writer','Docs','DOCS'],[/sec/i,'SEC','Security','Security','SEC'],[/data/i,'DATA','Data','Data','DATA']];
+const BUCKET={SESSION_STATUS_BUCKET_WORKING:'working',SESSION_STATUS_BUCKET_BLOCKED:'needs',SESSION_STATUS_BUCKET_REVIEW_READY:'done',SESSION_STATUS_BUCKET_COMPLETED:'idle',SESSION_STATUS_BUCKET_FAILED:'failed'};
+const sent=x=>{x=String(x||'').trim();if(!x)return'';x=x[0].toUpperCase()+x.slice(1);return /[.!?]$/.test(x)?x:x+'.';};
+function parseTitle(title,isLead){
+  const m=String(title).match(/^([^:]+):\s*(.+)$/);
+  if(isLead||!m)return{code:'LEAD',role:'Team Lead',short:'Lead',pal:'LEAD',task:'Leader ng '+title};
+  const word=m[1].trim(),hit=ROLE_WORDS.find(r=>r[0].test(word));
+  if(hit)return{code:hit[1],role:hit[2],short:hit[3],pal:hit[4],task:m[2]};
+  return{code:word.replace(/[^A-Za-z]/g,'').slice(0,4).toUpperCase(),role:word,short:word,pal:'BE',task:m[2]};
+}
+function infoOf(r){
+  const p=r.post_turn_summary||{},sc=r.session_context||{},em=r.external_metadata||{};
+  const src=r.environment_kind==='anthropic_cloud'?['Cloud','claude.ai/code']:['Local',{claude_code_cli:'CLI sa computer mo',desktop_app:'Claude desktop app'}[r.origin]||'computer mo'];
+  const url=(((sc.sources||[])[0]||{}).git_repository||{}).url||'';const repo=url.replace(/^https:\/\/github\.com\//,'');
+  return{status:BUCKET[r.status_bucket]||'idle',at:Date.parse(r.updated_at),ask:sent(p.needs_action),detail:p.status_detail||'',recent:p.recent_action||'',
+    source:src[0],host:src[1],repo,branch:repo&&em.current_branches?em.current_branches[repo]||'':'',model:sc.model||'',
+    ctx:em.context_usage||null,artifacts:em.artifacts||[],artifactCount:em.artifact_count||(em.artifacts||[]).length};
+}
+function mkLive(r,desk){
+  const p=parseTitle(r.title,r.id===TEAM.lead),i=infoOf(r);
+  const s=Object.assign({id:uid++,sid:r.id,name:r.title,code:p.code,role:p.role,short:p.short,task:p.task,
+    since:i.at,idleStart:i.at,idle:null,idleUntil:0,history:[],chat:[],nextChange:Infinity,pal:PAL[p.pal]||PAL.BE,
+    seed:Math.random()*4,desk,x:0,y:0,path:[],pose:'stand',typing:false,raise:false,lead:p.code==='LEAD'},i);
+  s.activity=['Nagtatrabaho.',sent(i.detail||i.recent||'Nagtatrabaho sa task niya')];
+  if(desk)desk.owner=s;return s;
+}
+function statusLine(s){
+  switch(s.status){
+    case'needs':return`Pumila sa opisina mo. Kailangan niya: "${s.ask}"`;
+    case'done':return`Handa na para sa review mo. ${sent(s.detail)}`;
+    case'working':return sent(s.detail||s.recent||'Nagtatrabaho');
+    case'failed':return`May error. ${sent(s.detail)}`;
+    default:return`Tapos na ang turn niya. ${sent(s.recent||s.detail)}`;}
+}
+function liveRows(s){
+  const pct=s.ctx?Math.round(s.ctx.used_tokens/s.ctx.max_tokens*100):null;
+  const arts=s.artifacts.slice(0,3).map(a=>`<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a>`).join(', ');
+  return `${s.detail?`<dt>Huling status</dt><dd>${esc(sent(s.detail))}</dd>`:''}${s.recent?`<dt>Huling ginawa</dt><dd>${esc(sent(s.recent))}</dd>`:''}
+    <dt>Huling update</dt><dd>${esc(dayLabel(s.at))}, ${esc(simLabel(s.at))}</dd>
+    ${s.repo?`<dt>Repo</dt><dd class="raw">${esc(s.repo)}${s.branch?' @ '+esc(s.branch):''}</dd>`:''}
+    ${s.model?`<dt>Model</dt><dd class="raw">${esc(s.model)}</dd>`:''}
+    ${pct!==null?`<dt>Context</dt><dd>${pct}% ang nagamit${pct>=70?', kaya malapit na itong mag-compact.':'.'}</dd>`:''}
+    ${arts?`<dt>Artifacts</dt><dd>${arts}${s.artifactCount>3?` at ${s.artifactCount-3} pa.`:'.'}</dd>`:''}
+    <dt>Session ID</dt><dd class="raw">${esc(s.sid)}</dd>`;
+}
+const freeDesk=()=>DESKS.find(d=>!d.owner);
+SNAPSHOT.forEach(r=>{const lead=r.id===TEAM.lead;sessions.push(mkLive(r,lead?null:freeDesk()));});
+sessions.forEach(s=>applyStatus(s,true));
+const POOL=[];
+log('Guard',`Bukas na ang office ng ${TEAM.name}. ${sessions.length} na session ang naka-duty.`,null,Math.min(...sessions.map(s=>s.at))-MIN);
+sessions.slice().sort((a,b)=>a.at-b.at).forEach(s=>log(s.short,statusLine(s),s,s.at));
+selected=(sessions.filter(s=>s.status==='needs').sort((a,b)=>b.at-a.at)[0]||sessions[0]).id;
+
+// Live updates: pass fresh records (same shape as SNAPSHOT or the claude.ai/code API).
+window.devRoomApply=function(records){
+  for(const r of records){
+    if(!TEAM.ids.includes(r.id))continue;
+    let s=sessions.find(x=>x.sid===r.id);
+    if(!s){
+      const lead=r.id===TEAM.lead,desk=lead?null:freeDesk();if(!lead&&!desk)continue;
+      s=mkLive(r,desk);place(s,{x:14.5*T,y:H+12});sessions.push(s);
+      say(guard,`Magandang araw, ${s.short}! Pirma po muna sa logbook.`,4500);
+      log('Guard',`May bagong session na pumasok: ${s.name}.`);seedChat(s);applyStatus(s,false);continue;
+    }
+    const i=infoOf(r),prev=s.status;Object.assign(s,i);
+    s.activity=['Nagtatrabaho.',sent(i.detail||i.recent||'Nagtatrabaho sa task niya')];
+    if(i.status!==prev){s.status=prev;setStatus(s,i.status,statusLine(Object.assign({},s,{status:i.status})));s.since=i.at;if(i.status==='idle')s.idleStart=i.at;}
+  }
+  render();
+};
+
+/* ---------- background ---------- */
+const bg=document.createElement('canvas');bg.width=W;bg.height=H;
+(function drawBG(){
+  const g=bg.getContext('2d');const r=(x,y,w,h,c)=>{g.fillStyle=c;g.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));};
+  const planks=(x,y,w,h,a,b,seam)=>{const X=x*T,Y=y*T,Wp=w*T,Hp=h*T;let row=0;for(let yy=Y;yy<Y+Hp;yy+=6,row++){r(X,yy,Wp,Math.min(6,Y+Hp-yy),row%2?a:b);r(X,yy+5,Wp,1,seam);const off=(row*17)%40;for(let xx=X+off;xx<X+Wp;xx+=40)r(xx,yy,1,5,seam);}};
+  const tiles=(x,y,w,h,a,b)=>{for(let i=x;i<x+w;i++)for(let j=y;j<y+h;j++)r(i*T,j*T,T,T,(i+j)%2?a:b);};
+  r(0,0,W,H,'#2a201a');
+  planks(0,0,19,8,'#a98060','#a47b5b','#8e6a4e');          // work floor, oak
+  planks(19,0,5,8,'#8f6a4f','#8a654b','#755440');          // lead office
+  planks(24,0,6,8,'#8a6248','#855e45','#6f4f3a');          // your office
+  planks(0,8,30,2,'#6b5444','#675040','#56423a');          // hallway
+  planks(0,10,7,8,'#9c7656','#977152','#80604a');          // lounge
+  tiles(7,10,4,8,'#d6cec0','#cbc2b3');                     // CR
+  tiles(11,10,6,8,'#bfae94','#b5a489');                    // lobby
+  planks(17,10,5,8,'#9c8068','#977b63','#826a56');         // HR
+  tiles(22,10,8,8,'#cbbda4','#b8a78c');                    // coffee bar
+  // brick top wall with warm windows
+  r(0,0,W,T,'#6e4636');
+  for(let j=0;j<3;j++){r(0,j*5+4,W,1,'#5a382b');for(let i=(j%2)*6;i<W;i+=12)r(i,j*5,1,5,'#5a382b');}
+  r(0,T-2,W,2,'#3a2a20');
+  for(let x=1;x<18;x+=4){r(x*T+4,2,T*2-8,10,'#3a2a20');r(x*T+5,3,T*2-10,8,'#e9d6a8');r(x*T+T-1,3,2,8,'#3a2a20');}
+  // chalkboard in lead office, framed art + shelf in your office
+  r(20*T,2,3*T,11,'#2f3a33');r(20*T,2,3*T,1,'#7a5a40');r(20*T+5,5,20,1,'#d9d2c0');r(20*T+5,8,28,1,'#d9d2c0');
+  r(25*T,2,2*T,10,'#3a2a20');r(25*T+2,4,2*T-4,6,'#c9a27e');r(28*T,2,22,10,'#3a2a20');r(28*T+2,4,18,6,'#7d8a6a');
+  // partitions
+  r(19*T-2,0,3,8*T,'#3a2a20');r(24*T-2,0,3,8*T,'#3a2a20');
+  for(const x of [7,11,17,22])r(x*T-2,10*T,3,8*T,'#3a2a20');
+  r(7*T,10*T-2,T,3,'#3a2a20');r(10*T,10*T-2,T,3,'#3a2a20');
+  // your office front wall with door in the middle
+  r(24*T,8*T-3,1.4*T,3,'#3a2a20');r(28.6*T,8*T-3,1.4*T,3,'#3a2a20');
+  // waiting bench outside your office
+  r(24.4*T,8*T+1,5.2*T,4,'#5e3f2b');r(24.6*T,8*T+5,2,3,'#3a2a20');r(29.3*T,8*T+5,2,3,'#3a2a20');
+  // outer walls + entrance
+  r(0,0,3,H,'#3a2a20');r(W-3,0,3,H,'#3a2a20');r(0,H-3,13*T,3,'#3a2a20');r(16*T,H-3,W-16*T,3,'#3a2a20');
+  r(13*T,H-4,3*T,4,'#5e4a3c');
+  // pendant light pools
+  const glow=(x,y,rad)=>{const gr=g.createRadialGradient(x,y,0,x,y,rad);gr.addColorStop(0,'rgba(255,214,150,.20)');gr.addColorStop(1,'rgba(255,214,150,0)');g.fillStyle=gr;g.fillRect(x-rad,y-rad,rad*2,rad*2);};
+  DESKS.forEach(d=>glow(d.x*T+T,d.y*T+8,22));glow(21.5*T,3*T+8,24);glow(27*T,4*T,30);glow(24.3*T,13*T,22);glow(27.6*T,13*T,22);glow(3.2*T,13.5*T,30);
+  // desks + chairs
+  const desk=(x,y,w)=>{r(x*T,y*T+3,w*T,11,'#5e3f2b');r(x*T,y*T+3,w*T,2,'#7a5338');r(x*T,y*T+14,w*T,3,'#4a3122');r(x*T+1,y*T+17,2,3,'#3a2a20');r(x*T+w*T-3,y*T+17,2,3,'#3a2a20');
+    r(x*T+w*T/2-7,y*T-5,14,10,'#2a2522');r(x*T+w*T/2-2,y*T+5,4,2,'#2a2522');r(x*T+w*T/2-6,y*T+9,12,3,'#d9cfbd');
+    r(x*T+3,y*T+5,4,4,'#efe6d8');r(x*T+4,y*T+6,2,2,'#6b4a35');};
+  const chair=(p)=>{r(p.x-4,p.y-6,8,6,'#3a2a20');r(p.x-1,p.y,2,2,'#2a201a');};
+  DESKS.forEach(d=>{desk(d.x,d.y,2);chair(d.seat);});
+  desk(LEAD_DESK.x,LEAD_DESK.y,2);chair(LEAD_DESK.seat);
+  // your office: rug, chair behind your desk, bookshelf, plant
+  r(24.6*T,5*T,4.8*T,2.6*T,'#5e4a3c');r(24.6*T+2,5*T+2,4.8*T-4,2.6*T-4,'#6e5847');
+  r(27*T-5,2.9*T,10,8,'#2a201a');
+  r(29*T,1.4*T,12,3*T,'#4a3122');for(let i=0;i<4;i++){r(29*T+1,1.6*T+i*11,10,1,'#3a2a20');r(29*T+2,1.6*T+i*11-6,3,6,['#7d8a6a','#9a6450','#c9a27e','#6a5f74'][i]);r(29*T+6,1.6*T+i*11-5,2,5,'#d9cfbd');}
+  // plants
+  const plant=(x,y)=>{r(x,y+8,8,6,'#7a5338');r(x-1,y,10,9,'#55684a');r(x+2,y-3,4,4,'#6a7d5a');};
+  plant(17.3*T,1.6*T);plant(22.6*T,5.8*T);plant(24.4*T,1.5*T);plant(1*T+4,11*T);plant(15.6*T,11*T);plant(29*T,15*T);
+  // water cooler
+  r(17*T-4,8*T-6,8,4,'#cfd8d6');r(17*T-4,8*T-2,8,10,'#e6e0d4');r(17*T-4,8*T+8,8,2,'#8a7f72');
+  // lounge: rug, sofa, armchair, bookshelf
+  r(1*T,12.5*T,5*T,3.2*T,'#6f6a52');r(1*T+3,12.5*T+3,5*T-6,3.2*T-6,'#7d7a5e');
+  r(1.2*T,14.2*T,4*T,9,'#5e3f2b');r(1.2*T,15.6*T,4*T,6,'#4a3122');r(1.2*T-3,14.2*T,4,14,'#4a3122');r(5.2*T-1,14.2*T,4,14,'#4a3122');
+  r(5*T,11.4*T,12,11,'#8a5a40');r(5*T+2,11.4*T,8,3,'#9e6a4c');
+  r(1.4*T,10.2*T,3*T,10,'#4a3122');for(let i=0;i<9;i++)r(1.4*T+3+i*5,10.2*T+2,3,6,['#9a6450','#c9a27e','#7d8a6a','#efe6d8'][i%4]);
+  // CR
+  r(7.4*T,15*T,1.4*T,2.6*T,'#b9b0a2');r(9.2*T,15*T,1.4*T,2.6*T,'#b9b0a2');r(7.9*T,16*T,8,6,'#f2ede4');r(9.7*T,16*T,8,6,'#f2ede4');
+  r(7.3*T,11*T,10,6,'#f2ede4');r(7.3*T+3,10.6*T,4,3,'#8a7f72');
+  // lobby: guard post, logbook, umbrella stand
+  r(11.3*T,12.3*T,1.8*T,10,'#5e3f2b');r(11.3*T,12.3*T,1.8*T,2,'#7a5338');r(11.6*T,12.3*T-3,8,4,'#efe6d8');
+  r(16*T,15.6*T,6,8,'#4a3122');r(16*T+1,14.9*T,1,6,'#3a2a20');r(16*T+4,15*T,1,5,'#6b4a35');
+  // HR desk, cabinet
+  r(18*T,12*T+3,2*T+6,11,'#5e3f2b');r(18*T,12*T+3,2*T+6,2,'#7a5338');r(18.4*T,12*T-3,12,8,'#2a2522');r(18.4*T+2,12*T-1,8,4,'#e2cc9c');
+  r(21*T-2,11*T,10,2.5*T,'#6b5c4e');r(21*T,11.5*T,6,1,'#4a3f36');r(21*T,12.5*T,6,1,'#4a3f36');
+  // coffee bar: round tables, counter, espresso machine, pastry case, menu board
+  const table=(x,y)=>{g.fillStyle='#5e3f2b';g.beginPath();g.ellipse(x,y,11,6,0,0,Math.PI*2);g.fill();g.fillStyle='#7a5338';g.beginPath();g.ellipse(x,y-1,10,4.5,0,0,Math.PI*2);g.fill();r(x-4,y-3,4,3,'#efe6d8');r(x+2,y-2,4,3,'#efe6d8');};
+  table(24.3*T,13*T);table(27.6*T,13*T);
+  r(22.3*T,16.9*T,6.4*T,1*T,'#4a3122');r(22.3*T,16.9*T,6.4*T,2,'#6b4a35');
+  r(23*T,16.1*T,12,13,'#8a7f72');r(23*T+2,16.1*T+2,8,3,'#2a2522');r(23*T+4,16.1*T+8,4,3,'#3a2a20');
+  r(25*T,16.3*T,22,11,'#d9cfbd');r(25*T+2,16.3*T+2,18,6,'#efe6d8');r(25*T+4,16.3*T+5,4,2,'#a47b5b');r(25*T+10,16.3*T+5,4,2,'#8a5a40');
+  r(29*T-2,10.6*T,12,16,'#2f3a33');r(29*T-2,10.6*T,12,1,'#7a5a40');r(29*T,10.6*T+4,8,1,'#d9d2c0');r(29*T,10.6*T+7,6,1,'#d9d2c0');r(29*T,10.6*T+10,7,1,'#d9d2c0');
+  // room labels
+  g.font='bold 7px monospace';g.fillStyle='rgba(42,32,26,.55)';
+  [['WORK FLOOR',1.1*T,7.6*T],['LEAD',19.5*T,7.6*T],['OPISINA MO',24.5*T,7.1*T],['LOUNGE',0.6*T,17.5*T],['CR',7.6*T,17.5*T],['LOBBY',11.4*T,17.5*T],['HR',17.6*T,17.5*T],['COFFEE BAR',22.6*T,11*T]].forEach(([t,x,y])=>g.fillText(t,x,y));
+})();
+
+/* ---------- drawing ---------- */
+function px(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),w,h);}
+function drawChar(e,t){
+  const p=e.pal,x=Math.round(e.x),y=Math.round(e.y);
+  if(e.pose!=='sleep'){ctx.fillStyle='rgba(30,20,14,.22)';ctx.fillRect(x-4,y-1,8,2);}
+  if(e.pose==='sleep'){px(x-8,y-9,4,4,p.hair);px(x-7,y-8,3,3,p.skin);px(x-4,y-9,12,5,'#c9b896');px(x-4,y-9,12,1,'#ddd0b4');return;}
+  if(e.pose==='sit'){
+    const ty=y-13;px(x-4,ty,8,6,p.hair);px(x-3,ty+6,6,1,p.skin);px(x-5,ty+7,10,5,p.shirt);
+    const k=e.typing?(Math.floor(t*9+e.seed)%2):0;
+    px(x-6,ty+6-k,2,3,p.shirt);px(x+4,ty+6-(e.typing?1-k:0),2,3,p.shirt);return;}
+  const y0=y-15,moving=e.pose==='walk',f=moving?Math.floor(t*6+e.seed)%2:0,bob=moving&&f?1:0;
+  px(x-3,y0+bob,6,2,p.hair);px(x-4,y0+1+bob,8,2,p.hair);
+  px(x-3,y0+3+bob,6,4,p.skin);px(x-4,y0+3+bob,1,2,p.hair);px(x+3,y0+3+bob,1,2,p.hair);
+  if(((t+e.seed)%4)>.14){px(x-2,y0+4+bob,1,1,'#1b1612');px(x+1,y0+4+bob,1,1,'#1b1612');}
+  px(x-4,y0+7+bob,8,5,p.shirt);
+  if(e===guard){px(x-4,y0+bob,8,1,'#14171c');px(x+1,y0+8+bob,2,2,'#c9a85a');}
+  if(e.raise){const w=Math.floor(t*4)%2;px(x+4,y0+1+w,2,7,p.shirt);px(x+4,y0-1+w,2,2,p.skin);}else px(x+4,y0+8+bob,1,4,p.shirt);
+  px(x-5,y0+8+bob,1,4,p.shirt);
+  if(e.idle==='eat'&&!moving){px(x-6,y0+9,5,3,'#efe6d8');px(x-5,y0+8,3,1,'#c9a27e');}
+  if(e.idle==='coffee'&&!moving){px(x+4,y0+9,3,3,'#efe6d8');px(x+4,y0+9,3,1,'#5e3f2b');}
+  px(x-3,y0+12,6,1,p.pants);
+  px(x-3,y0+13,2,moving&&f?1:2,p.pants);px(x+1,y0+13,2,moving&&!f?1:2,p.pants);
+}
+function drawBossDesk(t){
+  const x=25.5*T,y=4*T+1;
+  px(x,y,3*T,11,'#5e3f2b');px(x,y,3*T,2,'#7a5338');px(x,y+11,3*T,3,'#4a3122');px(x+1,y+14,2,3,'#3a2a20');px(x+3*T-3,y+14,2,3,'#3a2a20');
+  px(27*T-7,y-3,14,7,'#8a7f72');px(27*T-1,y-1,2,2,'#d9cfbd');      // your laptop, seen from the front
+  px(x+4,y+3,5,4,'#efe6d8');px(x+5,y+4,3,2,'#5e3f2b');               // mug
+  if(Math.floor(t*1.5)%2)px(x+6,y-2,1,2,'rgba(239,230,216,.6)');
+  px(x+3*T-12,y+3,8,5,'#d9cfbd');px(x+3*T-11,y+4,6,1,'#8a7f72');      // notes
+}
+function drawMonitor(d,s,t){
+  const cx=d.x*T+d.w*T/2;let c='#3a302a';
+  const seated=s&&!s.path.length&&!s.errand&&s.status!=='idle'&&s.status!=='needs';
+  if(seated){
+    if(s.status==='working')c=Math.floor(t*3+s.seed)%2?'#ecd9ae':'#e2cc9c';
+    else if(s.status==='failed')c=Math.floor(t*4)%2?'#c0614c':'#6a2a22';
+    else if(s.status==='done')c='#c9d3ae';
+  }
+  px(cx-6,d.y*T-4,12,8,c);
+  if(seated&&s.status==='working'){for(let i=0;i<3;i++)px(cx-5,d.y*T-3+i*2,2+((i*5+Math.floor(t*6))%8),1,'#8a6f50');}
+  if(seated&&s.status==='failed'){for(let i=0;i<3;i++){const k=(t*0.8+i/3)%1;px(cx-2+i*2+Math.sin(k*6)*2,d.y*T-6-k*14,3,3,`rgba(110,100,92,${1-k})`);}}
+}
+function ring(e,c,t){ctx.strokeStyle=c;ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(e.x,e.y,8+Math.sin(t*5)*1.2,3.2,0,0,Math.PI*2);ctx.stroke();}
+
+/* ---------- overlay ---------- */
+const overlay=$('overlay');const nodes=new Map();
+function node(e){let n=nodes.get(e);if(!n){n=document.createElement('div');n.className='ent';n.innerHTML='<div class="bub"></div><div class="tag"></div>';overlay.appendChild(n);nodes.set(e,n);n._b=n.firstChild;n._t=n.lastChild;n._bt=null;n._bc=null;}return n;}
+function bubbleFor(e,t){
+  if(e.npc)return[now()<e.bUntil?e.bubble:'',e.boss?'boss':'npc'];
+  if(e.errandMsg)return[e.errandMsg,'npc'];
+  if(e.path.length)return['',''];
+  switch(e.status){
+    case'working':return[e.activity[0],'minor'];
+    case'needs':return['Boss, may tanong ako.','need'];
+    case'done':return['Tapos na ako. Pa-review po.','done'];
+    case'failed':return['May error ang tests.','fail'];
+    case'idle':
+      if(e.idle==='sleep')return['Zzz','sleep'];
+      if(e.idle==='chismis'){const grp=sessions.filter(o=>o.status==='idle'&&o.idle==='chismis'&&!o.path.length);const k=Math.floor(t/2.8);if(grp[k%grp.length]!==e)return['',''];return[CHISMIS[k%CHISMIS.length],'minor'];}
+      if(e.idle==='eat')return['Kumakain muna ako.','minor'];
+      if(e.idle==='coffee')return['Kape muna ako.','minor'];
+      if(e.idle==='cr')return['Saglit lang, nasa CR ako.','minor'];
+      return['',''];}
+  return['',''];
+}
+function updateOverlay(t){
+  overlay.style.setProperty('--zs',Math.max(.85,Math.min(1.3,.7+cam.z*.25)).toFixed(2));
+  for(const e of PEOPLE()){
+    const n=node(e);const off=e.pose==='sleep'?11:e.pose==='sit'?15:18;
+    const lx=(e.x-cam.x)*cam.z/W*100,ly=(e.y-off-cam.y)*cam.z/H*100;
+    n.style.left=lx+'%';n.style.top=ly+'%';n.style.display=(lx<-8||lx>108||ly<-5||ly>115)?'none':'';
+    const[b,c]=bubbleFor(e,t);
+    if(b!==n._bt){n._b.textContent=b;n._bt=b;}
+    if(c!==n._bc){n._b.className='bub '+c;n._bc=c;}
+    const tag=e.npc?e.name:e.short;if(n._t.textContent!==tag)n._t.textContent=tag;
+    n._t.className='tag'+(e.boss?' you':'')+(e.id&&e.id===selected?' sel':'');
+  }
+}
+
+/* ---------- camera ---------- */
+const RES=2;
+const cam={x:0,y:0,z:1.8,tx:0,ty:0,follow:null};
+function clampCam(){const vw=W/cam.z,vh=H/cam.z;cam.tx=Math.max(0,Math.min(W-vw,cam.tx));cam.ty=Math.max(0,Math.min(H-vh,cam.ty));}
+function centerOn(x,y){cam.tx=x-W/cam.z/2;cam.ty=y-H/cam.z/2;clampCam();}
+function updateCam(dt){
+  if(cam.follow)centerOn(cam.follow.x,cam.follow.y-8);
+  const a=Math.min(1,dt*5);cam.x+=(cam.tx-cam.x)*a;cam.y+=(cam.ty-cam.y)*a;
+}
+function setZoom(z,ax,ay){
+  const vw=W/cam.z,vh=H/cam.z;ax=ax??cam.tx+vw/2;ay=ay??cam.ty+vh/2;
+  const fx=(ax-cam.tx)/vw,fy=(ay-cam.ty)/vh;
+  cam.z=Math.max(1,Math.min(3,z));
+  cam.tx=ax-fx*W/cam.z;cam.ty=ay-fy*H/cam.z;clampCam();
+}
+centerOn(20*T,6.5*T);cam.x=cam.tx;cam.y=cam.ty;
+
+/* ---------- loop ---------- */
+let last=performance.now();
+function frame(ts){
+  const dt=Math.min(.05,(ts-last)/1000);last=ts;const t=ts/1000;
+  if(!paused){
+    for(const e of PEOPLE()){
+      if(e.path.length){const p=e.path[0];const dx=p.x-e.x,dy=p.y-e.y,d=Math.hypot(dx,dy),sp=(e.lead?34:30)*dt;
+        if(d<=sp){e.x=p.x;e.y=p.y;e.path.shift();if(!e.path.length){e.pose='stand';const f=e.onArrive;e.onArrive=null;f&&f();}}
+        else{e.x+=dx/d*sp;e.y+=dy/d*sp;e.pose='walk';}}
+    }
+  }
+  updateCam(dt);
+  ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#2a201a';ctx.fillRect(0,0,cv.width,cv.height);
+  const k=RES*cam.z;ctx.setTransform(k,0,0,k,-cam.x*k,-cam.y*k);ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(bg,0,0);
+  DESKS.forEach(d=>drawMonitor(d,d.owner,t));drawMonitor(LEAD_DESK,sessions.find(s=>s.lead),t);
+  const all=PEOPLE().sort((a,b)=>a.y-b.y);
+  for(const e of all){
+    if(!e.npc&&e.status==='needs'&&!e.path.length)ring(e,'#c4573c',t);
+    if(e.id&&e.id===selected)ring(e,'#e2c08d',t);
+    drawChar(e,t);
+    if(e===boss)drawBossDesk(t);
+  }
+  updateOverlay(t);
+  requestAnimationFrame(frame);
+}
+
+/* ---------- sim tick ---------- */
+setInterval(()=>{
+  if(paused)return;
+  for(const s of sessions){
+    if(now()>s.nextChange&&!s.path.length&&!s.errand){
+      const ns=nextStatus(s);
+      if(ns==='working'&&s.status==='working'){s.activity=pick(ACTS[s.code]);s.nextChange=now()+rand(8,16)*1000;log(s.short,s.activity[1],s);say2(s,'agent',s.activity[1]);}
+      else if(ns==='idle'&&s.status==='idle'){s.nextChange=now()+rand(10,20)*1000;}
+      else if(s.status==='needs'&&ns==='working')setStatus(s,'working','Nasagot mo na ito sa ibang device, kaya bumalik na siya sa trabaho.');
+      else setStatus(s,ns);
+    }
+    if(s.status==='idle'&&now()>s.idleUntil&&!s.path.length){
+      const prev=s.idle;pickIdle(s,false);
+      if(s.idle!==prev)log(s.short,IDLE_SENT[s.idle],s);
+    }
+    leadThink(s);
+  }
+  hrThink();
+  render();
+},1000);
+
+/* ---------- UI ---------- */
+var ptab='chat',chatKey='';
+const compact=()=>$('app').clientWidth<=640;
+function stColor(s){return s.status==='idle'&&s.idle==='sleep'?'--sleep':ST[s.status].c;}
+function stLabel(s){return s.status==='idle'?(IDLE_LBL[s.idle]||'Naka-break'):ST[s.status].label;}
+function actText(s){
+  if(s.status==='needs')return (s.ask||ASKS[s.code]||'May tanong ako sa iyo.');
+  if(s.path.length&&!s.errand){
+    if(s.status==='idle')return`Papunta sa ${(IDLE_PLACE[s.idle]||'hallway').toLowerCase()}.`;
+    return'Pabalik na sa PC niya.';
+  }
+  if(s.errand)return'Kinakausap ang team.';
+  if(s.status==='working')return s.activity[1];
+  if(s.status==='done')return'Naghihintay ng review mo.';
+  if(s.status==='failed')return sent(s.detail||'May nag-fail sa huling turn niya');
+  return`${IDLE_SENT[s.idle]||'Naka-break.'} Idle na siya nang ${dur(now()-s.idleStart)}.`;
+}
+function av(s,size){return `<span class="av" style="${size?`width:${size}px;height:${size}px;`:''}background:${s.pal.shirt};--hair:${s.pal.hair}"><span>${esc(s.code)}</span></span>`;}
+function pill(s){return `<span class="pill${s.status==='needs'?' solid':''}" style="--st:var(${stColor(s)})">${esc(stLabel(s))}</span>`;}
+const sel=()=>sessions.find(x=>x.id===selected)||sessions[0];
+
+/* chat */
+function say2(s,from,text,extra){s.chat.push(Object.assign({from,text,t:now()},extra||{}));if(s.chat.length>40)s.chat.shift();}
+function seedChat(s){
+  say2(s,'sys',`Na-sync mula sa claude.ai/code. Huling update: ${dayLabel(s.at)}, ${simLabel(s.at)}.`,{t:s.at});
+  if(s.recent)say2(s,'agent',sent(s.recent),{t:s.at});
+  if(s.detail&&s.detail!==s.recent)say2(s,'agent','Status: '+sent(s.detail),{t:s.at});
+  if(!s.recent&&!s.detail)say2(s,'agent','Wala pang summary ang huling turn ko.',{t:s.at});
+  if(s.status==='needs')say2(s,'agent',s.ask,{ask:true,t:s.at});
+}
+function addChatFor(s,st,why){
+  if(st!=='needs')s.chat.forEach(m=>m.answered=true);
+  if(st==='working'&&!why)say2(s,'agent',s.activity[1]);
+  else if(st==='working'&&/ibang device/.test(why))say2(s,'sys','Nasagot na ang tanong na ito sa ibang device.');
+  else if(st==='needs')say2(s,'agent',(s.ask||ASKS[s.code]||'May tanong ako sa iyo.'),{ask:true});
+  else if(st==='done')say2(s,'agent','Tapos na ako sa task na ito. Pakireview na lang, boss.');
+  else if(st==='failed')say2(s,'agent',sent(s.detail||'May nag-fail sa huling turn ko'));
+  else if(st==='idle')say2(s,'sys',`Natapos ang turn ni ${s.short}. Nag-break muna siya.`);
+}
+function answer(s,text,mode){
+  if(!text.trim())return;
+  say2(s,'you',text.trim());
+  say2(s,'sys','Snapshot pa lang ito, kaya hindi pa naipapadala ang mensahe sa totoong session. Sa live app, ipapadala ito gamit ang send_message.');
+  say(boss,`Naka-draft na ang mensahe para kay ${s.short}.`,2500);
+  log('Ikaw',`Nag-draft ng mensahe para kay ${s.short}.`,s);
+  $('toast').hidden=true;render();
+}
+function msgHTML(s,m){
+  if(m.from==='sys')return `<div class="msg sys">${esc(m.text)} · ${simLabel(m.t)}</div>`;
+  const open=m.ask&&!m.answered&&s.status==='needs';
+  return `<div class="msg ${m.from}${m.ask?' asking':''}">${m.ask?'<b>Tanong:</b> ':''}${esc(m.text)}${open?`<div class="row"><button type="button" class="btn primary" data-act="reply" data-mode="approve" data-id="${s.id}">Approve</button><button type="button" class="btn" data-act="reply" data-mode="no" data-id="${s.id}">Hindi muna</button></div>`:''}<time>${m.from==='you'?'Ikaw':esc(s.short)} · ${simLabel(m.t)}</time></div>`;
+}
+
+/* panel */
+function renderPanel(){
+  const s=sel();if(!s)return;
+  const place=s.status==='needs'?'Sa harap ng opisina mo':s.status==='idle'?(IDLE_PLACE[s.idle]||'Hallway'):s.lead?'Opisina ng Lead':'Desk '+(s.desk.i+1);
+  $('cpHead').innerHTML=`${av(s,38)}<div class="who"><div class="nm">${esc(s.role)}${s.lead?' (leader)':''}</div><div class="raw">${esc(s.name)}</div></div><div class="side">${pill(s)}<span class="src">${s.source} · ${esc(s.host)}</span></div>`;
+  document.querySelectorAll('.cp-tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.ptab===ptab));
+  $('composer').hidden=ptab!=='chat';
+  $('msgLabel').textContent=`Mensahe para kay ${s.role}`;
+  const body=$('cpBody');
+  if(ptab==='chat'){
+    const key=`c${s.id}:${s.chat.length}:${s.status}:${s.chat.filter(m=>m.answered).length}`;
+    if(key!==chatKey){chatKey=key;body.innerHTML=`<div class="msgs">${s.chat.map(m=>msgHTML(s,m)).join('')}</div>`;body.scrollTop=body.scrollHeight;}
+  }else if(ptab==='info'){
+    chatKey='';
+    body.innerHTML=`<div class="info"><dl><dt>Ginagawa</dt><dd>${esc(actText(s))}</dd><dt>Gaano katagal</dt><dd>${dur(now()-s.since)}</dd><dt>Nasaan</dt><dd>${esc(place)}</dd><dt>Source</dt><dd>${s.source} · ${esc(s.host)}</dd><dt>Session name</dt><dd class="raw">${esc(s.name)}</dd><dt>Role</dt><dd>${esc(s.role)}${s.lead?' (leader ng team)':' (galing sa session name)'}</dd>${liveRows(s)}</dl>
+      <p class="sub2">Mga huling ginawa</p><ul class="tl">${s.history.map(h=>`<li><time>${simLabel(h.t)}</time><span>${esc(h.text)}</span></li>`).join('')||'<li><time>Ngayon</time><span>Wala pang activity.</span></li>'}</ul></div>`;
+  }else{
+    const key=`l${logs.length}:${logs[0]&&logs[0].t}`;
+    if(key!==chatKey){chatKey=key;body.innerHTML=`<ul class="tl">${logs.map(l=>`<li><time>${simLabel(l.t)}</time><span><span class="w">${esc(l.who)}:</span> ${esc(l.text)}</span></li>`).join('')}</ul>`;}
+  }
+}
+function dockCard(s){
+  return `<button type="button" class="dcard ${s.id===selected?'sel':''} ${s.status==='needs'?'needcard':''}" data-id="${s.id}">${av(s)}<span style="min-width:0"><span class="nm" style="display:block">${esc(s.role)}</span><span class="rl" style="display:block">${esc(s.task)}</span></span><span class="ft">${pill(s)}<span class="dur">${dur(now()-s.since)}</span></span></button>`;
+}
+function render(){
+  const by=st=>sessions.filter(s=>s.status===st).length;
+  const sleepN=sessions.filter(s=>s.status==='idle'&&s.idle==='sleep').length;
+  const needN=by('needs');
+  $('counts').innerHTML=`
+    <span class="count"><i class="dot" style="background:var(--work)"></i><b>${by('working')}</b> nagtatrabaho</span>
+    <span class="count need ${needN?'on':''}"><i class="dot" style="background:${needN?'#fff':'var(--need)'}"></i><b>${needN}</b> naghihintay sa iyo</span>
+    <span class="count"><i class="dot" style="background:var(--idle)"></i><b>${by('idle')-sleepN}</b> naka-break</span>
+    <span class="count"><i class="dot" style="background:var(--sleep)"></i><b>${sleepN}</b> tulog</span>
+    <span class="count"><i class="dot" style="background:var(--done)"></i><b>${by('done')+by('failed')}</b> tapos o may error</span>`;
+  $('dock').innerHTML=sessions.map(dockCard).join('')+`<button type="button" class="addcard" data-act="add">+ Magdagdag ng session</button>`;
+  renderPanel();
+  const tb=$('tabBadge');tb.hidden=!needN;tb.textContent=needN;
+  $('clock').textContent=dayLabel(now())+', '+simLabel(now());$('sbClock').textContent=simLabel(now()).replace(/ (AM|PM)/,'');
+}
+function renderLog(){
+  const f=$('feed');if(!f)return;
+  f.innerHTML=logs.slice(0,3).reverse().map(l=>`<div><b>${esc(l.who)}:</b> ${esc(l.text)}</div>`).join('');
+}
+let toastTimer;
+function toast(s){
+  const el=$('toast');el.hidden=false;el.dataset.id=s.id;
+  el.innerHTML=`${av(s,28)}<div style="min-width:0"><div class="ti">Dev Room · ngayon</div><b>Kailangan ka ng ${esc(s.role)}.</b><div style="font-size:12.5px">${esc((s.ask||ASKS[s.code]||'May tanong ako sa iyo.'))}</div></div>`;
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.hidden=true,6000);
+}
+function openChat(id){
+  selected=id;ptab='chat';chatKey='';const fs=sessions.find(x=>x.id===id);if(fs){cam.follow=fs;if(cam.z<1.6)setZoom(1.8);}
+  if(compact()){$('app').dataset.tab='chat';document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab==='chat'));}
+  render();
+}
+
+/* ---------- interactions ---------- */
+document.addEventListener('click',e=>{
+  const ag=e.target.closest('.dcard');if(ag){openChat(+ag.dataset.id);return;}
+  if(e.target.closest('[data-act="add"]')){addSession();return;}
+  const tst=e.target.closest('#toast');if(tst){tst.hidden=true;openChat(+tst.dataset.id);return;}
+  const a=e.target.closest('[data-act="reply"]');
+  if(a){const s=sessions.find(x=>x.id===+a.dataset.id);if(s&&s.status==='needs')answer(s,a.dataset.mode==='approve'?'Approved. Sige, ituloy mo.':'Hindi muna. Huwag mo munang gawin iyan.',a.dataset.mode);return;}
+  const pt=e.target.closest('[data-ptab]');if(pt){ptab=pt.dataset.ptab;chatKey='';renderPanel();return;}
+  const tab=e.target.closest('.tabs button');if(tab){$('app').dataset.tab=tab.dataset.tab;chatKey='';document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b===tab));render();return;}
+  const dv=e.target.closest('.seg button');if(dv){$('stage').dataset.device=dv.dataset.device;document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',b===dv));chatKey='';render();return;}
+});
+$('composer').addEventListener('submit',e=>{e.preventDefault();const s=sel();const v=$('msgInput').value;if(!v.trim())return;$('msgInput').value='';answer(s,v,'text');});
+$('msgInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('composer').requestSubmit();}});
+let drag=null;
+const toWorld=(e)=>{const r=cv.getBoundingClientRect();return{x:cam.x+(e.clientX-r.left)/r.width*W/cam.z,y:cam.y+(e.clientY-r.top)/r.height*H/cam.z,r};};
+cv.addEventListener('pointerdown',e=>{drag={sx:e.clientX,sy:e.clientY,cx:cam.tx,cy:cam.ty,moved:false};cv.setPointerCapture(e.pointerId);});
+cv.addEventListener('pointermove',e=>{
+  if(!drag)return;const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;
+  if(!drag.moved&&Math.hypot(dx,dy)<5)return;
+  drag.moved=true;cv.classList.add('drag');cam.follow=null;
+  const r=cv.getBoundingClientRect();cam.tx=drag.cx-dx/r.width*W/cam.z;cam.ty=drag.cy-dy/r.height*H/cam.z;clampCam();cam.x=cam.tx;cam.y=cam.ty;
+});
+cv.addEventListener('pointerup',e=>{
+  cv.classList.remove('drag');const d=drag;drag=null;if(!d||d.moved)return;
+  const p=toWorld(e);
+  let best=null,bd=14;for(const s of sessions){const dd=Math.hypot(s.x-p.x,s.y-8-p.y);if(dd<bd){bd=dd;best=s;}}
+  if(best){selected=best.id;cam.follow=best;ptab='chat';chatKey='';render();}
+});
+cv.addEventListener('wheel',e=>{e.preventDefault();const p=toWorld(e);cam.follow=null;setZoom(cam.z*(e.deltaY<0?1.15:1/1.15),p.x,p.y);},{passive:false});
+$('zIn').addEventListener('click',()=>setZoom(cam.z*1.25));
+$('zOut').addEventListener('click',()=>setZoom(cam.z/1.25));
+$('zFit').addEventListener('click',()=>{cam.follow=null;setZoom(1);});
+$('pauseBtn').addEventListener('click',()=>{
+  if(!paused){paused=true;pauseAt=Date.now();$('pauseBtn').textContent='Ituloy';}
+  else{pausedAcc+=Date.now()-pauseAt;paused=false;$('pauseBtn').textContent='Pause';}
+});
+function addSession(){
+  say(guard,'Wala pang bagong dumarating, boss.',3000);
+  log('Guard','Sa live app, dito papasok ang bagong session kapag nagsimula ito sa claude.ai/code o sa CLI mo.');
+}
+sessions.forEach(seedChat);
+render();renderLog();requestAnimationFrame(frame);
+{const q=sessions.find(x=>x.id===selected);if(q&&q.status==='needs')toast(q);}
+})();
+</script>

@@ -17,6 +17,11 @@ Mockup only. There is no real app yet.
 
 - Mockup: `mockup/dev-room-mockup.html` (single file, runs on sample data)
 - Published preview: https://claude.ai/artifact/RcjPyRzi2NLL72JgatPTUw
+- **Live data version:** `mockup/dev-room-logic-sim.html` shows the user's real **LOGIC_SIM_PROJECT** team (leader plus five subsessions on `Ronanski/icms-master-tool`), taken from claude.ai/code on 2026-10-31 20:24 UTC.
+  - Uses real time, with no random status changes.
+  - Each session's question, last status, repo, branch, model, context usage and artifacts come from its session record.
+  - `devRoomApply(records)` accepts fresh session records and moves the characters, so a server only needs to push the records.
+  - Chat replies are drafts only until the backend can call `send_message`.
 
 ## Requirements from the user
 
@@ -48,8 +53,10 @@ Mockup only. There is no real app yet.
 ### Platforms and data
 - [ ] **Portable desktop app** and **Android app**. The mockup has a Desktop/Android preview toggle; a real app is not built yet.
 - [ ] Must work with **both local CLI sessions and cloud sessions** (claude.ai/code).
-- [ ] Each session's role comes from its **session name**, which follows a fixed format. The real format is still to be provided; the mockup assumes `[ROLE] task`.
-- [ ] Data source plan: Claude Code hooks POST events to the app's server.
+- [x] Each session's role comes from its **session name**. The real format is `ROLE: task` (for example `CODE FIXER: LOGIC, ENGINE, PLANT MODEL`). A name with no colon (`LOGIC_SIM_PROJECT`) is the leader.
+- [ ] Data source plan, option A: poll claude.ai/code session records (`status_bucket` and `post_turn_summary`). This is already proven by the live version.
+  - `WORKING` maps to working, `BLOCKED` to needs input, `REVIEW_READY` to done, `COMPLETED` to idle, and `FAILED` to error.
+- [ ] Data source plan, option B: Claude Code hooks POST events to the app's server.
   - SessionStart: a session arrived.
   - UserPromptSubmit and PreToolUse: working, with the current tool.
   - Notification: needs input.
@@ -70,8 +77,9 @@ Mockup only. There is no real app yet.
 
 ## Open questions
 
-1. What is the real session-name format? We need 2–3 examples.
+1. ~~What is the real session-name format?~~ Answered: `ROLE: task`, and the leader has no colon.
 2. Which stack should the build use?
    - Desktop: Electron or Tauri.
    - Android: Capacitor or React Native.
 3. Where should the event server run so that both local and cloud sessions can reach it?
+4. How should the app know which sessions belong to one team? The live version uses a fixed list of session IDs. Options are a shared tag, a shared repo, or a name prefix.
