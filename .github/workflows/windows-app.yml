@@ -1,0 +1,46 @@
+name: Windows app
+
+on:
+  push:
+    paths: ["app/**", ".github/workflows/windows-app.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+      - name: Install Tauri CLI
+        working-directory: app
+        run: npm install
+      - name: Build portable exe
+        working-directory: app
+        run: npx tauri build --no-bundle
+      - name: Rename
+        shell: bash
+        run: cp app/src-tauri/target/release/dev-room.exe DevRoom.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DevRoom-windows
+          path: DevRoom.exe
+      - name: Publish to the "dev-room-latest" pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dev-room-latest
+          name: Dev Room (latest build)
+          target_commitish: ${{ github.sha }}
+          prerelease: true
+          body: |
+            Portable Windows app. Download DevRoom.exe and run it; no install needed.
+            Built from ${{ github.ref_name }} at ${{ github.sha }}.
+          files: DevRoom.exe

@@ -28,6 +28,18 @@ Mockup only. There is no real app yet.
   - `devRoomApply(records)` accepts fresh session records and moves the characters, so a server only needs to push the records.
   - Chat replies are drafts only until the backend can call `send_message`.
 
+## Windows app (in progress)
+
+- `app/` holds a portable Windows app built with Tauri: `DevRoom.exe` plus a local server on port 4317. See `app/README.md`.
+- Claude Code hooks on the PC POST events to the app, so status is real time.
+  - The app installs the hooks itself, keeping a backup of `settings.json`.
+- Phones on the same Wi-Fi open the same office by scanning a QR code that carries a pairing token.
+- The GitHub Action **Windows app** builds the exe and publishes it to the `dev-room-latest` pre-release.
+- Next steps:
+  - An Android APK wrapper.
+  - Replying from the app.
+  - Cloud sessions through a public relay.
+
 ## Requirements from the user
 
 ### Office and characters
