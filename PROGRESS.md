@@ -16,6 +16,11 @@ Dev Room shows them all in one place instead. Each session is a character in a s
 Mockup only. There is no real app yet.
 
 - Mockup: `mockup/dev-room-mockup.html` (single file, runs on sample data)
+- **Live view:** `mockup/dev-room-live.html`. It reads the sessions of whichever claude.ai account opens it, through the Claude Code Remote connector (`list_sessions` every 30 s, `get_session` for details), and sends chat messages with `send_message`.
+  - Role comes from `ROLE: task` titles. The default leader is the newest title without a colon.
+  - "Piliin ang team" lets the user pick the members and the leader. The choice is saved in the browser.
+  - If the connector is unavailable, the page shows clearly labelled sample data.
+  - Published (owned by the ronan.ece account): https://claude.ai/artifact/GedDDtAx4mCNCTsqj1E6Zv
 - Published preview: https://claude.ai/artifact/RcjPyRzi2NLL72JgatPTUw
 - **Live data version:** `mockup/dev-room-logic-sim.html` shows the user's real **LOGIC_SIM_PROJECT** team (leader plus five subsessions on `Ronanski/icms-master-tool`), taken from claude.ai/code on 2026-10-31 20:24 UTC.
   - Uses real time, with no random status changes.
@@ -36,7 +41,8 @@ Mockup only. There is no real app yet.
 - [x] **NPCs:**
   - The Guard greets new sessions at the lobby.
   - HR sends overworked sessions on break and reminds the user who is waiting.
-- [x] Top-down view is fine. Isometric is not required.
+- [x] Rooms are bigger and taller, and bubble text is smaller so the map is not crowded, like the user's reference screenshot.
+- [x] **Isometric view** (the user asked to try it after top-down). Every character has a **dark outline** so it doesn't blend into the floor or furniture.
 - [x] **Characters and rooms must not look small.** The map is zoomed in by default. It supports drag to pan, + and − buttons, the scroll wheel and an "entire office" button, and it follows a selected character.
 
 ### Monitoring and chat
