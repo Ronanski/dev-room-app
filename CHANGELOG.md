@@ -5,7 +5,7 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 - **MINOR** for new features.
 - **MAJOR** for changes that break pairing, hooks or saved data.
 
-The version lives in `VERSION`. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
+The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
 ## 0.3.0 (2026-11-01)
 

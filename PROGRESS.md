@@ -34,7 +34,7 @@ Mockup only. There is no real app yet.
 - Claude Code hooks on the PC POST events to the app, so status is real time.
   - The app installs the hooks itself, keeping a backup of `settings.json`.
 - Phones on the same Wi-Fi open the same office by scanning a QR code that carries a pairing token.
-- The GitHub Action **Windows app** builds the exe and publishes it to the `dev-room-latest` pre-release.
+- The GitHub Action **Windows app** builds the exe and the APK and publishes them as release `v<VERSION>-build.<N>`; builds from `main` are the Latest release.
 - **Android app (`mobile/`):** a Capacitor app that shows the office from the PC.
   - It pairs through `devroom://pair` from the QR page.
   - A foreground service polls the PC every 15 seconds and sends a notification when a session needs you.

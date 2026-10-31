@@ -724,7 +724,7 @@ function setConn(){
     (isLocal&&hooksOk===false?'<button type="button" class="btn primary" data-act="hooks">I-set up ang hooks</button>':'')+
     (isLocal&&hooksOk?'<button type="button" class="btn" data-act="hooks">Hooks: OK</button>':'')+
     (isLocal&&mode==='live'?'<button type="button" class="btn" data-act="pair">I-connect ang phone</button>':'')+
-    (!isLocal&&mode==='live'&&TOKEN&&window.top===window&&/Android/i.test(navigator.userAgent)?`<a class="btn primary" href="devroom://pair?u=${encodeURIComponent(location.origin)}&t=${encodeURIComponent(TOKEN)}">Buksan sa Dev Room app</a><a class="btn" href="https://github.com/Ronanski/dev-room-app/releases/download/dev-room-latest/DevRoom.apk">I-download ang app</a>`:'');
+    (!isLocal&&mode==='live'&&TOKEN&&window.top===window&&/Android/i.test(navigator.userAgent)?`<a class="btn primary" href="devroom://pair?u=${encodeURIComponent(location.origin)}&t=${encodeURIComponent(TOKEN)}">Buksan sa Dev Room app</a><a class="btn" href="https://github.com/Ronanski/dev-room-app/releases/latest/download/DevRoom.apk">I-download ang app</a>`:'');
 }
 async function poll(){
   try{

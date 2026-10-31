@@ -57,7 +57,7 @@ Phone on the same Wi-Fi  (http://<PC IP>:4317/?t=<pairing token>, from the QR co
 
 ## Build
 
-The **Windows app** GitHub Action builds `DevRoom.exe` on every push that touches `app/`. It publishes the file to the `dev-room-latest` pre-release.
+The **Windows app** GitHub Action builds `DevRoom.exe` on every push that touches `app/`. It publishes the files to a new GitHub release for that build; builds from `main` become the Latest release.
 
 Local build on Windows, with Rust and Node installed:
 
@@ -73,7 +73,7 @@ The exe needs the WebView2 runtime, which ships with Windows 10 and 11.
 
 ## Auto update
 
-Every push to `main` (and, until `main` exists, to this PR's branch) builds and publishes `DevRoom.exe`, `index.html` and `version.json` to the `dev-room-latest` release.
+Every push to `main` (and, until `main` exists, to this PR's branch) builds and publishes `DevRoom.exe`, `index.html` and `version.json` to a new GitHub release, `v<VERSION>-build.<N>`. Builds from `main` become the Latest release, which installed apps update from; other branches publish pre-releases.
 
 The running app checks `version.json` every 3 minutes.
 - **UI update:** when the UI's API version (`api-version.txt`) is unchanged, the new `index.html` is cached in `%APPDATA%\DevRoom\ui` and served at once. Open windows and paired phones reload themselves.

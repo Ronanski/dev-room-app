@@ -1,4 +1,4 @@
-//! In-app auto update from the `dev-room-latest` GitHub release.
+//! In-app auto update from the latest GitHub release (published from main).
 //!
 //! Every few minutes the app reads `version.json` from the release.
 //! - A newer UI (`index.html`) with the same API version is cached in %APPDATA%\DevRoom\ui
@@ -22,7 +22,7 @@ pub const VERSION: &str = match option_env!("DEVROOM_VERSION") {
     None => "dev",
 };
 pub const API: u64 = parse_u64(include_str!("../../api-version.txt"));
-const BASE: &str = "https://github.com/Ronanski/dev-room-app/releases/download/dev-room-latest/";
+const BASE: &str = "https://github.com/Ronanski/dev-room-app/releases/latest/download/";
 
 const fn parse_u64(s: &str) -> u64 {
     let b = s.as_bytes();

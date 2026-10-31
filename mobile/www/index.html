@@ -56,7 +56,7 @@ const $=id=>document.getElementById(id);
 const C=window.Capacitor;
 const DevRoom=C&&C.registerPlugin?C.registerPlugin('DevRoom'):null;
 const App=C&&C.registerPlugin?C.registerPlugin('App'):null;
-const APK_URL='https://github.com/Ronanski/dev-room-app/releases/download/dev-room-latest/DevRoom.apk';
+const APK_URL='https://github.com/Ronanski/dev-room-app/releases/latest/download/DevRoom.apk';
 const store={get(k){try{return localStorage.getItem(k);}catch(e){return null;}},set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v);}catch(e){}}};
 let myBuild=Number(window.APK_BUILD||0);
 $('ver').textContent=`Dev Room app v${window.APK_VERSION||'dev'} (build ${myBuild})`;

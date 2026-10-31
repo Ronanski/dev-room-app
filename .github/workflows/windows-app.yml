@@ -117,39 +117,26 @@ jobs:
           API=$(tr -dc '0-9' < app/api-version.txt)
           printf '{"version": "%s", "build": %s, "api": %s, "apk": %s, "commit": "%s"}\n' "$DEVROOM_VERSION" "${{ github.run_number }}" "$API" "${{ github.run_number }}" "${{ github.sha }}" > dl/version.json
           ls -la dl && cat dl/version.json
-      - name: Publish to the "dev-room-latest" pre-release
+      # Every build gets its own release; GitHub refuses to update an existing one from this workflow.
+      # main builds become the Latest release, which the apps update from (releases/latest/download/...).
+      # Other branches publish pre-releases, so test builds never reach installed apps.
+      - name: Publish release v${{ env.DEVROOM_VERSION }}-build.${{ github.run_number }}
         uses: softprops/action-gh-release@v2
         with:
-          # The update channel keeps its tag where it is; only the files and notes change.
-          # (Moving an existing release's tag is refused for the workflow token.)
-          tag_name: dev-room-latest
-          name: Dev Room v${{ env.DEVROOM_VERSION }} (build ${{ github.run_number }}, latest)
-          prerelease: true
+          tag_name: v${{ env.DEVROOM_VERSION }}-build.${{ github.run_number }}
+          name: Dev Room v${{ env.DEVROOM_VERSION }} (build ${{ github.run_number }})
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ github.ref != 'refs/heads/main' }}
+          make_latest: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
           body: |
+            **Version ${{ env.DEVROOM_VERSION }}, build ${{ github.run_number }}**, from `${{ github.ref_name }}` at ${{ github.sha }}.
+
             - **Windows:** download DevRoom.exe and run it; no install needed.
             - **Android:** download DevRoom.apk and install it (allow "Install unknown apps" for your browser).
-            Both apps update themselves from this release. index.html and version.json are for the in-app updaters.
-            Built from ${{ github.ref_name }} at ${{ github.sha }}.
+
+            Installed apps update themselves from the latest release. index.html and version.json are for the in-app updaters. See CHANGELOG.md for what changed.
           files: |
             dl/DevRoom.exe
             dl/DevRoom.apk
             dl/index.html
             dl/version.json
-      - name: Is this version already released?
-        id: tag
-        if: github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh release view "v$DEVROOM_VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "exists=false" >> "$GITHUB_OUTPUT"; fi
-      - name: Publish the versioned release
-        if: github.ref == 'refs/heads/main' && steps.tag.outputs.exists == 'false'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ env.DEVROOM_VERSION }}
-          name: Dev Room v${{ env.DEVROOM_VERSION }}
-          target_commitish: ${{ github.sha }}
-          body_path: CHANGELOG.md
-          files: |
-            dl/DevRoom.exe
-            dl/DevRoom.apk
