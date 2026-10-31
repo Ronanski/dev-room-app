@@ -67,7 +67,7 @@ h1{font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1;mar
 .zoom button:hover{background:#efe2c4}
 .overlay{position:absolute;inset:0;pointer-events:none}
 .ent{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;gap:2px;width:0}
-.bub{font-size:calc(11px * var(--zs,1));line-height:1.25;background:#f7f0e3;color:#2b211b;border:2px solid #2b211b;padding:2px 7px;border-radius:7px;width:max-content;max-width:150px;text-align:center;white-space:normal}
+.bub{font-size:calc(9px * var(--zs,1));line-height:1.2;background:#f7f0e3;color:#2b211b;border:1.5px solid #2b211b;padding:1px 5px;border-radius:5px;width:max-content;max-width:120px;text-align:center;white-space:normal}
 .bub:empty{display:none}
 .bub.need{background:#b24a32;border-color:#5a2216;color:#fff;font-weight:700;animation:bob .9s ease-in-out infinite}
 .bub.sleep{background:#e3ddd2;color:#5b5348}
@@ -75,13 +75,13 @@ h1{font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1;mar
 .bub.fail{background:#efd2c8}
 .bub.npc{background:#efe2c4}
 .bub.boss{background:#2b211b;color:#f7f0e3}
-.tag{font-family:var(--f-mono);font-size:calc(9px * var(--zs,1));font-weight:600;background:rgba(43,33,27,.82);color:#f7f0e3;padding:0 4px;border-radius:3px;white-space:nowrap}
+.tag{font-family:var(--f-mono);font-size:calc(8px * var(--zs,1));font-weight:600;background:rgba(43,33,27,.82);color:#f7f0e3;padding:0 4px;border-radius:3px;white-space:nowrap}
 .tag.sel{background:#c9a27e;color:#2b211b}
 .tag.you{background:#f7f0e3;color:#2b211b;border:1px solid #2b211b}
 @keyframes bob{50%{transform:translateY(-3px)}}
 @media (prefers-reduced-motion:reduce){.bub.need{animation:none}}
 .feed{position:absolute;left:8px;bottom:8px;display:flex;flex-direction:column;gap:4px;max-width:min(55%,340px);pointer-events:none}
-.feed div{background:rgba(30,22,18,.84);color:#efe6d8;font-size:11px;padding:4px 8px;border-radius:6px;line-height:1.3}
+.feed div{background:rgba(30,22,18,.84);color:#efe6d8;font-size:10px;padding:4px 8px;border-radius:6px;line-height:1.3}
 .feed b{color:#e2c08d}
 
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:12px;color:var(--muted)}
@@ -204,7 +204,7 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
     <main class="body">
       <section class="pane" data-pane="office" aria-label="Office">
         <div class="mapwrap">
-          <canvas id="map" width="1600" height="900" aria-label="Isometric café-style office map with session characters"></canvas>
+          <canvas id="map" width="2240" height="1260" aria-label="Isometric café-style office map with session characters"></canvas>
           <div class="overlay" id="overlay"></div>
           <div class="feed" id="feed" aria-live="polite"></div>
           <div class="zoom"><button type="button" id="zOut" aria-label="Zoom out">−</button><button type="button" id="zIn" aria-label="Zoom in">+</button><button type="button" id="zFit">Buong office</button></div>
@@ -442,14 +442,14 @@ log('Lead','Nag-delegate kay QA ng e2e tests para sa checkout.',sessions[0]);
 log('Frontend',`Pumila sa opisina mo. Tanong niya: "${ASKS.FE}"`,sessions[2]);
 
 /* ---------- isometric renderer ---------- */
-const SW=800,SH=450,RES=2,TW=16,TH=8,OX=18*16+16,OY=50,WALL=42;
+const SW=1120,SH=630,RES=2,TW=22,TH=11,OX=18*22+20,OY=86,WALL=64,HS=1.4;
 const OUT='#24180f';
 function iso(u,v,z){return{x:OX+(u-v)*TW,y:OY+(u+v)*TH-(z||0)};}
 const isoP=p=>iso(p.x/T,p.y/T,0);
 function poly(g,pts,fill,stroke){g.beginPath();g.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)g.lineTo(pts[i].x,pts[i].y);g.closePath();if(fill){g.fillStyle=fill;g.fill();}if(stroke){g.strokeStyle=stroke;g.lineWidth=.8;g.lineJoin='round';g.stroke();}}
 function shade(hex,f){const n=parseInt(hex.slice(1),16);const c=[n>>16,n>>8&255,n&255].map(v=>Math.round(Math.min(255,v*f)));return'#'+c.map(v=>v.toString(16).padStart(2,'0')).join('');}
 function box(g,u,v,w,d,h,col,z0,opt){
-  z0=z0||0;opt=opt||{};
+  z0=(z0||0)*HS;h*=HS;opt=opt||{};
   const a=iso(u,v+d,z0),b=iso(u+w,v+d,z0),c=iso(u+w,v,z0);
   const a2=iso(u,v+d,z0+h),b2=iso(u+w,v+d,z0+h),c2=iso(u+w,v,z0+h),d2=iso(u,v,z0+h);
   poly(g,[a,b,b2,a2],opt.front||shade(col,.8),OUT);
@@ -483,19 +483,19 @@ const bg=document.createElement('canvas');bg.width=SW*RES;bg.height=SH*RES;
   wallFace(iso(0,0),iso(30,0),iso(30,0,WALL),iso(0,0,WALL),'#7a4c3b');
   wallFace(iso(0,0),iso(0,18),iso(0,18,WALL),iso(0,0,WALL),'#6a4132');
   g.strokeStyle='rgba(40,22,15,.35)';g.lineWidth=.6;
-  for(let z=6;z<WALL;z+=6){let a=iso(0,0,z),b=iso(30,0,z);g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();a=iso(0,0,z);b=iso(0,18,z);g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();}
+  for(let z=8;z<WALL;z+=8){let a=iso(0,0,z),b=iso(30,0,z);g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();a=iso(0,0,z);b=iso(0,18,z);g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();}
   wallFace(iso(0,0,WALL),iso(30,0,WALL),iso(30,-.25,WALL),iso(0,-.25,WALL),'#3a2a20');
   wallFace(iso(0,0,WALL),iso(0,18,WALL),iso(-.25,18,WALL),iso(-.25,0,WALL),'#3a2a20');
   const winV=(u1,u2,z1,z2,col)=>poly(g,[iso(u1,0,z1),iso(u2,0,z1),iso(u2,0,z2),iso(u1,0,z2)],col,OUT);
   const winU=(v1,v2,z1,z2,col)=>poly(g,[iso(0,v1,z1),iso(0,v2,z1),iso(0,v2,z2),iso(0,v1,z2)],col,OUT);
-  for(let u=1.2;u<18;u+=4)winV(u,u+2.4,12,34,'#e9d6a8');
-  winV(20,23,14,32,'#2f3a33');                    // chalkboard
-  g.strokeStyle='#d9d2c0';g.lineWidth=.8;[[20.4,22,26],[20.4,22.6,21]].forEach(([a,b,z])=>{const p=iso(a,0,z),q=iso(b,0,z);g.beginPath();g.moveTo(p.x,p.y);g.lineTo(q.x,q.y);g.stroke();});
-  winV(25,26.8,16,30,'#c9a27e');winV(27.4,28.8,16,30,'#7d8a6a');   // framed art
-  for(let v=1;v<8;v+=3)winU(v,v+2,12,34,'#e9d6a8');
-  winU(11,13,12,30,'#e9d6a8');winU(14.5,16.5,12,30,'#e9d6a8');
+  for(let u=1.2;u<18;u+=4)winV(u,u+2.4,16,50,'#e9d6a8');
+  winV(20,23,20,48,'#2f3a33');                    // chalkboard
+  g.strokeStyle='#d9d2c0';g.lineWidth=.8;[[20.4,22,40],[20.4,22.6,32]].forEach(([a,b,z])=>{const p=iso(a,0,z),q=iso(b,0,z);g.beginPath();g.moveTo(p.x,p.y);g.lineTo(q.x,q.y);g.stroke();});
+  winV(25,26.8,24,44,'#c9a27e');winV(27.4,28.8,24,44,'#7d8a6a');   // framed art
+  for(let v=1;v<8;v+=3)winU(v,v+2,16,50,'#e9d6a8');
+  winU(11,13,16,46,'#e9d6a8');winU(14.5,16.5,16,46,'#e9d6a8');
   // labels
-  g.font='bold 7px monospace';g.fillStyle='rgba(36,24,15,.55)';g.textAlign='center';
+  g.font='bold 9px monospace';g.fillStyle='rgba(36,24,15,.55)';g.textAlign='center';
   [['WORK FLOOR',9.5,7.3],['LEAD',21.5,7.3],['OPISINA MO',27,7.6],['LOUNGE',3.5,17.4],['CR',9,17.4],['LOBBY',14,16.6],['HR',19.5,17.4],['COFFEE BAR',26,17.4]].forEach(([t,u,v])=>{const p=iso(u,v);g.fillText(t,p.x,p.y);});
 })();
 
@@ -627,9 +627,9 @@ function bubbleFor(e,t){
   return['',''];
 }
 function updateOverlay(t){
-  overlay.style.setProperty('--zs',Math.max(.85,Math.min(1.3,.75+cam.z*.25)).toFixed(2));
+  overlay.style.setProperty('--zs',Math.max(.9,Math.min(1.15,.8+cam.z*.15)).toFixed(2));
   for(const e of PEOPLE()){
-    const n=node(e);const p=isoP(e);const off=e.pose==='sleep'?20:e.pose==='sit'?34:40;
+    const n=node(e);const p=isoP(e);const off=e.pose==='sleep'?18:e.pose==='sit'?32:38;
     const lx=(p.x-cam.x)*cam.z/SW*100,ly=(p.y-off-cam.y)*cam.z/SH*100;
     n.style.left=lx+'%';n.style.top=ly+'%';n.style.display=(lx<-8||lx>108||ly<-5||ly>115)?'none':'';
     const[b,c]=bubbleFor(e,t);
@@ -641,7 +641,7 @@ function updateOverlay(t){
 }
 
 /* ---------- camera (screen space) ---------- */
-const cam={x:0,y:0,z:1.5,tx:0,ty:0,follow:null};
+const cam={x:0,y:0,z:1.4,tx:0,ty:0,follow:null};
 function clampCam(){const vw=SW/cam.z,vh=SH/cam.z;cam.tx=Math.max(0,Math.min(SW-vw,cam.tx));cam.ty=Math.max(0,Math.min(SH-vh,cam.ty));}
 function centerOn(x,y){cam.tx=x-SW/cam.z/2;cam.ty=y-SH/cam.z/2;clampCam();}
 function updateCam(dt){
