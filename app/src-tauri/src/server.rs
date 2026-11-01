@@ -22,8 +22,9 @@ const MAX_BODY: usize = 4 * 1024 * 1024;
 
 /// Set by the app: opens the Dev Room window (used when DevRoom.exe is started a second time).
 pub static ON_SHOW: std::sync::OnceLock<Box<dyn Fn() + Send + Sync>> = std::sync::OnceLock::new();
-/// Set by the app: opens the official Claude Code chat in its own Dev Room window.
-pub static ON_CLAUDE: std::sync::OnceLock<Box<dyn Fn() + Send + Sync>> = std::sync::OnceLock::new();
+/// Set by the app: shows the official Claude Code chat inside the Dev Room window at a rectangle
+/// (CSS pixels of the UI), or hides it (None).
+pub static ON_CLAUDE: std::sync::OnceLock<Box<dyn Fn(Option<(f64, f64, f64, f64)>) + Send + Sync>> = std::sync::OnceLock::new();
 
 /// Lock the shared state; a panic in another request must not take the whole server down.
 fn lk(m: &Mutex<State>) -> std::sync::MutexGuard<'_, State> { m.lock().unwrap_or_else(|e| e.into_inner()) }
@@ -608,7 +609,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
             list.sort_by_key(|r| std::cmp::Reverse(r.get("updated_at").and_then(|t| t.as_u64()).unwrap_or(0)));
             let lan = lan_ip().map(|ip| format!("http://{ip}:{port}/"));
             let body = json!({"version": s.version, "sessions": list, "team": s.team, "local": local,
-                "hooks_installed": if local { json!(hooks_installed(port)) } else { Value::Null }, "away": s.away,
+                "hooks_installed": if local { json!(hooks_installed(port)) } else { Value::Null }, "embed_claude": local && ON_CLAUDE.get().is_some(), "away": s.away,
                 "settings_path": if local { json!(claude_settings_path().display().to_string()) } else { Value::Null },
                 "lan_url": lan, "ts_url": tailscale_ip().map(|ip| format!("http://{ip}:{port}/")),
                 "app_build": crate::updater::BUILD, "app_version": crate::updater::VERSION, "ui_build": crate::updater::ui_build(),
@@ -654,9 +655,12 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
             drop(g);
             respond_json(req, 200, &Value::Object(all));
         }
-        (Method::Post, "/api/open-claude") => {
+        (Method::Post, "/api/claude-view") => {
             if !local { return respond_json(req, 403, &json!({"error": "loopback only"})); }
-            let ok = ON_CLAUDE.get().map(|f| f()).is_some();
+            let v = read_body(&mut req).unwrap_or(Value::Null);
+            let n = |k: &str| v.get(k).and_then(|x| x.as_f64()).unwrap_or(0.0);
+            let rect = if v.get("show").and_then(|x| x.as_bool()).unwrap_or(false) && n("w") > 50.0 && n("h") > 50.0 { Some((n("x"), n("y"), n("w"), n("h"))) } else { None };
+            let ok = ON_CLAUDE.get().map(|f| f(rect)).is_some();
             respond_json(req, if ok { 200 } else { 503 }, &json!({"ok": ok}));
         }
         (Method::Post, "/api/show") => {

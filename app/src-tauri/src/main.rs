@@ -46,20 +46,40 @@ fn make_window(app: &AppHandle, port: u16) {
         .build();
 }
 
-/// The official Claude Code chat (claude.ai/code, with this PC's sessions through Remote Control) in its own window.
-fn show_claude(app: &AppHandle) {
-    if let Some(w) = app.get_webview_window("claude") {
-        let _ = w.show();
-        let _ = w.unminimize();
-        let _ = w.set_focus();
+/// The official Claude Code chat (claude.ai/code, with this PC's sessions through Remote Control),
+/// shown as a second webview inside the Dev Room window, over the panel's chat area.
+/// Runs on a server thread (creating a child webview from the main thread can deadlock on Windows).
+fn claude_view(app: &AppHandle, rect: Option<(f64, f64, f64, f64)>) {
+    use tauri::{LogicalPosition, LogicalSize};
+    let existing = app.webviews().get("claude").cloned();
+    let Some((x, y, w, h)) = rect else {
+        if let Some(v) = existing { let _ = v.hide(); }
+        return;
+    };
+    if let Some(v) = existing {
+        let _ = v.set_position(LogicalPosition::new(x, y));
+        let _ = v.set_size(LogicalSize::new(w, h));
+        let _ = v.show();
         return;
     }
+    let Some(window) = app.get_window("main") else { return };
+    let app2 = app.clone();
+    let popups = std::sync::atomic::AtomicU32::new(0);
     let url = "https://claude.ai/code".parse().expect("valid url");
-    let _ = tauri::WebviewWindowBuilder::new(app, "claude", tauri::WebviewUrl::External(url))
-        .title("Claude · Dev Room")
-        .inner_size(1100.0, 860.0)
-        .min_inner_size(420.0, 520.0)
-        .build();
+    let builder = tauri::webview::WebviewBuilder::new("claude", tauri::WebviewUrl::External(url))
+        // sign-in pages that open a window (Google, email links) open inside Dev Room, in the same profile
+        .on_new_window(move |url, features| {
+            let n = popups.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            match tauri::WebviewWindowBuilder::new(&app2, format!("claude-signin-{n}"), tauri::WebviewUrl::External("about:blank".parse().unwrap()))
+                .window_features(features)
+                .title(format!("Claude · {}", url.host_str().unwrap_or("sign in")))
+                .build()
+            {
+                Ok(window) => tauri::webview::NewWindowResponse::Create { window },
+                Err(_) => tauri::webview::NewWindowResponse::Allow,
+            }
+        });
+    let _ = window.add_child(builder, LogicalPosition::new(x, y), LogicalSize::new(w, h));
 }
 
 fn show_main(app: &AppHandle, port: u16) {
@@ -101,10 +121,7 @@ fn main() {
         .setup(move |app| {
             if !hidden { make_window(app.handle(), port); }
             let ch = app.handle().clone();
-            let _ = server::ON_CLAUDE.set(Box::new(move || {
-                let h = ch.clone();
-                let _ = ch.run_on_main_thread(move || show_claude(&h));
-            }));
+            let _ = server::ON_CLAUDE.set(Box::new(move |rect| claude_view(&ch, rect)));
             let handle = app.handle().clone();
             let _ = server::ON_SHOW.set(Box::new(move || {
                 let h = handle.clone();
