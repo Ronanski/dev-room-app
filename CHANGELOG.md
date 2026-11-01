@@ -7,6 +7,18 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.13.0 (2026-11-01)
+
+- **Progress you can see.** Dev Room follows each session's own task list (its `TodoWrite`, `TaskCreate` and `TaskUpdate` calls, `track_tasks`):
+  - Tiles show a progress bar and `done/total`; the map shows a small bar under the session's name while she works.
+  - **Detalye** starts with the phase (**Sinimulan**, **Ginagawa**, **Tapos na**), a progress bar, and the checklist (✓ done, ▶ the current one, ○ waiting).
+  - A fresh list starts when you give new work after everything was done.
+- **Life in the playroom after work.** When a session finishes a turn after real work (over a minute), she walks to your office with her report ("Tapos na po, Boss…"), the Boss answers, and she goes back to her desk.
+- **Plan limits in the header.** The **5 oras** and **Linggo** meters show how much of your Claude limits is used and when each resets (amber from 70%, red from 90%). They are read on the PC with the sign-in Claude Code keeps there (`~/.claude/.credentials.json`); only the percentages and reset times are passed on, never the sign-in. If it cannot be read, the meter says why.
+- **Why a message waits.** Under a queued message, the chat now says exactly why (`queue_why`): the session is in the middle of a step (which one, and for how long), it is still answering your previous message, or Dev Room cannot find Claude Code on the PC. Claude Code takes a new message only between steps, like the Claude app's queue.
+- Finding Claude Code on Windows also asks Windows for the running `claude.exe` when it is not in the usual folders.
+- Tested here with Playwright and a stand-in usage service at 1366×768, 800×1280 and 412×900: meters, tile counts, map bars, the checklist, the queue reason and the report walk; no page errors, no overflow. The real usage service and the PC's sign-in file were not tested here.
+
 ## 0.12.0 (2026-11-01)
 
 - **Session tiles.** The cards under the office are now equal tiles that fill the full width: up to 4 a row (`dockCols`: fewer when the screen is narrow, 2 on a phone), and the rest wrap below instead of scrolling sideways.

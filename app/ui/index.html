@@ -530,6 +530,38 @@ body{margin:0}
 .app.focus .dock .dcard .ft{display:none}
 .app.focus .dock .dcard .tl8{display:none}
 .app.focus .dock>*{min-height:36px}
+.app .dock .dcard{position:relative;overflow:hidden}
+.app .dock .dcard .nm{display:flex;align-items:baseline;gap:6px}
+.app .dock .dcard .nmt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app .dock .dcard .pc{flex:none;margin-left:auto;font-family:var(--f-mono);font-size:10.5px;font-weight:600;color:var(--muted)}
+.pbar{display:block;height:4px;border-radius:2px;background:color-mix(in srgb,var(--muted) 22%,transparent);overflow:hidden}
+.pbar b{display:block;height:100%;background:var(--work);border-radius:2px;transition:width .4s ease}
+.pbar.ok b{background:var(--accent)}
+.app .dock .dcard .pbar{position:absolute;left:0;right:0;bottom:0;height:3px;border-radius:0}
+.prog{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:12px;background:var(--bg)}
+.prog .ph{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px;font-size:13px}
+.prog .ph span{font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
+.pbar.big{height:7px;border-radius:4px}
+.tasks{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:5px;font-size:12.5px}
+.tasks li{display:flex;gap:8px;align-items:flex-start}
+.tasks li i{flex:none;width:16px;text-align:center;font-style:normal;color:var(--muted)}
+.tasks li.completed span{color:var(--muted);text-decoration:line-through}
+.tasks li.completed i{color:var(--work)}
+.tasks li.in_progress{font-weight:700}
+.tasks li.in_progress i{color:var(--accent)}
+.pg{width:calc(30px * var(--bs,1.3));height:4px;border-radius:2px;background:rgba(43,33,27,.55);overflow:hidden;margin-top:1px;box-shadow:0 0 0 1px rgba(247,240,227,.35)}
+.pg i{display:block;height:100%;background:#7fbf5f}
+.pg.ok i{background:#e0b25a}
+.usage{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.um{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--chip);font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.um b{font-weight:700}
+.um small{color:var(--muted);font-size:10.5px}
+.um .ub{display:inline-block;width:46px;height:6px;border-radius:3px;background:color-mix(in srgb,var(--muted) 25%,transparent);overflow:hidden}
+.um .ub i{display:block;height:100%;background:var(--work)}
+.um.warm .ub i{background:var(--idle)}
+.um.hot .ub i{background:var(--need)}
+.um.hot span{color:var(--need);font-weight:700}
+.um.err{color:var(--muted)}
 .psplit{display:none;position:absolute;left:0;right:0;top:-9px;height:14px;z-index:3;cursor:row-resize;touch-action:none}
 .psplit::after{content:"";position:absolute;left:50%;top:5px;width:46px;height:4px;margin-left:-23px;border-radius:2px;background:var(--muted);opacity:.55}
 .psplit:hover::after,.psplit.on::after{opacity:1;background:var(--accent)}
@@ -547,6 +579,7 @@ body{margin:0}
         <div class="ttl"><h1>Dev Room · Unit 1</h1><p class="sub"><span id="unitName">Unit 1</span> · live mula sa PC mo<span id="via"></span> · <button type="button" class="updpill" id="ver" data-act="updinfo" data-st="wait">Tinitingnan ang update…</button> · <span class="clock" id="clock"></span></p><div class="units" id="units" hidden role="tablist" aria-label="Mga office"></div></div>
       </div>
       <div class="counts" id="counts"></div>
+      <div class="usage" id="usage" hidden></div>
       <div class="controls">
         <div class="seg" role="group" aria-label="Preview">
           <button type="button" id="devDesktop" data-device="desktop" aria-pressed="true">Desktop</button>
@@ -859,8 +892,21 @@ function nextRound(s){
     setTimeout(()=>{if(sessions.includes(o))talk(o,replyFor(o));},2400);
     setTimeout(()=>nextRound(s),8000);});
 }
+// How far a session got, from its own task list: started, in progress (n of m) or done.
+function prog(s){const t=s.tasks||[],total=t.length,done=t.filter(x=>x.st==='completed').length,cur=t.find(x=>x.st==='in_progress')||null;
+  const phase=total?(done===total?'done':done||cur?'doing':'start'):(s.status==='working'?'start':'');
+  return{total,done,cur,phase,pct:total?Math.round(done*100/total):0};}
+function progLabel(s){const p=prog(s);if(!p.total)return p.phase==='start'?'Sinimulan':'';return p.phase==='done'?'Tapos na lahat':`${p.done} sa ${p.total} tapos`;}
+// After real work she brings her report to your office, then goes back to her desk.
+function reportToBoss(s){
+  release(s);s.idle='report';const spot={x:BOSS_MEET.x+rand(-1.4,1.4)*T,y:BOSS_MEET.y-rand(.4,1.2)*T};
+  goTo(s,spot,()=>{s.pose='stand';const p=prog(s);
+    talk(s,p.total?`Tapos na po, Boss: ${p.done} sa ${p.total} na task.`:pick(['Tapos na po, Boss. Nasa chat ang report ko.','Boss, tapos na. Pakitingnan na lang po.','Done na po, Boss!']));react(s,'📋');
+    if(boss&&!boss.path.length)setTimeout(()=>say(boss,pick([`Salamat, ${s.short}.`,'Sige, titingnan ko.','Ayos, good job!'])),1600);
+    setTimeout(()=>{if(s.status==='idle'&&s.idle==='report')sitAtDesk(s,false,'desk');},6000);});
+}
 function setStatus(s,st,why){
-  const prev=s.status,wasAct=s.idle;s.status=st;s.since=s.at||now();
+  const prev=s.status,wasAct=s.idle,prevSince=s.since;s.status=st;s.since=s.at||now();
   if(st==='needs'||st==='failed'){s.acked=false;s.alarmAt=now();s.prio=/permission/i.test(s.ask||'')||st==='failed'?1:2;}
   if(s.tl){s.tl.push({st,from:now()});const cut=now()-8*60*MIN;while(s.tl.length>2&&s.tl[1].from<cut)s.tl.shift();}
   if(st==='idle'&&prev!=='idle'){s.idleStart=s.since;s.lingerMs=rand(2,5)*MIN/SPEED();}
@@ -869,6 +915,7 @@ function setStatus(s,st,why){
   addChatFor(s,st,why);
   if(st==='needs'||st==='failed')toast(s);
   applyStatus(s,false);
+  if(st==='idle'&&prev==='working'&&!firstLoad&&s.since-prevSince>60000)reportToBoss(s);
   // called back from a break: say so and hurry to the desk
   if(st==='working'&&prev!=='working'&&wasAct&&!/^(desk|check|rounds)$/.test(wasAct)){s.hurry=true;s.talk={text:pick(BACK_LINES[wasAct]||BACK_LINES._),until:now()+4500};}
   render();
@@ -1168,7 +1215,7 @@ function infoOf(r){
   const url=(((sc.sources||[])[0]||{}).git_repository||{}).url||'';const repo=url.replace(/^https:\/\/github\.com\//,'');
   const br=em.current_branches||{};
   const o={prio:/permission/i.test(p.needs_action||'')?1:2,status:BUCKET[r.status_bucket]||'idle',at:(typeof r.updated_at==='number'?r.updated_at:Date.parse(r.updated_at))||now(),cwd:r.cwd||'',act:r.short||'',prompt_at:r.prompt_at||0,ask:askText(sent(p.needs_action)),detail:p.status_detail||r.task_summary||'',recent:p.recent_action||'',
-    source:src[0],host:src[1],archived:r.session_status==='SESSION_STATUS_ARCHIVED',inbox:r.inbox||[],convo_n:r.convo_n||0,listening:!!r.listening};
+    source:src[0],host:src[1],archived:r.session_status==='SESSION_STATUS_ARCHIVED',inbox:r.inbox||[],convo_n:r.convo_n||0,listening:!!r.listening,tasks:Array.isArray(r.tasks)?r.tasks:[],step:r.step||'',step_at:r.step_at||0,qwhy:r.queue_why||''};
   if(repo)o.repo=repo;if(repo&&(br[repo]||br['']))o.branch=br[repo]||br[''];
   if(sc.model)o.model=sc.model;if(em.context_usage)o.ctx=em.context_usage;if(em.artifacts)o.artifacts=em.artifacts;
   return o;
@@ -1380,7 +1427,7 @@ async function poll(){
       const j=await r.json();
       const teamChanged=JSON.stringify(j.team)!==JSON.stringify(TEAM);
       updates(j);
-      version=j.version;TEAM=j.team||TEAM;isLocal=!!j.local;hooksOk=j.hooks_installed;embedClaude=false;instantChat=!!j.instant_chat;$('app').classList.add('hasclaude');REMOTE=j.remote||null;if(!$('teamPanel').hidden&&$('remoteBox'))remoteBox();settingsPath=j.settings_path||'';lanUrl=j.lan_url||'';tsUrl=j.ts_url||'';
+      version=j.version;TEAM=j.team||TEAM;isLocal=!!j.local;hooksOk=j.hooks_installed;embedClaude=false;instantChat=!!j.instant_chat;renderUsage(j.usage);$('app').classList.add('hasclaude');REMOTE=j.remote||null;if(!$('teamPanel').hidden&&$('remoteBox'))remoteBox();settingsPath=j.settings_path||'';lanUrl=j.lan_url||'';tsUrl=j.ts_url||'';
       mode='live';lastSync=Date.now();
       if(teamChanged&&!firstLoad){allRecords=j.sessions;rebuildTeam();}else applyRecords(j.sessions);
       awayMode=j.away||awayMode;
@@ -1394,6 +1441,11 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.13.0':{news:['<b>Kita na ang progress:</b> may progress bar at bilang (hal. 2/4) sa tile ng bawat session, at maliit na bar sa ilalim ng pangalan niya sa office. Sa <b>Detalye</b>, nandoon ang yugto (Sinimulan, Ginagawa, Tapos na) at ang listahan ng mga task niya.',
+    '<b>Pagkatapos ng trabaho,</b> pupunta siya sa opisina mo para mag-report bago bumalik sa desk.',
+    '<b>Limit ng Claude mo:</b> nasa itaas na ang <b>5 oras</b> at <b>Linggo</b>, kung ilang porsyento na ang nagamit at kailan magre-reset.',
+    '<b>Kapag naka-pila ang mensahe mo,</b> nakasulat na kung bakit: halimbawa, nasa gitna pa siya ng isang hakbang (at kung gaano na katagal).'],
+    todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
   '0.12.0':{news:['<b>Bagong session tiles:</b> pantay-pantay na ang laki at sakop ang buong lapad ng screen. Hanggang 4 kada row, at nasa ibaba ang iba. May <b>mukha</b> na ang bawat isa (galing sa mismong character niya), at <b>isang pangalan</b> lang. Ang tuldok sa mukha ang nagsasabi ng status.',
     '<b>Naaayos na ang taas ng panel sa portrait:</b> i-drag pataas o pababa ang maliit na bar sa ibabaw ng panel. Tatandaan ito ng app. I-double tap para ibalik sa dati.',
     'Mas mababa na rin ang tiles sa portrait at fullscreen.'],
@@ -1932,6 +1984,8 @@ function updateOverlay(t){
     if(c!==n._bc){n._b.className='bub '+c;n._bc=c;}
     const ic=FX.icons?iconFor(e):'';const tag=(ic?ic+' ':'')+(e.npc?e.name:e.short);{const ti=e.npc?e.name:e.role;if(n._t.title!==ti)n._t.title=ti;}if(n._t.textContent!==tag)n._t.textContent=tag;
     if(!e.npc&&FX.mood){if(!n._e){n._e=document.createElement('div');n._e.className='en';n._e.innerHTML='<i></i>';n.appendChild(n._e);}const en=energy(e),ew=Math.round(en*20)*5;if(n._e.hidden)n._e.hidden=false;if(n._ew!==ew){n._ew=ew;n._e.firstChild.style.width=ew+'%';n._e.firstChild.style.background=en>.6?'#6f9a55':en>.3?'#d2a75a':'#c4573c';}}else if(n._e&&!n._e.hidden)n._e.hidden=true;
+    if(!e.npc){const pr=prog(e),show=pr.total>0&&(e.status==='working'||pr.phase==='done');if(show){if(!n._p){n._p=document.createElement('div');n._p.className='pg';n._p.innerHTML='<i></i>';n.appendChild(n._p);}
+      if(n._p.hidden)n._p.hidden=false;const k=pr.pct+(pr.phase==='done'?'d':'');if(n._pk!==k){n._pk=k;n._p.firstChild.style.width=Math.max(6,pr.pct)+'%';n._p.classList.toggle('ok',pr.phase==='done');n._p.title=progLabel(e);}}else if(n._p&&!n._p.hidden)n._p.hidden=true;}
     const tc='tag'+(e.boss?' you':'')+(e.id&&e.id===selected?' sel':'');if(n._tc!==tc){n._tc=tc;n._t.className=tc;}
   }
 }
@@ -2183,7 +2237,7 @@ function bake(){
 }
 setScene('office');
 // test hook (only with ?debug=1): lets automated checks look at walking and the floor grid
-if(/[?&]debug=1/.test(location.search))window.__dr={NAV,navPath,sessions,T,setScene};
+if(/[?&]debug=1/.test(location.search))window.__dr={NAV,navPath,sessions,T,setScene,reportToBoss,prog};
 
 /* ---------- loop ---------- */
 let last=performance.now();
@@ -2428,6 +2482,30 @@ function closeViewer(){const v=$('viewer');if(v.hidden)return;v.hidden=true;$('v
 })();
 // One feed for the whole team: your prompts, the sessions' replies and messages sent from this app.
 const SYS_PROMPT=/^\s*<(wake|event|[a-z][\w]*(?:-[\w]+)+)[\s>]/i;
+// Why your message is still waiting, in words (from the PC: queue_why)
+function queueText(s){
+  const mins=s.step_at?Math.max(0,Math.round((Date.now()-s.step_at)/60000)):0,step=s.step?TOOLNAME(s.step):'isang hakbang';
+  switch(s.qwhy){
+    case'answering':return'Nakapila: sinasagot pa niya ang nauna mong mensahe; kasama ito sa susunod niyang hakbang.';
+    case'step':return`Nakapila: nasa gitna siya ng ${step}${mins?` (${mins} min na)`:''}. Papasok ito pagkatapos ng hakbang na iyon, tulad sa Claude app.`;
+    case'nocli':return'Nakapila: hindi mahanap ng Dev Room ang Claude Code sa PC, kaya hindi ito maipasa agad. Papasok ito sa susunod na galaw ng session.';
+    case'soon':return'Ipinapasa…';
+    case'busy':return'Nakapila: tumatakbo pa ang turn niya; papasok ito sa susunod niyang hakbang.';
+    default:return s.status==='working'?'Nakapila: papasok ito sa susunod niyang hakbang.':'Ipinapasa…';}
+}
+const TOOLNAME=t=>({Agent:'pagpapagawa sa isang agent',Task:'pagpapagawa sa isang agent',Bash:'isang command',Edit:'pag-edit ng file',Write:'pagsulat ng file',Read:'pagbasa ng file',WebFetch:'pagbukas ng web page',WebSearch:'pag-search',Monitor:'paghihintay sa isang proseso',TaskOutput:'paghihintay sa resulta ng agent'})[t]||(/^mcp__/.test(t)?'isang tool':t);
+// Your Claude plan limits (read on the PC): the 5-hour window and the week, with when each resets.
+function renderUsage(u){
+  const el=$('usage');if(!el)return;if(!u){el.hidden=true;return;}el.hidden=false;
+  if(u.err){const why={nosignin:'Hindi makita ang sign-in ng Claude Code sa PC na ito.',expired:'Expired ang sign-in; buksan ang Claude Code sa PC para ma-refresh.',offline:'Walang internet sa PC.',format:'Nagbago ang sagot ng usage service.'}[u.err]||'';
+    const h=`<span class="um err" title="${esc(why)}">Limit: —</span>`;if(el.innerHTML!==h)el.innerHTML=h;return;}
+  const tm=r=>{const d=r?new Date(r):null;return d&&!isNaN(d)?d.toLocaleTimeString('fil-PH',{hour:'numeric',minute:'2-digit'}):'';};
+  const dy=r=>{const d=r?new Date(r):null;return d&&!isNaN(d)?d.toLocaleDateString('fil-PH',{weekday:'short'})+' '+tm(r):'';};
+  const m=(lab,p,when,full)=>{if(!p||p.pct==null)return'';const v=Math.max(0,Math.min(100,p.pct)),c=v>=90?'hot':v>=70?'warm':'';
+    return `<span class="um ${c}" title="${esc(full)}: ${v}% nagamit${when?` · magre-reset ${when}`:''}"><b>${lab}</b><i class="ub"><i style="width:${v}%"></i></i><span>${Math.round(v)}%</span>${when?`<small>${esc(when)}</small>`:''}</span>`;};
+  const h=m('5 oras',u.five,tm(u.five&&u.five.reset),'Limit sa loob ng 5 oras')+m('Linggo',u.week,dy(u.week&&u.week.reset),'Lingguhang limit');
+  if(el.innerHTML!==h)el.innerHTML=h;
+}
 function chatFeed(){
   const list=chatFilter==='all'?sessions:sessions.filter(s=>s.sid===chatFilter);
   PENDING=PENDING.filter(p=>!(p.id&&(bySid(p.sid)?.inbox||[]).some(m=>m.id===p.id)));
@@ -2445,7 +2523,7 @@ function chatFeed(){
   items.sort((a,b)=>a.t-b.t);
   const out=items.slice(-120).map(it=>{
     const who=it.you?`<b>Boss</b> → ${esc(it.s.short)}`:`<i style="background:${it.s.pal.shirt}"></i><b>${esc(it.s.short)}</b>`;
-    const st=it.app?`<span class="st">${(it.st==='queued'&&it.s.status==='working'?'Nakapila: matatanggap niya sa susunod niyang hakbang, tulad ng pag-type habang nagtatrabaho siya sa Claude app':{sending:'Ipinapadala…',queued:'Ipinapasa…',sent:'Natanggap na niya ✓',delivered:'Natanggap na niya ✓',failed:'Hindi naipadala.'}[it.st]||'')}${it.st==='failed'&&it.pi!=null?` <button type="button" class="linkbtn" data-retry="${it.pi}">Subukan ulit</button> <button type="button" class="linkbtn" data-drop="${it.pi}">Alisin</button>`:''}${it.why?' ('+esc(it.why)+')':''}${it.app?' · mula sa app':''}</span>`:'';
+    const st=it.app?`<span class="st">${(it.st==='queued'?queueText(it.s):{sending:'Ipinapadala…',queued:'Ipinapasa…',sent:'Natanggap na niya ✓',delivered:'Natanggap na niya ✓',failed:'Hindi naipadala.'}[it.st]||'')}${it.st==='failed'&&it.pi!=null?` <button type="button" class="linkbtn" data-retry="${it.pi}">Subukan ulit</button> <button type="button" class="linkbtn" data-drop="${it.pi}">Alisin</button>`:''}${it.why?' ('+esc(it.why)+')':''}${it.app?' · mula sa app':''}</span>`:'';
     if(it.att)return `<div class="cmsg ${it.you?'you':''}"><span class="who">${who} · ${simLabel(it.t)}</span>${attHTML(it)}</div>`;
     if(it.sys)return `<div class="msg sys" data-chatto="${esc(it.s.sid)}">${esc(it.s.short)}: ${esc(it.text)} · ${simLabel(it.t)}</div>`;
     return `<div class="cmsg ${it.you?'you':''}" data-chatto="${esc(it.s.sid)}"><span class="who">${who} · ${simLabel(it.t)}</span><div class="msg md ${it.you?'you':'agent'}">${md(it.text)}</div>${st}</div>`;
@@ -2494,7 +2572,11 @@ function renderPanel(){
     const aw=$('awaySel');if(aw.value!==awayMode)aw.value=awayMode;
   }else if(ptab==='info'){
     loadDetail(s);
-    const ih=`<div class="info"><dl><dt>Ginagawa</dt><dd>${esc(actText(s))}</dd><dt>Gaano katagal</dt><dd>${dur(now()-s.since)}</dd><dt>Nasaan</dt><dd>${esc(place)}</dd><dt>Source</dt><dd>${s.source} · ${esc(s.host)}</dd><dt>Session name</dt><dd class="raw">${esc(s.name)}</dd><dt>Role</dt><dd>${esc(s.role)}${s.lead?' (leader ng team)':' (galing sa session name)'}</dd>${liveRows(s)}</dl>
+    const pr=prog(s);
+    const ph=pr.phase?`<div class="prog"><div class="ph"><b>${pr.phase==='done'?'Tapos na':pr.phase==='doing'?'Ginagawa':'Sinimulan'}</b><span>${pr.total?`${pr.done} sa ${pr.total} · ${pr.pct}%`:'Wala pang listahan ng task'}</span></div>
+      <i class="pbar big${pr.phase==='done'?' ok':''}"><b style="width:${pr.total?pr.pct:4}%"></b></i>
+      ${pr.total?`<ul class="tasks">${(s.tasks||[]).map(t=>`<li class="${t.st}"><i>${t.st==='completed'?'✓':t.st==='in_progress'?'▶':'○'}</i><span>${esc(t.st==='in_progress'&&t.a?t.a:t.t)}</span></li>`).join('')}</ul>`:''}</div>`:'';
+    const ih=`<div class="info">${ph}<dl><dt>Ginagawa</dt><dd>${esc(actText(s))}</dd><dt>Gaano katagal</dt><dd>${dur(now()-s.since)}</dd><dt>Nasaan</dt><dd>${esc(place)}</dd><dt>Source</dt><dd>${s.source} · ${esc(s.host)}</dd><dt>Session name</dt><dd class="raw">${esc(s.name)}</dd><dt>Role</dt><dd>${esc(s.role)}${s.lead?' (leader ng team)':' (galing sa session name)'}</dd>${liveRows(s)}</dl>
       <p class="sub2">Mga huling ginawa</p><ul class="tl">${s.history.map(h=>`<li><time>${simLabel(h.t)}</time><span>${esc(h.text)}</span></li>`).join('')||'<li><time>Ngayon</time><span>Wala pang activity.</span></li>'}</ul></div>`;
     if(chatKey!=='i'+ih){chatKey='i'+ih;body.innerHTML=ih;}
   }else{
@@ -2578,7 +2660,7 @@ function faceURL(s){
 function faceHTML(s){const u=faceURL(s);
   return `<span class="face" style="--shirt:${s.pal.shirt}">${u?`<img src="${u}" alt="" draggable="false">`:`<b>${esc(s.code)}</b>`}<i class="sdot" style="--st:var(${stColor(s)})"></i></span>`;}
 function dockCard(s){
-  return `<button type="button" class="dcard ${s.id===selected?'sel':''} ${s.status==='needs'?'needcard':''}" data-id="${s.id}" title="${esc(s.role)}${s.task?' · '+esc(s.task):''}">${faceHTML(s)}<span class="nm">${esc(s.short||s.role)}</span><span class="ft">${pill(s)}</span>${FX.timeline?tlHTML(s):''}</button>`;
+  return `<button type="button" class="dcard ${s.id===selected?'sel':''} ${s.status==='needs'?'needcard':''}" data-id="${s.id}" title="${esc(s.role)}${s.task?' · '+esc(s.task):''}${progLabel(s)?' · '+esc(progLabel(s)):''}">${faceHTML(s)}<span class="nm"><span class="nmt">${esc(s.short||s.role)}</span>${prog(s).total?`<span class="pc">${prog(s).done}/${prog(s).total}</span>`:''}</span><span class="ft">${pill(s)}</span>${FX.timeline?tlHTML(s):''}${prog(s).total?`<i class="pbar${prog(s).phase==='done'?' ok':''}"><b style="width:${prog(s).pct}%"></b></i>`:''}</button>`;
 }
 // equal tiles across the full width: up to 4 a row (fewer on narrow screens), the rest wrap below
 function dockCols(){const d=$('dock');if(!d)return;const n=[...d.children].filter(c=>c.getClientRects().length).length||1,W=d.clientWidth||innerWidth;
