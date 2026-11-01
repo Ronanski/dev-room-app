@@ -1114,6 +1114,8 @@ fn tail_transcripts(st: &Mutex<State>) {
         }
     }
     g.bump();
+    // keep what was read: a restart must not lose replies or pictures
+    g.save();
 }
 
 /// The Claude Code program on this PC (the one the sessions use), for continuing a session right away.

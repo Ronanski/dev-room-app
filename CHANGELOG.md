@@ -18,7 +18,7 @@ The version lives in `VERSION`. Each build is published as release `v<VERSION>-b
   - One rounded box that grows with the text, with a round send button.
   - Recipient chips under **Para kay** replace the native dropdown.
   - The **Opsyon** (away mode) is gone, and a saved "on" or "auto" is switched off.
-- The live transcript reader no longer drops the first reply of a session whose transcript was empty when first seen.
+- The live transcript reader no longer drops the first reply of a session whose transcript was empty when first seen, and it saves what it reads, so a restart keeps replies and pictures.
 
 - **Chat replies are formatted like in the Claude app:** bold, italics, inline code, code blocks, headings, bullet and numbered lists, and rules.
   - The text is escaped before formatting, so a reply can never inject HTML.
