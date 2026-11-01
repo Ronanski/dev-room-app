@@ -58,6 +58,11 @@ The user's real team is **LOGIC_SIM_PROJECT**: a leader plus subsessions (CODE F
   - The embedded claude.ai chat is a child webview over the Chat panel. It uses the Tauri `unstable` feature, and its navigation is limited to an allowlist.
 - **`app/src-tauri/src/updater.rs`:** polls the Latest release every 3 minutes and does the UI hot swap and the exe swap.
 - **`app/ui/index.html`:** the whole UI in one file: canvas map, overlay, panel, chat feed and notes. Edit it directly; `tools/ui-build/` only reproduces older versions.
+- **Scenes and units (in `index.html`):**
+  - `setScene('office'|'resort')` redraws the background (`drawOfficeBG` / `drawResortBG`), rebuilds the furniture (`buildOffice` / `buildResort`) and re-bakes it.
+  - Both scenes share the floor plan: `DESKS`, `SPOTS` and the routes.
+  - `computeUnits` groups sessions by team or project folder. Units alternate scenes.
+  - New scenes must keep the same desk and spot coordinates.
 - **`mobile/`:** the Capacitor Android shell.
   - It shows the office in an iframe, served by the PC.
   - `ClaudeActivity` is the in-app claude.ai screen.

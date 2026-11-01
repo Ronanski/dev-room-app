@@ -7,6 +7,48 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.9.0 (2026-11-01)
+
+- **Updates arrive in seconds, not minutes.**
+  - The PC checks for a new release every 30 seconds, instead of every 3 minutes.
+  - A downloaded update installs within 2 seconds when the window is in the tray or minimized.
+  - With the window open, it installs after 15 seconds without input (never while you are typing a message), after a 5-second countdown.
+- **People walk around things.**
+  - Walls and furniture are recorded on a half-tile grid while a scene is built.
+  - Everyone (sessions, the crew and the staff) walks with A* around them and through the doors, then the path is straightened where the line of sight is clear.
+  - Works in the office and the resort.
+- **The PC app installs updates while minimized.**
+  - Before, a minimized window waited for you forever. Only the UI updated; the exe (server features) did not.
+  - Now a minimized window counts like the tray: the update installs within about 3 minutes and the window comes back minimized.
+- **Units: several playrooms in one app.**
+  - Unit 1 is your chosen team (or the biggest project). Every other project folder gets its own unit, shown as tabs under the title, with a red count when someone there needs you.
+  - Units alternate between scenes:
+    - **Office:** the power plant office.
+    - **Beach Resort:** a co-working deck by the sea, nipa huts, a hammock grove, cabins, a beach bar, videoke, a pool and a sand volleyball court.
+  - Same floor plan, people and pixel art. The resort has its own place names, activity words and staff (Bantay, Lifeguard, Housekeeping, Bartender).
+  - A scene that repeats gets another colour.
+  - The chosen unit is remembered on each device.
+- **Free drag:** the playroom can be pulled well past its edges (for example out from under the panel).
+- **Pictures and artifacts in the chat:**
+  - Screenshots and images a session looks at (tool results), and pictures you paste, show inline.
+  - Pages a session publishes (the Artifact tool) and files it sends (SendUserFile) show as cards, opened full screen inside the app.
+  - Files are stored once by content hash under `%APPDATA%\DevRoom\att` (newest 300) and served at `/api/att/<id>`, with the pairing token required.
+  - Pages and SVGs are served with a CSP sandbox and opened in a sandboxed iframe, so they cannot reach Dev Room or its token.
+- **New composer, like the Claude app:**
+  - One rounded box that grows with the text, with a round send button.
+  - Recipient chips under **Para kay** replace the native dropdown.
+  - The **Opsyon** (away mode) is gone, and a saved "on" or "auto" is switched off.
+- The live transcript reader no longer drops the first reply of a session whose transcript was empty when first seen, and it saves what it reads, so a restart keeps replies and pictures.
+
+- **Chat replies are formatted like in the Claude app:** bold, italics, inline code, code blocks, headings, bullet and numbered lists, and rules.
+  - The text is escaped before formatting, so a reply can never inject HTML.
+  - Links show as text.
+- The project name in the chat header stays on one line, with an ellipsis.
+- **Messages no longer get stuck:**
+  - A message waiting for a busy session goes out as soon as that session is free, even when its turn ends without a Stop hook (an idle notification, or background work that stopped).
+  - A turn stopped with Esc sends no Stop hook. A session with no hook and no transcript write for 10 minutes now counts as not working, so a message to it still goes out.
+  - A queued message to a working session now says plainly that it arrives with the session's next step, like typing in the Claude app while it works.
+
 ## 0.8.0 (2026-11-01)
 
 **Real-time chat in Dev Room's own chatbox.** The Chat tab is Dev Room's chat again, not claude.ai.

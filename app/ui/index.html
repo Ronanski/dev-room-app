@@ -68,6 +68,13 @@ html,body{overflow-x:hidden}
   linear-gradient(var(--ink),var(--ink)) 3px 24px/20px 2px no-repeat}
 h1{font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1;margin:0;letter-spacing:.5px}
 .sub{margin:3px 0 0;color:var(--muted);font-size:12px}
+.units{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:8px 0 0;padding-bottom:2px}
+.units::-webkit-scrollbar{display:none}
+.units[hidden]{display:none}
+.units button{flex:none;font:inherit;font-size:12.5px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:5px 12px;cursor:pointer;display:inline-flex;gap:6px;align-items:center;min-height:32px}
+.units button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.units .un{font-family:var(--f-mono);font-size:11px;opacity:.75}
+.units .ub{background:var(--need);color:#fff;border-radius:999px;font-size:10.5px;font-weight:700;padding:0 6px}
 .remotebox{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:10px 0}
 .remotebox .hint{grid-column:1/-1;margin:0}
 .remotebox .rs{font-size:12.5px;color:var(--muted)}
@@ -198,6 +205,29 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .chatpanel.embed .cp-body,.chatpanel.embed .claudebar,.chatpanel.embed .composer{display:none!important}
 /* with the real Claude chat inside the app, the Chat tab is Claude itself: no extra Claude buttons */
 .app.hasclaude .claudebtn,.app.hasclaude .claudebar{display:none!important}
+.composer .rcpt{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;align-items:center;font-size:12px;color:var(--muted)}
+.composer .rcpt::-webkit-scrollbar{display:none}
+.composer .rcpt>span{white-space:nowrap;flex:none}
+.composer .rcpt button{flex:none;font:inherit;font-size:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:4px 10px;display:inline-flex;gap:5px;align-items:center;cursor:pointer;min-height:30px}
+.composer .rcpt button i{width:8px;height:8px;border-radius:50%}
+.composer .rcpt button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--panel);font-weight:700}
+.composer .cbox{display:flex;align-items:flex-end;gap:8px;border:1px solid var(--line);border-radius:22px;background:var(--bg);padding:5px 5px 5px 14px}
+.composer .cbox:focus-within{border-color:var(--accent)}
+.composer .cbox textarea{flex:1;border:0;outline:0!important;background:none;min-height:24px;max-height:160px;padding:6px 0;line-height:1.4;font-size:14px}
+.composer .send{flex:none;width:38px;height:38px;border-radius:50%;border:0;background:var(--accent);color:var(--panel);display:grid;place-items:center;cursor:pointer}
+.composer .send:disabled{opacity:.4;cursor:default}
+.attimg{display:block;max-width:100%;max-height:260px;border-radius:10px;border:1px solid var(--line);cursor:zoom-in;background:var(--chip)}
+.attcard{display:flex;gap:10px;align-items:center;text-align:left;font:inherit;border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:12px;padding:10px 12px;cursor:pointer;max-width:100%}
+.attcard .ic{width:34px;height:34px;flex:none;border-radius:8px;display:grid;place-items:center;background:var(--accent);color:var(--panel);font-weight:800}
+.attcard small{display:block;color:var(--muted);font-size:11.5px}
+.cmsg.you .attimg,.cmsg.you .attcard{margin-left:auto}
+.viewer{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column}
+.viewer[hidden]{display:none}
+.viewer .vbar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+.viewer .vbar b{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.viewer .vbody{flex:1;min-height:0;display:grid;place-items:center;overflow:auto}
+.viewer .vbody img{max-width:100%;max-height:100%;object-fit:contain}
+.viewer .vbody iframe{width:100%;height:100%;border:0;background:#fff}
 .typing{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:4px 2px}
 .typing i{width:8px;height:8px;border-radius:50%;flex:none}
 .typing .dots{display:inline-flex;gap:3px;margin-left:2px}
@@ -218,6 +248,15 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .cmsg .who b{color:var(--ink)}
 .cmsg .who i{width:8px;height:8px;border-radius:2px;display:inline-block}
 .cmsg .msg{max-width:100%;white-space:pre-wrap}
+.cmsg .msg.md{white-space:normal}
+.msg.md p{margin:0 0 6px}.msg.md p:last-child{margin-bottom:0}
+.msg.md p.h{font-weight:700;margin-top:4px}
+.msg.md ul,.msg.md ol{margin:0 0 6px;padding-left:20px}.msg.md li{margin:2px 0}
+.msg.md code{font-family:var(--f-mono);font-size:.92em;background:color-mix(in srgb,var(--ink) 9%,transparent);padding:0 4px;border-radius:4px}
+.msg.md pre{margin:4px 0 6px;padding:8px;border-radius:8px;background:color-mix(in srgb,var(--ink) 9%,transparent);overflow-x:auto;white-space:pre}
+.msg.md pre code{background:none;padding:0}
+.msg.md hr{border:0;border-top:1px solid var(--line);margin:6px 0}
+.cp-head .raw{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cmsg .st{font-size:10.5px;color:var(--muted)}
 .listen{align-self:stretch;font-size:12px;border:1px dashed var(--work);border-radius:8px;padding:6px 9px;color:var(--ink);background:color-mix(in srgb,var(--work) 10%,var(--panel))}
 .composer .to{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
@@ -317,7 +356,7 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
   .app[data-tab="chat"] .top,.app[data-tab="chat"] .conn{display:none}
   .app[data-tab="chat"] .chatpanel{height:calc(100dvh - 90px - env(safe-area-inset-bottom,0px))}
   .toasts .toast:not(:last-child){display:none}
-  .app.typing .tabs,.app.typing .cp-head,.app.typing .cp-tabs,.app.typing .composer .away,.app.typing .cfilter{display:none}
+  .app.typing .tabs,.app.typing .cp-head,.app.typing .cp-tabs,.app.typing .cfilter{display:none}
   .app.typing .chatpanel{height:calc(100dvh - 16px)}
   .app[data-tab="chat"] .pane[data-pane="office"],.app[data-tab="chat"] .dockwrap,.app[data-tab="office"] .pane[data-pane="chat"]{display:none!important}
   .pane[data-pane="chat"]{min-height:0}
@@ -401,7 +440,7 @@ body{margin:0}
     <header class="top">
       <div class="brand">
         <span class="logo" aria-hidden="true"></span>
-        <div><h1>Dev Room · Unit 1</h1><p class="sub">Unit 1 · live mula sa PC mo<span id="via"></span> · <button type="button" class="updpill" id="ver" data-act="updinfo" data-st="wait">Tinitingnan ang update…</button> · <span class="clock" id="clock"></span></p></div>
+        <div><h1>Dev Room · Unit 1</h1><p class="sub"><span id="unitName">Unit 1</span> · live mula sa PC mo<span id="via"></span> · <button type="button" class="updpill" id="ver" data-act="updinfo" data-st="wait">Tinitingnan ang update…</button> · <span class="clock" id="clock"></span></p><div class="units" id="units" hidden role="tablist" aria-label="Mga office"></div></div>
       </div>
       <div class="counts" id="counts"></div>
       <div class="controls">
@@ -441,9 +480,9 @@ body{margin:0}
           <div class="claudehost" id="claudeHost" hidden><span>Binubuksan ang Claude…</span></div>
           <div class="claudebar"><button type="button" class="btn primary" data-act="claude">Kausapin sa Claude</button><span class="hint">Instant na sagot mula sa mismong Claude Code.</span></div>
           <form class="composer" id="composer">
-            <div class="to"><label for="chatTo" id="msgLabel">Para kay</label><select id="chatTo"></select></div>
-            <textarea id="msgInput" rows="2" placeholder="Ano ang gusto mong ipagawa?"></textarea>
-            <div class="row"><details class="away"><summary>Opsyon</summary><label for="awaySel">Kapag tapos na ang session, abangan ang utos mula sa app:</label><select id="awaySel"><option value="off">Hindi (normal na tatapusin ang turn)</option><option value="auto">Kapag may phone na nakabukas</option><option value="on">Palagi</option></select></details><button type="submit" class="btn primary">Ipadala</button></div>
+            <div class="rcpt" id="rcpt" role="group" aria-label="Para kay"></div>
+            <div class="cbox"><textarea id="msgInput" rows="1" placeholder="Mensahe…" aria-label="Mensahe"></textarea><button type="submit" class="send" aria-label="Ipadala"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+            <select id="chatTo" hidden></select><select id="awaySel" hidden><option value="off">off</option><option value="auto">auto</option><option value="on">on</option></select>
           </form>
         </div>
       </section>
@@ -459,6 +498,7 @@ body{margin:0}
 <div id="toast" hidden></div>
     <div class="teampanel" id="teamPanel" hidden></div>
     <div class="teampanel" id="whatsNew" hidden></div>
+    <div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-label="Tingnan"><div class="vbar"><b id="vTitle"></b><button type="button" class="btn" data-act="vclose">Isara</button></div><div class="vbody" id="vBody"></div></div>
   </div>
 </div>
 <p class="devnote">Galing ang data sa Claude Code hooks sa PC mo.</p>
@@ -555,7 +595,56 @@ function mkSession(name,source,host,status,minsAgo,desk){
 /* ---------- movement ---------- */
 function roomOf(p){if(p.y>H)return'out';const tx=p.x/T;if(p.y<11*T)return tx<17?'work':tx<22?'lead':tx<28?'boss':tx<35?'lib':'sleep';if(p.y<13*T)return'corr';return tx<5?'lobby':tx<9?'cr':tx<16?'pantry':tx<22?'lounge':tx<28?'rec':tx<34?'gym':'court';return tx<7?'lounge':tx<11?'cr':tx<17?'lobby':tx<22?'hr':'cafe';}
 function aisle(p){const g=[.8,5.1,9.5,13.6].map(v=>v*T);let best=g[0];for(const x of g)if(Math.abs(x-p.x)<Math.abs(best-p.x))best=x;return{x:best,y:p.y};}
+/* ---------- walking around things ----------
+   Every piece of furniture and wall that stands on the floor is recorded while the scene is baked, on a
+   half-tile grid. People walk with A* around them and through the doors, then the path is straightened where
+   the line of sight is clear. */
+const NAV={rec:null,grid:null,C:84,R:52,S:T/2};
+function buildNav(boxes){
+  const {C,R}=NAV,g=new Uint8Array(C*R);
+  for(const [u,v,w,d] of boxes){
+    // a thin wall still blocks every cell it touches; a small object blocks the cells under it
+    const c0=Math.floor(u*2+.15),c1=Math.max(c0,Math.ceil((u+w)*2-.15)-1),r0=Math.floor(v*2+.15),r1=Math.max(r0,Math.ceil((v+d)*2-.15)-1);
+    for(let r=Math.max(0,r0);r<=Math.min(R-1,r1);r++)for(let c=Math.max(0,c0);c<=Math.min(C-1,c1);c++)g[r*C+c]=1;
+  }
+  // the part of the floor everyone can reach (corners closed in by furniture are never used as a destination)
+  const main=new Uint8Array(C*R);let best=null;const seen=new Uint8Array(C*R);
+  for(let i=0;i<C*R;i++){if(g[i]||seen[i])continue;const comp=[i];seen[i]=1;for(let k=0;k<comp.length;k++){const j=comp[k],c=j%C,r=(j/C)|0;
+    for(const [dc,dr] of [[1,0],[-1,0],[0,1],[0,-1]]){const nc=c+dc,nr=r+dr;if(nc<0||nr<0||nc>=C||nr>=R)continue;const q=nr*C+nc;if(!g[q]&&!seen[q]){seen[q]=1;comp.push(q);}}}
+    if(!best||comp.length>best.length)best=comp;}
+  if(best)for(const i of best)main[i]=1;
+  NAV.grid=g;NAV.main=main;
+}
+const navCell=p=>[Math.max(0,Math.min(NAV.C-1,Math.floor(p.x/NAV.S))),Math.max(0,Math.min(NAV.R-1,Math.floor(p.y/NAV.S)))];
+const navFree=(c,r)=>c>=0&&r>=0&&c<NAV.C&&r<NAV.R&&!NAV.grid[r*NAV.C+c];
+const navOk=(c,r)=>navFree(c,r)&&NAV.main[r*NAV.C+c];
+function navNearest(c,r){if(navOk(c,r))return[c,r];for(let k=1;k<14;k++)for(let dr=-k;dr<=k;dr++)for(let dc=-k;dc<=k;dc++){if(Math.max(Math.abs(dc),Math.abs(dr))!==k)continue;if(navOk(c+dc,r+dr))return[c+dc,r+dr];}return null;}
+// clear line between two cell centres, with a body's width of room on every side
+function navLos(a,b){const n=Math.ceil(Math.max(Math.abs(b[0]-a[0]),Math.abs(b[1]-a[1]))*4);for(let i=1;i<n;i++){const t=i/n;const x=a[0]+.5+(b[0]-a[0])*t,y=a[1]+.5+(b[1]-a[1])*t;
+  for(const [ox,oy] of [[-.35,-.35],[.35,-.35],[-.35,.35],[.35,.35]])if(!navFree(Math.floor(x+ox),Math.floor(y+oy)))return false;}return true;}
+function navPath(a,b){
+  if(!NAV.grid)return null;
+  const s=navNearest(...navCell(a)),e=navNearest(...navCell(b));if(!s||!e)return null;
+  const {C,R}=NAV,N=C*R,start=s[1]*C+s[0],goal=e[1]*C+e[0];
+  const gs=new Float32Array(N).fill(1e9),from=new Int32Array(N).fill(-1),done=new Uint8Array(N);
+  const heap=[];const push=(i,f)=>{heap.push([f,i]);let k=heap.length-1;while(k){const p=(k-1)>>1;if(heap[p][0]<=heap[k][0])break;[heap[p],heap[k]]=[heap[k],heap[p]];k=p;}};
+  const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let k=0;for(;;){const l=2*k+1,r=l+1;let m=k;if(l<heap.length&&heap[l][0]<heap[m][0])m=l;if(r<heap.length&&heap[r][0]<heap[m][0])m=r;if(m===k)break;[heap[m],heap[k]]=[heap[k],heap[m]];k=m;}}return top;};
+  const h=i=>{const dx=Math.abs(i%C-e[0]),dy=Math.abs(((i/C)|0)-e[1]);return Math.max(dx,dy)+.41*Math.min(dx,dy);};
+  gs[start]=0;push(start,h(start));let found=false,steps=0;
+  while(heap.length&&steps++<N*2){const [,i]=pop();if(done[i])continue;done[i]=1;if(i===goal){found=true;break;}
+    const c=i%C,r=(i/C)|0;
+    for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){if(!dc&&!dr)continue;const nc=c+dc,nr=r+dr;if(!navFree(nc,nr))continue;
+      if(dc&&dr&&(!navFree(c+dc,r)||!navFree(c,r+dr)))continue;   // no cutting corners
+      const j=nr*C+nc,ng=gs[i]+(dc&&dr?1.41:1);if(ng<gs[j]){gs[j]=ng;from[j]=i;push(j,ng+h(j));}}}
+  if(!found)return null;
+  const cells=[];for(let i=goal;i!==-1;i=from[i])cells.push([i%C,(i/C)|0]);cells.reverse();
+  // straighten: keep a corner only where the straight line would hit something
+  const out=[];let k=0;while(k<cells.length-1){let j=cells.length-1;while(j>k+1&&!navLos(cells[k],cells[j]))j--;out.push(cells[j]);k=j;}
+  const pts=out.map(([c,r])=>({x:(c+.5)*NAV.S,y:(r+.5)*NAV.S}));
+  pts.push(b);return pts;
+}
 function route(a,b){
+  const p=navPath(a,b);if(p)return p;
   const ra=roomOf(a),rb=roomOf(b);if(ra===rb&&ra!=='out'&&ra!=='work')return[b];
   const cy=CORR-6+Math.random()*12;const pts=[];let sx=a.x;
   if(ra==='work'){const q=aisle(a);pts.push(q);sx=q.x;}
@@ -1010,6 +1099,43 @@ function autoLead(rs){
   const pool=named.length?named:(roled.length?cands:[]);
   return pool.sort((a,b)=>(b.updated_at||0)-(a.updated_at||0))[0]||null;
 }
+// Units: one office per team or project, in the same app. Unit 1 is your chosen team (or the biggest project);
+// every other project folder gets its own unit. Same art, its own colours.
+const THEMES=[{n:'Klasiko',f:'none'},{n:'Gabi',f:'hue-rotate(185deg) saturate(.85) brightness(.95)'},{n:'Gubat',f:'hue-rotate(65deg) saturate(.9)'},
+  {n:'Rosas',f:'hue-rotate(295deg) saturate(.85)'},{n:'Dagat',f:'hue-rotate(140deg) saturate(.8)'},{n:'Ginto',f:'sepia(.45) saturate(1.3)'}];
+let UNIT='';try{UNIT=localStorage.getItem('devroom.unit')||'';}catch(e){}
+let UNITS=[];
+function computeUnits(records){
+  const proj=r=>r.cwd?baseName(r.cwd):'Iba pa';
+  const units=[];let rest=records;
+  if(TEAM.ids&&TEAM.ids.length){const t=pickTeam(records);const counts={};t.list.forEach(r=>{const k=proj(r);counts[k]=(counts[k]||0)+1;});
+    const name=Object.keys(counts).sort((a,b)=>counts[b]-counts[a])[0]||'Team';
+    units.push({key:'team',label:name,lead:t.lead,list:t.list});rest=records.filter(r=>!t.list.includes(r));}
+  const groups=new Map();for(const r of rest){const k=proj(r);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(r);}
+  [...groups.entries()].sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0])).forEach(([k,list])=>{
+    const lead=autoLead(list);const ordered=lead?[lead,...list.filter(r=>r!==lead)]:list;
+    units.push({key:'p:'+k,label:k,lead:lead?lead.id:null,list:ordered.slice(0,MAXN+1)});});
+  if(!units.length)units.push({key:'team',label:'Team',lead:null,list:[]});
+  units.forEach((u,i)=>{u.n=i+1;u.scene=['office','resort'][i%2];u.theme=THEMES[Math.floor(i/2)%THEMES.length];u.need=u.list.filter(r=>r.status_bucket==='SESSION_STATUS_BUCKET_BLOCKED'||r.status_bucket==='SESSION_STATUS_BUCKET_FAILED').length;});
+  return units;
+}
+let themeNow='none';
+// recolour the baked office (floor, walls, furniture) once per switch; characters keep their own colours
+function applyTheme(f){
+  if(f===themeNow)return;themeNow=f;
+  const recolor=(src,dst)=>{const g=dst.getContext('2d');g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,dst.width,dst.height);g.filter=f;g.drawImage(src,0,0);g.filter='none';};
+  if(!bg.orig){const c=document.createElement('canvas');c.width=bg.width;c.height=bg.height;c.getContext('2d').drawImage(bg,0,0);bg.orig=c;}
+  recolor(bg.orig,bg);
+  for(const o of STAT){if(!o.img)continue;if(!o.img.orig){const c=document.createElement('canvas');c.width=o.img.width;c.height=o.img.height;c.getContext('2d').drawImage(o.img,0,0);o.img.orig=c;}recolor(o.img.orig,o.img);}
+  if(typeof redrawAll==='function')redrawAll();
+}
+function renderUnits(){
+  const el=$('units');if(!el)return;const cur=UNITS.find(u=>u.key===UNIT)||UNITS[0];
+  const h=UNITS.length<2?'':UNITS.map(u=>`<button type="button" data-unit="${esc(u.key)}" aria-pressed="${u===cur}"><b>Unit ${u.n}</b> · ${esc(u.label)} <span class="un">${u.list.length}</span>${u!==cur&&u.need?`<span class="ub">${u.need}</span>`:''}</button>`).join('');
+  if(el.dataset.h!==h){el.dataset.h=h;el.innerHTML=h;el.hidden=!h;}
+  const t=`Dev Room · Unit ${cur?cur.n:1}`;const h1=document.querySelector('.top h1');if(h1&&h1.textContent!==t)h1.textContent=t;
+  const u1=$('unitName');if(u1&&cur&&u1.textContent!==cur.label)u1.textContent=cur.label;
+}
 function pickTeam(records){
   if(TEAM.ids&&TEAM.ids.length){const list=records.filter(r=>TEAM.ids.includes(r.id));const l=TEAM.lead||(autoLead(list)||{}).id||null;return{lead:l,list};}
   const lead=(TEAM.lead&&records.find(r=>r.id===TEAM.lead))||autoLead(records);
@@ -1022,7 +1148,15 @@ function dropSession(s,why){
 }
 function applyRecords(records){
   allRecords=records;
-  const {lead,list}=pickTeam(records);
+  UNITS=computeUnits(records);
+  let cur=UNITS.find(u=>u.key===UNIT)||UNITS[0];
+  if(cur.key!==applyRecords.unit){
+    // switching office: everyone of the old unit leaves quietly, the new unit's people are already at work
+    if(applyRecords.unit!==undefined){for(const s of sessions.slice())dropSession(s,'');firstLoad=true;logs.length=0;}
+    applyRecords.unit=cur.key;setScene(cur.scene);applyTheme(cur.theme.f);
+  }
+  renderUnits();
+  const {lead,list}=cur;
   for(const s of sessions.slice()){if(!list.some(r=>r.id===s.sid)||(s.lead!==(s.sid===lead)))dropSession(s,firstLoad?'':`Umalis muna sa office si ${s.short}.`);}
   for(const r of list){
     let s=sessions.find(x=>x.sid===r.id);
@@ -1049,7 +1183,7 @@ function applyRecords(records){
     s.short=n>1?base.replace(/[.…]$/,'')+' '+n:base;s.role=m>1?baseRole+' '+m:baseRole;}}
   if(!sessions.some(x=>x.id===selected)){const q=sessions.filter(x=>x.status==='needs').sort((a,b)=>b.at-a.at)[0]||sessions.find(x=>x.lead)||sessions[0];selected=q?q.id:0;}
   if(firstLoad){
-    log('Guard',`Bukas na ang office. ${sessions.length} na session ang naka-duty.`);
+    log(guard.name,`Bukas na ang ${SCENE==='resort'?'resort':'office'}. ${sessions.length} na session ang naka-duty.`);
     sessions.slice().sort((a,b)=>a.at-b.at).forEach(s=>log(s.short,statusLine(s),s,s.at));
     sessions.filter(x=>x.status==='needs'||x.status==='failed').forEach(toast);
   }
@@ -1134,6 +1268,8 @@ async function poll(){
       mode='live';lastSync=Date.now();
       if(teamChanged&&!firstLoad){allRecords=j.sessions;rebuildTeam();}else applyRecords(j.sessions);
       awayMode=j.away||awayMode;
+      // the old "wait for the app" option is gone: messages are real time now, so a held turn is never wanted
+      if(awayMode!=='off'&&!setAway.fixed){setAway.fixed=true;setAway('off');}
       {const cn=(j.sessions||[]).map(r=>r.id+':'+(r.convo_n||0)).join(',');if(cn!==convoKey){convoKey=cn;loadConvo();}}
     }else mode='offline';
   }catch(e){mode='offline';}
@@ -1142,6 +1278,15 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.9.0':{news:['<b>Iba-ibang playroom sa iisang app (Units):</b> bawat project ay may sariling lugar. Ang Unit 1 ay ang office; ang Unit 2 ay <b>Beach Resort</b>: may co-working deck sa tabing-dagat, kubo, duyan, beach bar, videoke, pool at beach volleyball. Pareho ang art at ang mga tao. Pindutin ang Unit sa itaas para lumipat; may pulang bilang kapag may naghihintay sa ibang unit.',
+    '<b>Malaya nang i-drag ang playroom</b>, kahit palabas sa ilalim ng panel.',
+    '<b>Mabilis na ang update:</b> bawat 30 segundo nagche-check ang PC, at agad nai-install kapag nasa tray o naka-minimize. Kapag bukas ang window, mai-install ito pagkatapos ng 15 segundong hindi mo ginagalaw, pero hindi habang nagta-type ka.',
+    '<b>Hindi na tumatagos ang mga tao sa dingding at gamit:</b> iniikutan na nila ang mga mesa at dumadaan sa mga pinto, sa office man o sa resort.',
+    '<b>Bagong chatbox, tulad ng sa Claude app:</b> isang kahon na lumalaki habang nagta-type ka, may bilog na send button, at mga pindutan sa <b>Para kay</b> imbes na dropdown.',
+    '<b>Kita na ang mga larawan at artifact na ipinapadala nila:</b> screenshots at pages, mismo sa chat. Pindutin para buksan nang buo sa loob ng app.',
+    '<b>Naka-format na ang mga sagot</b> (bold, listahan, code), at wala nang <b>Opsyon</b>: real time na ang lahat.',
+    '<b>Hindi na naiipit ang mensahe mo:</b> kapag nagtatrabaho ang session, matatanggap niya ito sa susunod niyang hakbang, tulad sa Claude app. Pagkatapos, agad itong naipapadala, kahit pinahinto mo siya gamit ang Esc.'],
+    todo:['Isang beses lang, para makuha ng PC ang bagong app: <b>isara ang window ng Dev Room (X)</b>. Mananatili ito sa tray at mag-a-update sa loob ng ilang minuto. Pagkatapos nito, kusa na itong nag-a-update kahit naka-minimize.']},
   '0.8.0':{news:['<b>Real-time na ang chat ng Dev Room.</b> Bumalik ang dating chatbox, pero wala nang hintayan:',
     '<b>Sagot nila:</b> lumalabas agad habang isinusulat nila, hindi na sa dulo ng turn lang. Kita ang lahat ng session sa <b>Lahat</b>, o pumili ng isa.',
     '<b>Mensahe mo:</b> kung tapos na ang session, agad siyang sasagot (ang Dev Room mismo ang nagpapatuloy sa session). Kung nagtatrabaho pa, matatanggap niya sa loob ng ilang segundo.',
@@ -1240,16 +1385,16 @@ function showUpd(){
 if(window.parent!==window)addEventListener('message',e=>{if(e.source!==window.parent)return;const d=e.data||{};
   if(d.type==='devroom:via'){const v={wifi:' (Wi-Fi)',tailscale:' (Tailscale)',remote:' (malayo, internet)'}[d.via]||'';const el=$('via');if(el&&el.textContent!==v)el.textContent=v;return;}
   if(d.type==='devroom:apk'){UPD.apk={build:Number(d.build)||0,latest:Number(d.latest)||0,ver:String(d.ver||'').replace(/[^0-9A-Za-z.\-]/g,'')};showUpd();}});
-// A downloaded update installs itself: right away when the window is not on screen, otherwise after a
-// minute without input, with a 10 s countdown and a button to wait.
+// A downloaded update installs itself: right away when the window is not on screen, otherwise after 15 s
+// without input (never while you are typing a message), with a 5 s countdown and a button to wait.
 const autoRestart={ready:false,ver:'',left:0,timer:0,waitUntil:0,lastInput:Date.now(),
   tick(){
     if(!this.ready||this.timer||restartApp.going)return;
     if(document.hidden)return;   // minimized or in the background: the app restarts by itself only from the tray
     const el=$('updbar');el.hidden=false;
-    if(Date.now()<this.waitUntil||Date.now()-this.lastInput<60000){
+    if(Date.now()<this.waitUntil||Date.now()-this.lastInput<15000||(document.activeElement&&document.activeElement.id==='msgInput'&&document.activeElement.value)){
       el.innerHTML=`<span>May bagong bersyon ng Dev Room${this.ver?' (v'+this.ver+')':''}. Kusa itong magre-restart kapag hindi mo ginagamit.</span><button type="button" class="btn primary" data-act="restart">I-restart ngayon</button>`;return;}
-    this.left=10;this.show();
+    this.left=5;this.show();
     this.timer=setInterval(()=>{if(--this.left<=0){clearInterval(this.timer);this.timer=0;restartApp(false);}else this.show();},1000);
   },
   show(){const el=$('updbar');el.hidden=false;el.classList.add('counting');el.innerHTML=`<span>Magre-restart ang Dev Room sa loob ng ${this.left} segundo para sa update.</span><button type="button" class="btn" data-act="restart-wait">Mamaya</button><button type="button" class="btn primary" data-act="restart">Ngayon na</button>`;},
@@ -1295,6 +1440,7 @@ const isoP=p=>iso(p.x/T,p.y/T,0);
 function poly(g,pts,fill,stroke){g.beginPath();g.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)g.lineTo(pts[i].x,pts[i].y);g.closePath();if(fill){g.fillStyle=fill;g.fill();}if(stroke){g.strokeStyle=stroke;g.lineWidth=.8;g.lineJoin='round';g.stroke();}}
 function shade(hex,f){const n=parseInt(hex.slice(1),16);const c=[n>>16,n>>8&255,n&255].map(v=>Math.round(Math.min(255,v*f)));return'#'+c.map(v=>v.toString(16).padStart(2,'0')).join('');}
 function box(g,u,v,w,d,h,col,z0,opt){
+  if(NAV.rec&&(z0||0)<2.5&&h>=1.5)NAV.rec.push([u,v,w,d]);
   z0=(z0||0)*HS;h*=HS;opt=opt||{};
   const a=iso(u,v+d,z0),b=iso(u+w,v+d,z0),c=iso(u+w,v,z0);
   const a2=iso(u,v+d,z0+h),b2=iso(u+w,v+d,z0+h),c2=iso(u+w,v,z0+h),d2=iso(u,v,z0+h);
@@ -1306,7 +1452,7 @@ function flat(g,u,v,w,d,col,stroke){poly(g,[iso(u,v),iso(u+w,v),iso(u+w,v+d),iso
 
 /* static floor + back walls */
 const BGRES=2;const bg=document.createElement('canvas');bg.width=SW*BGRES;bg.height=SH*BGRES;
-(function drawBG(){
+function drawOfficeBG(){
   const g=bg.getContext('2d');
   // fully opaque: the map canvas is not cleared each frame, so a transparent corner would keep old pixels (the alarm light piled up into a red disk)
   g.fillStyle='#1c140f';g.fillRect(0,0,bg.width,bg.height);g.scale(BGRES,BGRES);
@@ -1354,7 +1500,7 @@ const BGRES=2;const bg=document.createElement('canvas');bg.width=SW*BGRES;bg.hei
   g.font='bold 14px monospace';g.fillStyle='rgba(15,18,22,.5)';g.textAlign='center';g.textBaseline='middle';
   [['CONTROL ROOM',4,10.5],['TEAM SUPERVISOR',19.5,10.5],['OPISINA MO',25,10.5],['LIBRARY',31.5,10.5],['TULUGAN',38.5,10.5],
    ['GATE',2.5,22.4],['CR',7,22.4],['PANTRY',12.5,22.4],['LOUNGE',19,22.4],['REC ROOM',25,22.4],['GYM',31,22.4],['HALF COURT',38,22.6]].forEach(([t,u,v])=>{const p=iso(u,v-.55);g.save();g.translate(p.x,p.y);g.transform(1,TH/TW,-1,TH/TW,0,0);g.fillText(t,0,0);g.restore();});
-})();
+}
 
 /* furniture as depth-sorted objects */
 const objs=[];
@@ -1365,6 +1511,16 @@ function wallSeg(u1,v1,u2,v2,h,glass){
   if(v1===v2)for(let u=u1;u<u2-1e-6;u+=1){const w=Math.min(1,u2-u);addBox(u,v1-th/2,w,th,h,'#454b52',0,opt);}
   else for(let v=v1;v<v2-1e-6;v+=1){const d=Math.min(1,v2-v);addBox(u1-th/2,v,th,d,h,'#454b52',0,opt);}
 }
+function wallText(u,z,txt,size,col){const p=iso(u,0,z);ctx.save();ctx.transform(1,TH/TW,0,1,p.x,p.y);ctx.fillStyle=col;ctx.font=`bold ${size}px monospace`;ctx.textAlign='center';ctx.fillText(txt,0,0);ctx.restore();}
+function screenColor(s,t){
+  if(!s||s.path.length||s.status==='idle'||s.status==='needs')return'#26313a';
+  if(s.status==='working')return Math.floor(t*3+s.seed)%2?'#3f8aa5':'#367b94';
+  if(s.status==='failed')return Math.floor(t*4)%2?'#d0473a':'#6a1f19';
+  if(s.status==='done')return'#5f8a6c';
+  return'#26313a';
+}
+let tvCh=0,MWV=0;const TVC=['#6f8fb0','#b08a5f','#7fa07a','#a06f8a','#c9b27a'];
+function buildOffice(){
 // top band partitions (glass for the control room and supervisor), front walls with doors to the corridor
 wallSeg(17,0,17,4,18,true);wallSeg(17,6,17,11,18,true);wallSeg(22,0,22,11,18,true);wallSeg(28,0,28,11,18);wallSeg(35,0,35,11,18);
 wallSeg(0,11,1,11,10);wallSeg(4,11,8,11,10);wallSeg(11,11,13,11,10);wallSeg(17,11,18.5,11,10);wallSeg(21,11,23,11,10);wallSeg(27,11,29,11,10);wallSeg(31,11,32,11,10);wallSeg(34.5,11,36,11,10);wallSeg(39,11,42,11,10);
@@ -1373,13 +1529,6 @@ wallSeg(0,13,1.5,13,9);wallSeg(3.5,13,5.5,13,9);wallSeg(8,13,9.5,13,9);wallSeg(1
 for(const x of [5,9,16,22,28,34])wallSeg(x,13,x,23,10);
 wallSeg(42,0,42,23,5);wallSeg(0,23,1.5,23,5);wallSeg(3.5,23,42,23,5);
 
-function screenColor(s,t){
-  if(!s||s.path.length||s.status==='idle'||s.status==='needs')return'#26313a';
-  if(s.status==='working')return Math.floor(t*3+s.seed)%2?'#3f8aa5':'#367b94';
-  if(s.status==='failed')return Math.floor(t*4)%2?'#d0473a':'#6a1f19';
-  if(s.status==='done')return'#5f8a6c';
-  return'#26313a';
-}
 function addConsole(dk,ownerFn){
   const u=dk.x,v=dk.y+.25,w=dk.w;
   add(u+w/2+v+.45,(g,t)=>{
@@ -1427,13 +1576,13 @@ addBox(3.9,14.0,.15,1.2,8,'#9aa3ab');addBox(3.9,16.4,.15,1.2,8,'#9aa3ab');
 for(let i=0;i<3;i++)addBox(5.3+i*.7,13.3,.6,.45,22,['#6f7f8a','#66757f','#6f7f8a'][i]);
 addBox(5.6,21.8,1.2,.8,9,'#b9b0a2');addBox(7.3,21.8,1.2,.8,9,'#b9b0a2');addBox(5.4,17.0,.5,1.6,8,'#e8e4dc');
 // pantry: counter, fridge, coffee machine, tables
-add(9.4+13.6+.4,(g,t)=>{box(g,9.4,13.3,4.2,.7,10,'#4a3f36',0,{top:'#6b5a4c'});box(g,9.7,13.35,.6,.45,8,'#8a7f72',10);box(g,11.4,13.35,.9,.5,5,'#d9cfbd',10);
+add(9.4+13.6+.4,(g,t)=>{box(g,9.4,13.3,3.2,.7,10,'#4a3f36',0,{top:'#6b5a4c'});box(g,9.7,13.35,.6,.45,8,'#8a7f72',10);box(g,11.3,13.35,.9,.5,5,'#d9cfbd',10);
   if(Math.floor(t*1.5)%2){const p=iso(10,13.6,22);g.fillStyle='rgba(239,230,216,.7)';g.fillRect(p.x,p.y,1,3);}});
 addBox(14.2,13.3,1.2,.8,26,'#d9dde0');
 const table=(u,v)=>add(u+v+.9,g=>{box(g,u+.35,v+.35,.2,.2,7,'#3a2a20');box(g,u,v,.9,.9,2,'#7a5338',7,{top:'#8d6443'});box(g,u+.2,v+.2,.15,.15,3,'#efe6d8',9);box(g,u+.55,v+.5,.15,.15,3,'#efe6d8',9);});
 table(11.8,18.8);table(11.8,21.0);
 // lounge: TV wall, sofas, plants
-let tvCh=0;const TVC=['#6f8fb0','#b08a5f','#7fa07a','#a06f8a','#c9b27a'];
+tvCh=0;
 add(17.2+13.2,(g,t)=>{box(g,17.2,13.15,3.6,.4,5,'#3a2a20');const on=sessions.some(s=>s.idle==='tv'&&!s.path.length);const c=on?(Math.floor(t*2)%2?TVC[tvCh%TVC.length]:shade(TVC[tvCh%TVC.length],.85)):'#25282c';box(g,17.4,13.2,3.2,.12,12,'#1d1d22',5,{front:c});});
 addBox(16.8,18.3,4.4,.7,5,'#6b4a35',0,{top:'#7d5840'});addBox(16.8,18.3,4.4,.25,10,'#5a3e2c');
 addBox(16.4,21.4,2.4,.8,5,'#6b4a35',0,{top:'#7d5840'});
@@ -1455,8 +1604,7 @@ addBox(34.6,21.8,3,.6,5,'#6b4a35',0,{top:'#7d5840'});
 const plant=(u,v)=>add(u+v+.5,g=>{box(g,u,v,.5,.5,6,'#7a5338');box(g,u+.05,v+.05,.4,.4,10,'#5f7a4f',6,{top:'#7a9466'});});
 [[.4,.4],[16.2,.4],[21.3,.4],[34.3,.4],[41.3,9.9],[.4,13.4],[15.3,13.4],[21.3,22.2],[33.3,22.2]].forEach(([u,v])=>plant(u,v));
 // video wall content
-function wallText(u,z,txt,size,col){const p=iso(u,0,z);ctx.save();ctx.transform(1,TH/TW,0,1,p.x,p.y);ctx.fillStyle=col;ctx.font=`bold ${size}px monospace`;ctx.textAlign='center';ctx.fillText(txt,0,0);ctx.restore();}
-let MWV=0;
+MWV=0;
 add(-1e9,(g,t)=>{
   const P=(u1,u2,z1,z2,col)=>poly(g,[iso(u1,0,z1),iso(u2,0,z1),iso(u2,0,z2),iso(u1,0,z2)],col);
   P(2,6.4,13,55,'#1d2a33');P(6.8,11,13,55,'#1d2a33');P(11.4,15,13,55,'#1d2a33');
@@ -1469,6 +1617,7 @@ add(-1e9,(g,t)=>{
   box(g,8.7,.05,.4,.3,2,'#2a2f35',60,{top:un&&Math.floor(t*3)%2?'#ff4a3e':'#5a2222',front:un&&Math.floor(t*3)%2?'#e0392f':'#4a1c1c'});
   if(un){const c=iso(8.9,.2,62),a=(t*4)%(Math.PI*2);g.fillStyle='rgba(255,74,62,.08)';g.beginPath();g.moveTo(c.x,c.y);g.arc(c.x,c.y,90,a,a+.5);g.fill();}
 });
+}
 
 /* characters: pixel sprite with a dark outline */
 const spr=document.createElement('canvas');spr.width=24;spr.height=32;const sg=spr.getContext('2d');
@@ -1679,7 +1828,11 @@ function resizeMap(){
   const narrow=VW<560;if(narrow!==resizeMap.narrow){resizeMap.narrow=narrow;cam.z=narrow?2.6:1.25;const p=cam.follow?isoP(cam.follow):iso(14,9);centerOn(p.x,p.y);}
   clampCam();cam.x=cam.tx;cam.y=cam.ty;
 }
-function clampCam(){const vw=viewW(),vh=viewH();cam.tx=vw>=SW?(SW-vw)/2:Math.max(0,Math.min(SW-vw,cam.tx));cam.ty=vh>=SH?(SH-vh)/2:Math.max(0,Math.min(SH-vh,cam.ty));}
+// The office can be dragged anywhere, up to most of the view past its edges (for example out from under the
+// panel); at least a third of the view keeps some office in sight.
+function clampCam(){const vw=viewW(),vh=viewH(),sx=vw*.65,sy=vh*.65;
+  cam.tx=Math.max(Math.min(0,(SW-vw)/2)-sx,Math.min(Math.max(SW-vw,(SW-vw)/2)+sx,cam.tx));
+  cam.ty=Math.max(Math.min(0,(SH-vh)/2)-sy,Math.min(Math.max(SH-vh,(SH-vh)/2)+sy,cam.ty));}
 function centerOn(x,y){cam.tx=x-viewW()/2;cam.ty=y-viewH()/2;clampCam();}
 function updateCam(dt){
   if(cam.follow){const p=isoP(cam.follow);centerOn(p.x,p.y-20);}
@@ -1706,7 +1859,183 @@ const bounds=(()=>{const Q=.25,sc=document.createElement('canvas');sc.width=Math
     return x1<0?null:{bx:Math.floor(x0/Q-M),by:Math.floor(y0/Q-M),bw:Math.ceil((x1-x0+1)/Q+2*M),bh:Math.ceil((y1-y0+1)/Q+2*M)};};})();
 const hit=(a,b)=>a.bx<b.bx+b.bw&&b.bx<a.bx+a.bw&&a.by<b.by+b.bh&&b.by<a.by+a.bh;
 const STAT=[],DYN=[];
-(function bake(){
+/* ---------- scenes: each unit is its own kind of place, same pixel art and the same people ----------
+   The resort keeps the office's floor plan (so walking, desks and hangout spots work the same) but every room
+   is something else: a beachfront co-working deck, nipa huts, a beach bar, videoke, a pool and a sand court. */
+let SCENE='';
+const SCENE_TXT={
+  office:null,
+  resort:{
+    l:{read:'Nasa duyan',gym:'Lumalangoy',basketball:'Nagva-volleyball',coffee:'Umiinom ng buko',eat:'Kumakain sa kubo',tv:'Nagva-videoke',sleep:'Natutulog sa cabin',chismis:'Nakikipagkwentuhan',wander:'Naglalakad sa boardwalk'},
+    s:{read:'Nagpapahinga sa duyan sa lilim ng niyog.',gym:'Lumalangoy sa pool.',basketball:'Naglalaro ng beach volleyball.',coffee:'Umiinom ng buko juice sa beach bar.',eat:'Kumakain sa kubo.',tv:'Kumakanta sa videoke.',sleep:'Natutulog sa cabin.',wander:'Naglalakad-lakad sa boardwalk.'},
+    p:{read:'Duyan',gym:'Pool',basketball:'Volleyball court',coffee:'Beach bar',eat:'Beach bar',chismis:'Boardwalk',cr:'Shower',sleep:'Cabin',wander:'Boardwalk',tv:'Videoke',billiards:'Laro',chess:'Laro',darts:'Laro',stretch:'Boardwalk',phone:'Boardwalk'},
+    npc:{guard:'Bantay',hr:'Lifeguard',janitor:'Housekeeping',barista:'Bartender',tech:'Maintenance'}}};
+const BASE_TXT={l:Object.assign({},IDLE_LBL),s:Object.assign({},IDLE_SENT),p:Object.assign({},IDLE_PLACE)};
+function applySceneText(k){
+  const t=SCENE_TXT[k];
+  for(const [dst,src] of [[IDLE_LBL,'l'],[IDLE_SENT,'s'],[IDLE_PLACE,'p']]){Object.assign(dst,BASE_TXT[src]);if(t)Object.assign(dst,t[src]);}
+  const names={guard:'Guard',hr:'Safety',janitor:'Janitor',barista:'Pantry',tech:'Maintenance'},npc={guard,hr,janitor,barista,tech};
+  for(const key in npc){if(npc[key])npc[key].name=(t&&t.npc[key])||names[key];}
+}
+function setScene(k){
+  if(k===SCENE)return;SCENE=k;
+  const g=bg.getContext('2d');g.setTransform(1,0,0,1,0,0);g.filter='none';bg.orig=null;themeNow='none';
+  objs.length=0;
+  if(k==='resort'){drawResortBG();buildResort();}else{drawOfficeBG();buildOffice();}
+  bake();
+  if(typeof guard!=='undefined')applySceneText(k);
+}
+
+function drawResortBG(){
+  const g=bg.getContext('2d');
+  g.fillStyle='#16222b';g.fillRect(0,0,bg.width,bg.height);g.scale(BGRES,BGRES);
+  const room=(u0,v0,w,d,a,b,style)=>{for(let u=u0;u<u0+w;u++)for(let v=v0;v<v0+d;v++){
+    const c=style==='tile'?((u+v)%2?a:b):style==='sand'?(((u*7+v*13)%5)?a:b):(v%2?a:b);flat(g,u,v,1,1,c);
+    if(style==='plank'){g.strokeStyle='rgba(60,36,18,.22)';g.lineWidth=.6;const m1=iso(u,v+.5),m2=iso(u+1,v+.5);g.beginPath();g.moveTo(m1.x,m1.y);g.lineTo(m2.x,m2.y);g.stroke();}}};
+  room(0,0,17,11,'#b98a5b','#b28454','plank');     // co-working deck
+  room(17,0,5,11,'#cdb071','#c6a96b','plank');     // lead's nipa hut (bamboo mat)
+  room(22,0,6,11,'#a8835f','#a37e5a','plank');     // your villa
+  room(28,0,7,11,'#e6d29d','#dccb93','sand');      // hammock grove
+  room(35,0,7,11,'#b49470','#ad8e6a','plank');     // cabins
+  room(0,11,42,2,'#9a7350','#936d4a','plank');     // boardwalk
+  room(0,13,5,10,'#bdb6a6','#b5ae9e','tile');      // entrance
+  room(5,13,4,10,'#d3e6e8','#c8dcdf','tile');      // showers
+  room(9,13,7,10,'#e6d29d','#dccb93','sand');      // beach bar
+  room(16,13,6,10,'#b98a5b','#b28454','plank');    // videoke
+  room(22,13,6,10,'#cdb071','#c6a96b','plank');    // games hut
+  room(28,13,6,10,'#ddd6c6','#d4cdbd','tile');     // pool deck
+  room(34,13,8,10,'#ecd9a3','#e4d19b','sand');     // volleyball sand
+  // the pool
+  flat(g,28.8,14.2,4.4,7.4,'#2f86a8','rgba(20,40,50,.5)');flat(g,29,14.4,4,7,'#43a6c6');
+  g.strokeStyle='rgba(230,248,255,.55)';g.lineWidth=.8;
+  for(let k=0;k<6;k++){const a=iso(29.3,15+k*1.1),b=iso(32.7,15.3+k*1.1);g.beginPath();g.moveTo(a.x,a.y);g.quadraticCurveTo((a.x+b.x)/2,(a.y+b.y)/2-2,b.x,b.y);g.stroke();}
+  // volleyball court lines (rope)
+  g.strokeStyle='rgba(255,255,255,.8)';g.lineWidth=1;
+  const L=pts=>{g.beginPath();pts.forEach(([u,v],i)=>{const p=iso(u,v);i?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y);});g.stroke();};
+  L([[35,14],[41,14],[41,22],[35,22],[35,14]]);
+  // mats, towels, a beach rug
+  flat(g,22.6,5.2,4.8,2.6,'#3f7f86','rgba(20,24,28,.35)');flat(g,22.8,5.4,4.4,2.2,'#4f969c');
+  flat(g,16.4,15.6,5.2,3.2,'#a0523f','rgba(20,24,28,.35)');flat(g,16.6,15.8,4.8,2.8,'#b8654e');
+  // backdrop: sky and sea behind the resort, jungle on the side
+  const face=(pts,col)=>poly(g,pts,col);
+  face([iso(0,0),iso(42,0),iso(42,0,22),iso(0,0,22)],'#2f8bb0');
+  face([iso(0,0,22),iso(42,0,22),iso(42,0,26),iso(0,0,26)],'#5fb3cf');
+  face([iso(0,0,26),iso(42,0,26),iso(42,0,WALL),iso(0,0,WALL)],'#a9dcec');
+  face([iso(0,0),iso(0,23),iso(0,23,WALL),iso(0,0,WALL)],'#4f7f4a');
+  for(let v=1;v<23;v+=2){const p=iso(0,v,WALL*.55+((v*37)%9));g.fillStyle=v%4?'#5f9257':'#456f40';g.beginPath();g.ellipse(p.x,p.y,10,8,0,0,Math.PI*2);g.fill();}
+  // waves and the sun
+  g.strokeStyle='rgba(235,250,255,.6)';g.lineWidth=.8;
+  for(let k=0;k<14;k++){const u=1.5+k*2.9,z=6+((k*5)%13);const a=iso(u,0,z),b=iso(u+1.2,0,z);g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();}
+  const sun=iso(33,0,WALL-10);g.fillStyle='#ffd77a';g.beginPath();g.arc(sun.x,sun.y,9,0,Math.PI*2);g.fill();
+  g.fillStyle='rgba(255,255,255,.85)';[[8,WALL-8],[20,WALL-5],[27,WALL-11]].forEach(([u,z])=>{const c=iso(u,0,z);g.beginPath();g.ellipse(c.x,c.y,9,3,0,0,Math.PI*2);g.ellipse(c.x+7,c.y-2,6,3,0,0,Math.PI*2);g.fill();});
+  // low sea wall along the back
+  face([iso(0,0),iso(42,0),iso(42,0,4),iso(0,0,4)],'#c9b48a');
+  g.font='bold 14px monospace';g.fillStyle='rgba(60,40,20,.45)';g.textAlign='center';g.textBaseline='middle';
+  [['CO-WORKING',4,10.5],['KUBO NI LEAD',19.5,10.5],['VILLA MO',25,10.5],['DUYAN',31.5,10.5],['CABINS',38.5,10.5],
+   ['ENTRANCE',2.5,22.4],['SHOWER',7,22.4],['BEACH BAR',12.5,22.4],['VIDEOKE',19,22.4],['LARO',25,22.4],['POOL',31,22.4],['VOLLEYBALL',38,22.6]].forEach(([t,u,v])=>{const p=iso(u,v-.55);g.save();g.translate(p.x,p.y);g.transform(1,TH/TW,-1,TH/TW,0,0);g.fillText(t,0,0);g.restore();});
+}
+
+function buildResort(){
+  const BAM='#b8945a',BAMT='#d3b27a',THATCH='#a8864a';
+  // low bamboo fences instead of walls (same openings as the office doors)
+  const fence=(u1,v1,u2,v2,h)=>{const th=.14;
+    if(v1===v2)for(let u=u1;u<u2-1e-6;u+=1){const w=Math.min(1,u2-u);addBox(u,v1-th/2,w,th,h,BAM,0,{top:BAMT});}
+    else for(let v=v1;v<v2-1e-6;v+=1){const d=Math.min(1,v2-v);addBox(u1-th/2,v,th,d,h,BAM,0,{top:BAMT});}};
+  fence(17,0,17,4,8);fence(17,6,17,11,8);fence(22,0,22,11,8);fence(28,0,28,11,6);fence(35,0,35,11,6);
+  fence(0,11,1,11,5);fence(4,11,8,11,5);fence(11,11,13,11,5);fence(21,11,23,11,5);fence(27,11,29,11,5);fence(39,11,42,11,5);
+  fence(0,13,1.5,13,5);fence(3.5,13,5.5,13,5);fence(8,13,9.5,13,5);fence(19.5,13,22.5,13,5);fence(25.5,13,28.5,13,5);
+  for(const x of [5,9,16,22,28,34])fence(x,13,x,23,5);
+  fence(42,0,42,23,4);fence(0,23,1.5,23,4);fence(3.5,23,42,23,4);
+  // co-working: bamboo tables with laptops; the screen shows what each session is doing
+  const laptopDesk=(dk,ownerFn)=>{
+    const u=dk.x,v=dk.y+.25,w=dk.w;
+    add(u+w/2+v+.45,(g,t)=>{
+      box(g,u+.1,v+.1,.12,.12,7,'#7a5530');box(g,u+w-.22,v+.1,.12,.12,7,'#7a5530');
+      box(g,u,v,w,.8,1.2,'#a7824f',7,{top:'#c29a5e'});
+      const s=ownerFn(),sc=screenColor(s,t);
+      for(let i=0;i<2;i++){box(g,u+.35+i*1.3,v+.3,.9,.45,.3,'#3a3f45',8.2);box(g,u+.35+i*1.3,v+.22,.9,.08,6,'#2a2f35',8.5,{front:sc});}
+      box(g,u+w-.55,v+.45,.22,.22,2.2,'#e9e1cf',8.2,{top:'#f4ead2'});   // buko with a straw
+      if(s&&(s.status==='needs'||s.status==='failed')){const un=!s.acked;const on=!un||Math.floor(t*2)%2;box(g,u+.05,v+.05,.2,.2,3,'#5a3a20',8.2,{top:on?(s.status==='failed'||s.prio===1?'#ff4a3e':'#f2b23a'):'#3a2020',front:on?(s.status==='failed'?'#c8382f':'#d79a1c'):'#3a2020'});}
+    });
+    const sx=dk.seat.x/T,sy=dk.seat.y/T;
+    add(sx+sy-.25,g=>{box(g,sx-.22,sy-.3,.44,.4,5,'#8a6438',0,{top:'#b8945a'});});
+  };
+  DESKS.forEach(d=>laptopDesk(d,()=>d.owner));
+  laptopDesk(LEAD_DESK,()=>sessions.find(s=>s.lead));
+  // umbrellas over the deck (high, so people stay visible)
+  const umbrella=(u,v,c)=>add(u+v+.3,g=>{box(g,u,v,.12,.12,30,'#7a5530');const p=iso(u+.06,v+.06,46);g.fillStyle=c;g.beginPath();g.ellipse(p.x,p.y,22,9,0,0,Math.PI*2);g.fill();g.strokeStyle='rgba(0,0,0,.25)';g.stroke();g.fillStyle='rgba(255,255,255,.35)';g.beginPath();g.ellipse(p.x-6,p.y-2,8,3,0,0,Math.PI*2);g.fill();});
+  umbrella(4.4,4.9,'#d9593f');umbrella(8.9,4.9,'#2f8bb0');umbrella(13.2,4.9,'#e2b23a');
+  // the lead's hut: hanging lamp post and a small shelf
+  addBox(17.4,1.0,.6,2.4,10,'#7a5530',0,{top:THATCH});addBox(20.6,8.6,1,1,5,'#a7824f',0,{top:'#c29a5e'});
+  // your villa: desk, chair, beach lounger
+  add(24.7+.3+3.7+.2,g=>{box(g,24.7,3.7,.6,.4,6,'#7a5530');box(g,24.7,3.7,.6,.12,14,'#7a5530',6);});
+  add(25+4.65,g=>{box(g,23.5,4.3,3,.7,8,'#8a6438',0,{top:'#a7824f'});box(g,23.7,4.42,.6,.08,8,'#9a9086',8);box(g,26.2,4.5,.22,.22,2.4,'#e9e1cf',8,{top:'#f4ead2'});});
+  addBox(22.5,8.8,3,.8,3,'#2f8bb0',0,{top:'#4fa7c6'});
+  // hammock grove: palms and hammocks
+  const palm=(u,v,h)=>add(u+v+.4,g=>{for(let k=0;k<6;k++)box(g,u+k*.04,v,.22,.22,h/6,'#8a6438',k*h/6);const top=iso(u+.3,v+.1,h*HS+2);
+    g.fillStyle='#4f8a45';for(let a=0;a<6;a++){const ang=a*Math.PI/3;g.beginPath();g.ellipse(top.x+Math.cos(ang)*9,top.y+Math.sin(ang)*4,10,3.2,ang,0,Math.PI*2);g.fill();}
+    g.fillStyle='#6b4a2a';g.beginPath();g.arc(top.x,top.y+2,2.2,0,Math.PI*2);g.fill();});
+  const hammock=(u,v)=>add(u+v+.8,g=>{box(g,u,v,.12,.12,10,'#7a5530');box(g,u+2,v,.12,.12,10,'#7a5530');
+    const a=iso(u+.06,v+.06,9*HS),b=iso(u+2.06,v+.06,9*HS),m=iso(u+1.06,v+.06,4*HS);g.strokeStyle='#d9593f';g.lineWidth=3;g.beginPath();g.moveTo(a.x,a.y);g.quadraticCurveTo(m.x,m.y+6,b.x,b.y);g.stroke();
+    g.strokeStyle='#f2c14e';g.lineWidth=1;g.beginPath();g.moveTo(a.x,a.y+1);g.quadraticCurveTo(m.x,m.y+7,b.x,b.y+1);g.stroke();});
+  hammock(29.4,6.4);hammock(31.6,8.6);palm(28.8,1.2,30);palm(33.6,1.6,34);palm(30.2,3.6,28);palm(34.2,9.6,30);
+  // cabins: low beds with bright sheets
+  const bed=(u,v,c)=>add(u+v+1.3,g=>{box(g,u,v,2.2,1,3,'#8a6438',0,{top:c});box(g,u+.05,v+.1,.5,.8,1,'#f4ead2',3);});
+  bed(35.6,2.6,'#2f8bb0');bed(35.6,5.6,'#d9593f');bed(38.8,2.6,'#e2b23a');bed(38.8,5.6,'#4f8a45');
+  addBox(39.4,8.4,2.2,.7,7,'#8a6438',0,{top:'#a7824f'});addBox(40,8.45,.7,.1,6,'#2a2f35',7,{front:'#3f8aa5'});
+  // boardwalk: tiki torches
+  const torch=(u,v)=>add(u+v+.2,(g,t)=>{box(g,u,v,.1,.1,14,'#6b4a2a');const p=iso(u+.05,v+.05,15*HS+2);const f=Math.sin(t*9+u)*1.2;g.fillStyle='#f2a33a';g.beginPath();g.ellipse(p.x,p.y-2,2.4,3.6+f,0,0,Math.PI*2);g.fill();g.fillStyle='#ffe08a';g.beginPath();g.ellipse(p.x,p.y-1,1.2,2+f*.5,0,0,Math.PI*2);g.fill();});
+  [2,9,15.5,24,30,37,41].forEach(u=>torch(u,11.15));
+  // entrance: welcome arch and the guard's hut counter
+  addBox(1.8,15.2,1.9,.6,8,'#8a6438',0,{top:'#a7824f'});addBox(2.3,15.25,.6,.1,6,'#2a2f35',8,{front:'#2f5c70'});
+  add(1.5+13.2,g=>{box(g,1.5,13.1,.18,.18,26,'#7a5530');box(g,3.5,13.1,.18,.18,26,'#7a5530');box(g,1.5,13.1,2.2,.18,4,'#a8864a',26);
+    const p=iso(2.6,13.15,30*HS);g.save();g.translate(p.x,p.y);g.transform(1,TH/TW,0,1,0,0);g.fillStyle='#4a2f17';g.font='bold 6px monospace';g.textAlign='center';g.fillText('MABUHAY!',0,0);g.restore();});
+  // showers
+  for(let i=0;i<2;i++)add(5.6+i*1.6+21.8,g=>{const u=5.6+i*1.6,v=21.8;box(g,u,v,1.1,.9,.3,'#b8c9cc');box(g,u+.5,v+.1,.1,.1,18,'#9aa3ab');box(g,u+.3,v+.1,.5,.2,.5,'#9aa3ab',18);});
+  addBox(5.4,17.0,.5,1.6,6,'#d3e6e8');
+  // beach bar: thatched counter, coconuts, tables with umbrellas
+  add(9.4+13.6+.4,(g,t)=>{box(g,9.4,13.3,3.2,.7,8,'#7a5530',0,{top:'#a7824f'});box(g,9.3,13.2,3.4,.9,1.2,THATCH,8);
+    for(let k=0;k<4;k++)box(g,9.7+k*.7,13.45,.3,.3,1.6,k%2?'#5f7a3a':'#6b4a2a',9.2);});
+  addBox(14.2,13.3,1.2,.8,18,'#e9e1cf',0,{top:'#f4ead2'});
+  const btable=(u,v,c)=>{add(u+v+.9,g=>{box(g,u+.35,v+.35,.2,.2,6,'#6b4a2a');box(g,u,v,.9,.9,1.4,'#a7824f',6,{top:'#c29a5e'});box(g,u+.25,v+.3,.25,.25,1.8,'#e9e1cf',7.4,{top:'#f4ead2'});});umbrella(u+.4,v+.4,c);};
+  btable(11.8,18.8,'#2f8bb0');btable(11.8,21.0,'#d9593f');
+  // videoke: the screen (same channel logic as the lounge TV), speakers, benches
+  add(17.2+13.2,(g,t)=>{box(g,17.2,13.15,3.6,.4,4,'#6b4a2a');const on=sessions.some(s=>s.idle==='tv'&&!s.path.length);
+    const c=on?(Math.floor(t*2)%2?TVC[tvCh%TVC.length]:shade(TVC[tvCh%TVC.length],.85)):'#25282c';box(g,17.6,13.2,2.8,.12,10,'#1d1d22',4,{front:c});
+    box(g,17.25,13.2,.35,.3,9,'#2a2f35');box(g,20.4,13.2,.35,.3,9,'#2a2f35');
+    if(on){const p=iso(19,13.25,10*HS);g.fillStyle='#fff';g.font='bold 4px monospace';g.textAlign='center';g.fillText('♪ ♫ ♪',p.x,p.y-6+Math.sin(t*4));}});
+  addBox(16.8,18.3,4.4,.7,4,'#8a6438',0,{top:'#a7824f'});addBox(16.4,21.4,2.4,.8,4,'#8a6438',0,{top:'#a7824f'});
+  // games hut: billiards, chess, darts (same spots as the rec room)
+  add(23.4+15.05+.65,g=>{box(g,23.5,14.5,.25,.25,6,'#6b4a2a');box(g,25.5,14.5,.25,.25,6,'#6b4a2a');box(g,23.5,15.5,.25,.25,6,'#6b4a2a');box(g,25.5,15.5,.25,.25,6,'#6b4a2a');
+    box(g,23.4,14.4,2.4,1.3,2,'#7a5530',6,{top:'#3f7f52'});box(g,24,14.8,.12,.12,1,'#efe6d8',8);box(g,24.8,15.0,.12,.12,1,'#b03a2e',8);});
+  add(23.6+20.4+.9,g=>{box(g,23.95,20.75,.2,.2,6,'#6b4a2a');box(g,23.6,20.4,.9,.9,1.5,'#a7824f',6,{top:'#e9e1cf'});for(let i=0;i<4;i++)box(g,23.7+(i%2)*.4,20.5+(i>>1)*.4,.12,.12,1.5,i%3?'#2a201a':'#efe6d8',7.5);});
+  add(27.84+20.2+.5,g=>{box(g,27.8,20.0,.06,.7,6,'#6b4a2a',5,{front:'#d9593f'});box(g,27.79,20.25,.06,.2,2,'#efe6d8',7);});
+  // pool: ladder and loungers
+  add(32.9+14.4,g=>{box(g,32.9,14.3,.08,.08,8,'#cfd6dc');box(g,33.2,14.3,.08,.08,8,'#cfd6dc');for(let k=0;k<3;k++)box(g,32.9,14.3,.38,.06,.4,'#cfd6dc',2+k*2);});
+  const lounger=(u,v,c)=>add(u+v+.6,g=>{box(g,u,v,.6,1.5,1.6,'#f4ead2',0,{top:c});box(g,u,v,.6,.4,3.2,'#f4ead2',0,{top:c});});
+  lounger(28.3,21.8,'#2f8bb0');lounger(29.2,21.8,'#e2b23a');lounger(33.4,21.6,'#d9593f');
+  // volleyball: posts and net across the middle of the court
+  add(38+18,(g,t)=>{box(g,34.9,17.9,.14,.14,26,'#9aa3ab');box(g,41,17.9,.14,.14,26,'#9aa3ab');
+    const a=iso(35,18,26*HS),b=iso(41.1,18,26*HS),a2=iso(35,18,18*HS),b2=iso(41.1,18,18*HS);poly(g,[a,b,b2,a2],'rgba(255,255,255,.22)');
+    g.strokeStyle='#f4ead2';g.lineWidth=1.2;g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();
+    g.strokeStyle='rgba(255,255,255,.5)';g.lineWidth=.5;for(let k=1;k<12;k++){const p=iso(35+k*.5,18,26*HS),q=iso(35+k*.5,18,18*HS);g.beginPath();g.moveTo(p.x,p.y);g.lineTo(q.x,q.y);g.stroke();}});
+  addBox(34.6,21.8,3,.6,4,'#8a6438',0,{top:'#a7824f'});
+  // more palms around the resort
+  [[.6,.8,30],[16.3,.6,26],[41.2,10,28],[.6,13.8,26],[15.4,13.6,24],[21.2,22,26],[33.4,22.2,24],[41.4,22,30]].forEach(([u,v,h])=>palm(u,v,h));
+  // status board at the back: one tile per session, like the control room's video wall
+  add(-1e9,(g,t)=>{
+    const P=(u1,u2,z1,z2,col)=>poly(g,[iso(u1,0,z1),iso(u2,0,z1),iso(u2,0,z2),iso(u1,0,z2)],col);
+    P(1.6,15.4,12,56,'#6b4a2a');P(2,15,14,54,'#2a3b44');
+    sessions.slice(0,9).forEach((s,i)=>{const u=2.3+(i%3)*1.4,z=48-Math.floor(i/3)*12;const c=s.status==='working'?'#9fe0c0':s.status==='failed'?(Math.floor(t*2)%2?'#ff4a3e':'#7a1d18'):s.status==='needs'?((s.acked||Math.floor(t*2)%2)?(s.prio===1?'#ff4a3e':'#f2b23a'):'#3a3020'):'#55606a';P(u,u+1.1,z-8,z,c);});
+    const n=sessions.filter(s=>s.status==='working').length;
+    wallText(10.5,40,n+' NAGTATRABAHO',8,'#ffd77a');wallText(10.5,28,'BEACH RESORT',6,'#9fd8e6');
+    const un=sessions.some(s=>(s.status==='needs'||s.status==='failed')&&!s.acked);
+    box(g,8.7,.05,.4,.3,2,'#6b4a2a',58,{top:un&&Math.floor(t*3)%2?'#ff4a3e':'#5a2222',front:un&&Math.floor(t*3)%2?'#e0392f':'#4a1c1c'});
+  });
+}
+
+function bake(){
+  STAT.length=0;DYN.length=0;NAV.rec=[];
   const R=BGRES,g=bg.getContext('2d');
   for(const o of objs.slice().sort((a,b)=>a.d-b.d)){
     if(o.draw.length>=2){const bb=bounds(o.draw,24,[0,.37,.81,1.6]);Object.assign(o,bb||{bx:0,by:0,bw:SW,bh:SH});DYN.push(o);continue;}
@@ -1717,7 +2046,11 @@ const STAT=[],DYN=[];
   }
   // every piece is drawn exactly once per frame, in depth order (drawing a piece twice made glass and edges flicker)
   objs.length=0;objs.push(...STAT,...DYN);
-})();
+  buildNav(NAV.rec);NAV.rec=null;
+}
+setScene('office');
+// test hook (only with ?debug=1): lets automated checks look at walking and the floor grid
+if(/[?&]debug=1/.test(location.search))window.__dr={NAV,navPath,sessions,T,setScene};
 
 /* ---------- loop ---------- */
 let last=performance.now();
@@ -1874,10 +2207,50 @@ function openClaude(id){
 async function setAway(m){
   if(m!=='off'&&!confirm('Kapag naka-on ito, hindi muna matatapos ang turn ng session pagkatapos niyang sumagot: maghihintay siya ng utos mo mula sa app nang hanggang 20 minuto. Habang naghihintay, mukha siyang "may ginagawa" sa Claude Code at hindi ka makakapag-utos doon nang normal (pindutin ang Esc para ituloy). Ituloy?')){$('awaySel').value=awayMode;return;}
   awayMode=m;chatKey='';renderPanel();try{await fetch('/api/away',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({mode:m})});}catch(e){}}
+// Claude's replies are Markdown: show them formatted like in the Claude app (bold, lists, code, headings),
+// built from escaped text only, so nothing in a reply can inject HTML.
+function md(src){
+  const inline=t=>esc(t)
+    .replace(/`([^`\n]+)`/g,'<code>$1</code>')
+    .replace(/\*\*([^*\n]+?)\*\*/g,'<b>$1</b>').replace(/__([^_\n]+?)__/g,'<b>$1</b>')
+    .replace(/(^|[^*\w])\*([^*\n]+?)\*(?!\w)/g,'$1<i>$2</i>').replace(/(^|[^_\w])_([^_\n]+?)_(?!\w)/g,'$1<i>$2</i>')
+    .replace(/\[([^\]\n]+)\]\((https?:[^)\s]+)\)/g,'$1');
+  const lines=String(src||'').replace(/\r/g,'').split('\n');const out=[];let list=null,para=[],code=null;
+  const flushP=()=>{if(para.length){out.push('<p>'+para.map(inline).join('<br>')+'</p>');para=[];}};
+  const flushL=()=>{if(list){out.push(`<${list.t}>`+list.items.map(x=>'<li>'+inline(x)+'</li>').join('')+`</${list.t}>`);list=null;}};
+  for(const ln of lines){
+    if(code!==null){if(/^\s*```/.test(ln)){out.push('<pre><code>'+esc(code.join('\n'))+'</code></pre>');code=null;}else code.push(ln);continue;}
+    if(/^\s*```/.test(ln)){flushP();flushL();code=[];continue;}
+    let m;
+    if(!ln.trim()){flushP();flushL();continue;}
+    if((m=ln.match(/^\s{0,3}#{1,6}\s+(.*)$/))){flushP();flushL();out.push('<p class="h">'+inline(m[1])+'</p>');continue;}
+    if(/^\s*([-*_])\s*\1\s*\1[\s\-*_]*$/.test(ln)){flushP();flushL();out.push('<hr>');continue;}
+    if((m=ln.match(/^\s*[-*+]\s+(.*)$/))){flushP();if(!list||list.t!=='ul'){flushL();list={t:'ul',items:[]};}list.items.push(m[1]);continue;}
+    if((m=ln.match(/^\s*\d+[.)]\s+(.*)$/))){flushP();if(!list||list.t!=='ol'){flushL();list={t:'ol',items:[]};}list.items.push(m[1]);continue;}
+    if(list&&/^\s{2,}\S/.test(ln)){list.items[list.items.length-1]+=' '+ln.trim();continue;}
+    flushL();para.push(ln);
+  }
+  if(code!==null)out.push('<pre><code>'+esc(code.join('\n'))+'</code></pre>');
+  flushP();flushL();return out.join('');
+}
 function cleanMsg(t){
   const SYS='system-reminder|command-name|command-message|command-args|command-contents|local-command-stdout|local-command-stderr|local-command-caveat|side-sessions-event|task-notification|user-prompt-submit-hook|bash-input|bash-stdout|bash-stderr';
   return String(t||'').replace(new RegExp('<('+SYS+')\\b[^>]*>[\\s\\S]*?<\\/\\1>','gi'),'').replace(new RegExp('<\\/?('+SYS+')\\b[^>]*>','gi'),'').replace(/\n{3,}/g,'\n\n').trim();
 }
+// Pictures and pages the sessions show or send: in the chat, opened inside the app (pages run sandboxed).
+const attUrl=id=>'/api/att/'+encodeURIComponent(id)+(TOKEN?'?t='+encodeURIComponent(TOKEN):'');
+const attKind=id=>/\.(png|jpg|gif|webp|svg)$/.test(id)?'image':/\.html$/.test(id)?'page':'file';
+function attHTML(it){
+  const k=attKind(it.att);
+  if(k==='image')return `<img class="attimg" src="${attUrl(it.att)}" alt="${esc(it.title||it.name)}" loading="lazy" data-view="${esc(it.att)}" data-vt="${esc(it.title||it.name)}">`;
+  return `<button type="button" class="attcard" data-view="${esc(it.att)}" data-vt="${esc(it.title||it.name)}"><span class="ic">${k==='page'?'▣':'PDF'}</span><span><b>${esc(it.title||it.name)}</b><small>${k==='page'?'Artifact':'File'} · ${esc(it.name)} · pindutin para buksan</small></span></button>`;
+}
+function openViewer(id,title){
+  const v=$('viewer'),b=$('vBody');$('vTitle').textContent=title||id;
+  b.innerHTML=attKind(id)==='image'?`<img src="${attUrl(id)}" alt="${esc(title||'')}">`:`<iframe src="${attUrl(id)}" ${attKind(id)==='page'?'sandbox="allow-scripts allow-popups allow-forms"':''} title="${esc(title||'')}"></iframe>`;
+  v.hidden=false;v.querySelector('[data-act="vclose"]').focus();
+}
+function closeViewer(){const v=$('viewer');if(v.hidden)return;v.hidden=true;$('vBody').innerHTML='';}
 // One feed for the whole team: your prompts, the sessions' replies and messages sent from this app.
 function chatFeed(){
   const list=chatFilter==='all'?sessions:sessions.filter(s=>s.sid===chatFilter);
@@ -1886,16 +2259,19 @@ function chatFeed(){
   for(const s of list){
     // a message you sent from the app also comes back as the session's prompt: show it once (with its status)
     const sent=new Set((s.inbox||[]).map(m=>String(m.text||'').trim()));
-    for(const m of (CONVO[s.sid]||[])){const text=cleanMsg(m.text);if(!text||(m.role==='user'&&sent.has(text)))continue;items.push({s,t:m.at,you:m.role==='user',sys:m.role==='sys',text});}
+    for(const m of (CONVO[s.sid]||[])){
+      if(m.att){items.push({s,t:m.at,you:m.role==='user',att:m.att,name:m.name||'',title:m.title||''});continue;}
+      const text=cleanMsg(m.text);if(!text||(m.role==='user'&&sent.has(text)))continue;items.push({s,t:m.at,you:m.role==='user',sys:m.role==='sys',text});}
     for(const m of (s.inbox||[]))items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true});
     PENDING.forEach((m,pi)=>{if(m.sid===s.sid)items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true,why:m.why,pi});});
   }
   items.sort((a,b)=>a.t-b.t);
   const out=items.slice(-120).map(it=>{
     const who=it.you?`<b>Boss</b> → ${esc(it.s.short)}`:`<i style="background:${it.s.pal.shirt}"></i><b>${esc(it.s.short)}</b>`;
-    const st=it.app?`<span class="st">${{sending:'Ipinapadala…',queued:'Ipinapasa…',sent:'Natanggap na niya ✓',delivered:'Natanggap na niya ✓',failed:'Hindi naipadala.'}[it.st]||''}${it.st==='failed'&&it.pi!=null?` <button type="button" class="linkbtn" data-retry="${it.pi}">Subukan ulit</button> <button type="button" class="linkbtn" data-drop="${it.pi}">Alisin</button>`:''}${it.why?' ('+esc(it.why)+')':''}${it.app?' · mula sa app':''}</span>`:'';
+    const st=it.app?`<span class="st">${(it.st==='queued'&&it.s.status==='working'?'Nakapila: matatanggap niya sa susunod niyang hakbang, tulad ng pag-type habang nagtatrabaho siya sa Claude app':{sending:'Ipinapadala…',queued:'Ipinapasa…',sent:'Natanggap na niya ✓',delivered:'Natanggap na niya ✓',failed:'Hindi naipadala.'}[it.st]||'')}${it.st==='failed'&&it.pi!=null?` <button type="button" class="linkbtn" data-retry="${it.pi}">Subukan ulit</button> <button type="button" class="linkbtn" data-drop="${it.pi}">Alisin</button>`:''}${it.why?' ('+esc(it.why)+')':''}${it.app?' · mula sa app':''}</span>`:'';
+    if(it.att)return `<div class="cmsg ${it.you?'you':''}"><span class="who">${who} · ${simLabel(it.t)}</span>${attHTML(it)}</div>`;
     if(it.sys)return `<div class="msg sys" data-chatto="${esc(it.s.sid)}">${esc(it.s.short)}: ${esc(it.text)} · ${simLabel(it.t)}</div>`;
-    return `<div class="cmsg ${it.you?'you':''}" data-chatto="${esc(it.s.sid)}"><span class="who">${who} · ${simLabel(it.t)}</span><div class="msg ${it.you?'you':'agent'}">${esc(it.text)}</div>${st}</div>`;
+    return `<div class="cmsg ${it.you?'you':''}" data-chatto="${esc(it.s.sid)}"><span class="who">${who} · ${simLabel(it.t)}</span><div class="msg md ${it.you?'you':'agent'}">${md(it.text)}</div>${st}</div>`;
   });
   // a queued message to a session that already stopped (and is not waiting) only arrives with its next turn
   const typing=list.filter(s=>s.status==='working').map(s=>`<div class="typing" data-chatto="${esc(s.sid)}"><i style="background:${s.pal.shirt}"></i><b>${esc(s.short)}</b> ${esc(s.detail&&s.detail.length<90?s.detail:'nagtatrabaho')}<span class="dots"><span></span><span></span><span></span></span></div>`);
@@ -1932,6 +2308,10 @@ function renderPanel(){
       const near=body.scrollHeight-body.scrollTop-body.clientHeight<80,top=body.scrollTop;
       body.innerHTML=`<div class="cfilter"><button type="button" data-cf="all" aria-pressed="${chatFilter==='all'}">Lahat</button>${sessions.map(x=>`<button type="button" data-cf="${esc(x.sid)}" aria-pressed="${chatFilter===x.sid}"><i style="background:${x.pal.shirt}"></i>${esc(x.short)}</button>`).join('')}</div><div class="msgs">${chatFeed()}</div>`;
       if(near||forceScroll){forceScroll=false;body.scrollTop=body.scrollHeight;}else body.scrollTop=top;}
+    {const one=chatFilter!=='all'&&bySid(chatFilter);if(one)chatTo=one.sid;
+     const rk=(one?'1':'*')+chatTo+'|'+sessions.map(x=>x.sid+x.short).join(',');const rc=$('rcpt');
+     if(rc.dataset.k!==rk){rc.dataset.k=rk;rc.innerHTML=one?`<span>Para kay <b>${esc(one.role)}</b></span>`:`<span>Para kay</span>`+sessions.map(x=>`<button type="button" data-rcpt="${esc(x.sid)}" aria-pressed="${x.sid===chatTo}"><i style="background:${x.pal.shirt}"></i>${esc(x.short)}</button>`).join('');}
+     const tgt=bySid(chatTo);$('msgInput').placeholder=tgt?`Mensahe kay ${tgt.short}…`:'Mensahe…';}
     const sel2=$('chatTo');const opts=sessions.map(x=>`<option value="${esc(x.sid)}">${esc(x.role)}${x.listening?' · naka-abang':x.status==='working'?' · nagtatrabaho':''}</option>`).join('');
     if(sel2.dataset.k!==opts){sel2.dataset.k=opts;sel2.innerHTML=opts;}if(sel2.value!==chatTo)sel2.value=chatTo;
     const aw=$('awaySel');if(aw.value!==awayMode)aw.value=awayMode;
@@ -1970,6 +2350,7 @@ async function saveTeam(t){
   catch(e){connMsg='Hindi na-save ang team.';}
   version=0;setConn();
 }
+function switchUnit(k){if(k===UNIT&&applyRecords.unit===k)return;UNIT=k;try{localStorage.setItem('devroom.unit',k);}catch(e){}applyRecords(allRecords);firstLoad=false;chatKey='';render();setConn();}
 function rebuildTeam(){for(const s of sessions.slice())dropSession(s,'');firstLoad=true;logs.length=0;applyRecords(allRecords);setConn();}
 function collectNames(){const n=Object.assign({},TEAM.names||{});document.querySelectorAll('#teamPanel .tname').forEach(i=>{const r=allRecords.find(x=>x.id===i.dataset.id);const v=i.value.trim();if(!v||(r&&v===r.title&&!n[i.dataset.id]))delete n[i.dataset.id];else n[i.dataset.id]=v;});return n;}
 function dockCard(s){
@@ -2023,6 +2404,7 @@ document.addEventListener('click',e=>{
   if(e.target.closest('[data-act="hooks"]')){installHooks();return;}
   if(e.target.closest('[data-act="restart"]')){restartApp(false);return;}
   if(e.target.closest('[data-act="remote-toggle"]')){toggleRemote();return;}
+  const un=e.target.closest('[data-unit]');if(un){switchUnit(un.dataset.unit);return;}
   if(e.target.closest('[data-act="updinfo"]')){const ap=apkUpd(),pc=pcUpd();
     if(ap&&ap.act){try{window.parent.postMessage({type:'devroom:update'},'*');}catch(x){}}
     connMsg=[pc&&('PC: '+pc.d),ap&&('Phone: '+ap.d)].filter(Boolean).join(' ');setConn();clearTimeout(showUpd.t);showUpd.t=setTimeout(()=>{connMsg='';setConn();},12000);return;}
@@ -2048,8 +2430,12 @@ document.addEventListener('click',e=>{
 });
 $('composer').addEventListener('submit',async e=>{e.preventDefault();const s=bySid(chatTo);const v=$('msgInput').value;if(!v.trim())return;
   if(!s){connMsg='Wala na sa office ang napiling session. Pumili ulit sa Para kay.';setConn();return;}
-  $('msgInput').value='';if(!await answer(s,v)&&!$('msgInput').value)$('msgInput').value=v;});
+  $('msgInput').value='';$('msgInput').style.height='auto';if(!await answer(s,v)&&!$('msgInput').value)$('msgInput').value=v;});
 $('chatTo').addEventListener('change',e=>{chatTo=e.target.value;});
+$('rcpt').addEventListener('click',e=>{const b=e.target.closest('[data-rcpt]');if(!b)return;chatTo=b.dataset.rcpt;$('rcpt').dataset.k='';renderPanel();$('msgInput').focus();});
+// the message box grows with the text, like in the Claude app
+$('msgInput').addEventListener('input',e=>{const t=e.target;t.style.height='auto';t.style.height=Math.min(160,t.scrollHeight)+'px';});
+$('viewer').addEventListener('click',e=>{if(e.target.closest('[data-act="vclose"]'))closeViewer();});
 $('composer').addEventListener('focusin',()=>{$('app').classList.add('typing');setTimeout(()=>{document.querySelector('.chatpanel').scrollIntoView({block:'start'});const b=$('cpBody');b.scrollTop=b.scrollHeight;},350);});
 $('composer').addEventListener('focusout',()=>setTimeout(()=>{if(!$('composer').contains(document.activeElement))$('app').classList.remove('typing');},200));
 $('awaySel').addEventListener('change',e=>setAway(e.target.value));
@@ -2057,7 +2443,8 @@ $('cpBody').addEventListener('click',e=>{
   const rt=e.target.closest('[data-retry]');if(rt){const m=PENDING[+rt.dataset.retry];if(m){PENDING.splice(+rt.dataset.retry,1);const s=bySid(m.sid);if(s)answer(s,m.text);else{connMsg='Wala na sa office ang session na iyon.';setConn();}}chatKey='';renderPanel();return;}
   const dp=e.target.closest('[data-drop]');if(dp){PENDING.splice(+dp.dataset.drop,1);chatKey='';renderPanel();return;}
   const f=e.target.closest('[data-cf]');if(f){chatFilter=f.dataset.cf;if(chatFilter!=='all')chatTo=chatFilter;forceScroll=true;chatKey='';renderPanel();return;}
-  const m=e.target.closest('[data-chatto]');if(m){chatTo=m.dataset.chatto;$('chatTo').value=chatTo;$('msgInput').focus();}
+  const vw=e.target.closest('[data-view]');if(vw){openViewer(vw.dataset.view,vw.dataset.vt);return;}
+  const m=e.target.closest('[data-chatto]');if(m){chatTo=m.dataset.chatto;$('rcpt').dataset.k='';$('chatTo').value=chatTo;$('msgInput').focus();}
 });
 $('msgInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('composer').requestSubmit();}});
 let drag=null;
@@ -2106,6 +2493,7 @@ applyBS();
 $('chatToggle').addEventListener('click',()=>setDrawer(!$('app').classList.contains('drawer')));
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape')return;
+  if(!$('viewer').hidden){closeViewer();return;}
   if(!$('whatsNew').hidden){$('whatsNew').querySelector('[data-act="wn-ok"]')?.click();return;}
   if(!$('teamPanel').hidden){$('teamPanel').hidden=true;return;}
   if($('app').classList.contains('drawer')){if(document.activeElement&&document.activeElement.closest('.pane'))document.activeElement.blur();setDrawer(false);return;}

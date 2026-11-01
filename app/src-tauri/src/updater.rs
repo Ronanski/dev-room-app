@@ -52,6 +52,10 @@ pub fn note() -> String { STATE.lock().map(|s| s.note.clone()).unwrap_or_default
 /// Whether the window is hidden in the tray (set by main), so an update can restart without bothering anyone.
 pub static HIDDEN: AtomicBool = AtomicBool::new(false);
 pub fn set_hidden(h: bool) { HIDDEN.store(h, Ordering::Relaxed); }
+/// Whether the window is minimized (set by main): nobody is looking, so an update installs right away and the
+/// window comes back minimized. (Before 0.9.1 a minimized window waited for you forever.)
+pub static MINIMIZED: AtomicBool = AtomicBool::new(false);
+pub fn set_minimized(m: bool) { MINIMIZED.store(m, Ordering::Relaxed); }
 
 fn set_note(n: &str) { if let Ok(mut s) = STATE.lock() { s.note = n.to_string(); } }
 
@@ -128,12 +132,14 @@ pub fn start() {
         }
     }
     std::thread::spawn(|| {
-        std::thread::sleep(Duration::from_secs(15));
+        std::thread::sleep(Duration::from_secs(5));
         loop {
             match check_once() { Ok(()) => set_note(""), Err(e) => set_note(&format!("Hindi nakapag-check ng update: {e}")) }
-            for _ in 0..18 {
-                if exe_ready() && HIDDEN.load(Ordering::Relaxed) && crate::server::LISTENERS.load(Ordering::Relaxed) == 0 { restart(true); return; }
-                std::thread::sleep(Duration::from_secs(10));
+            // check every 30 s; once an update is downloaded, install it within 2 s when nobody is looking
+            for _ in 0..15 {
+                let away = HIDDEN.load(Ordering::Relaxed) || MINIMIZED.load(Ordering::Relaxed);
+                if exe_ready() && away && crate::server::LISTENERS.load(Ordering::Relaxed) == 0 { restart(HIDDEN.load(Ordering::Relaxed)); return; }
+                std::thread::sleep(Duration::from_secs(2));
             }
         }
     });
@@ -148,7 +154,7 @@ pub fn restart(hidden: bool) {
         if let Ok(exe) = std::env::current_exe() {
             let mut cmd = std::process::Command::new(exe);
             cmd.arg("--restarted");
-            if hidden { cmd.arg("--tray"); }
+            if hidden { cmd.arg("--tray"); } else if MINIMIZED.load(Ordering::Relaxed) { cmd.arg("--minimized"); }
             crate::tunnel::shutdown();
             let _ = cmd.spawn();
         }
