@@ -7,6 +7,13 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.11.1 (2026-11-01)
+
+- **Messages reach a lead that has agents running in the background right away.** Subagent hooks carry the parent's session id; they used to mark the parent as working (and `SubagentStop` turned an idle parent into "working"), so a message to a lead whose own turn was over sat in the queue for up to ten minutes. Now subagent hooks (with `agent_id`, or a `subagents` transcript) only update the parent's detail text while it works, never its status or its transcript; `SubagentStop` never marks a free session busy. Tested with a fake `claude`: the message went out in under a second.
+- **Claude Code's own turns are no longer shown as your messages.** Prompts that Claude Code writes itself (`<task-notification>`, `<side-sessions-event>` and similar wrappers, for example "None of the sessions you started is working now…") are left out of the chat, from the hooks, the transcript reader and messages already saved.
+- **Tablet portrait layout.** With the panel open on a tall screen wider than a phone, the panel docks under the office (office, session cards, then the chat across the full width) instead of covering half of the office, in normal and fullscreen view. A tall office view zooms so the office fills it.
+- The status line is cleared when a turn ends.
+
 ## 0.11.0 (2026-11-01)
 
 - **The PC window comes back as you left it.** Dev Room remembers the window's place, size and whether it was maximized (`window.json` in the data folder, saved on move, resize, close and before an update restart).

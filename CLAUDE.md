@@ -49,6 +49,7 @@ The user's real team is **LOGIC_SIM_PROJECT**: a leader plus subsessions (CODE F
     - `deliver_now` continues an idle session with `claude -p --resume <sid>`, in its cwd and `perm_mode`.
     - Working sessions get messages through the PostToolUse `additionalContext`.
     - The Chat tab is Dev Room's own chat; never replace it with claude.ai.
+  - Subagent hooks (`agent_id`, or a `subagents` transcript) carry the parent's session id: they only update its detail text while it works, never its status or transcript, so a lead with agents in the background stays free for messages. Prompts Claude Code writes itself (`system_prompt()`, `SYS_PROMPT` in the UI) are not shown as the user's messages.
   - A liveness thread marks a session as working while its transcript keeps being written after Stop.
   - State lives in `%APPDATA%\DevRoom\state.json` and is written atomically.
 - **`app/src-tauri/src/main.rs`:**
@@ -67,6 +68,7 @@ The user's real team is **LOGIC_SIM_PROJECT**: a leader plus subsessions (CODE F
   - With no playrooms saved, it groups sessions by team or project folder, and the units alternate scenes.
   - The **Mga Playroom** editor is `openTeam` / `renderRooms` / `roomsClick`.
   - New scenes must keep the same desk and spot coordinates.
+- **Tablet portrait:** with the panel open on a portrait screen ≥ 641 px wide, the panel docks under the office (grid `office / dock / chat`) instead of overlaying it.
 - **`mobile/`:** the Capacitor Android shell.
   - It shows the office in an iframe, served by the PC.
   - `ClaudeActivity` is the in-app claude.ai screen.

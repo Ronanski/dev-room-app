@@ -269,6 +269,29 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<St
         "id": sid, "status": "idle", "detail": "", "ask": "", "recent": "", "short": "", "auto_title": "", "title_scanned": false, "started_at": now
     }));
     let s = entry.as_object_mut().unwrap();
+    // A subagent's hooks carry its parent's session id. They must not make the parent look busy: when the
+    // parent's own turn is over (it left agents running in the background), it is free, and a message from
+    // you goes to it right away, like in the Claude app. They also must not replace its transcript.
+    let sub = v.get("agent_id").is_some() || v.get("transcript_path").and_then(|x| x.as_str()).map(|t| t.contains("subagents")).unwrap_or(false);
+    if sub {
+        let busy = s.get("status").and_then(|x| x.as_str()) == Some("working") && !s.get("live_guess").and_then(|x| x.as_bool()).unwrap_or(false);
+        let kind = v.get("agent_type").and_then(|x| x.as_str()).filter(|k| !k.is_empty()).unwrap_or("agent").to_string();
+        match ev {
+            "PreToolUse" if busy => {
+                let tool = v.get("tool_name").and_then(|x| x.as_str()).unwrap_or("tool");
+                let (_, detail) = describe_tool(tool, v.get("tool_input").unwrap_or(&Value::Null));
+                s.insert("detail".into(), json!(format!("Agent ({}): {}", clip(&kind, 30), detail)));
+            }
+            "SubagentStop" => {
+                if busy { s.insert("detail".into(), json!("Tapos na ang isang agent; binabasa ang resulta.")); }
+                else { s.insert("recent".into(), json!(format!("Tapos na ang agent ({}) sa background.", clip(&kind, 30)))); }
+            }
+            _ => {}
+        }
+        s.insert("updated_at".into(), json!(now));
+        st.bump();
+        return;
+    }
     if let Some(c) = v.get("cwd").and_then(|x| x.as_str()) { s.insert("cwd".into(), json!(c)); }
     if let Some(m) = v.get("permission_mode").and_then(|x| x.as_str()) { s.insert("perm_mode".into(), json!(m)); }
     let transcript = v.get("transcript_path").and_then(|x| x.as_str()).map(String::from);
@@ -307,13 +330,15 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<St
             s.insert("short".into(), json!("Nagbabasa ng utos."));
             s.insert("prompt_at".into(), json!(now));
             let p = v.get("prompt").and_then(|x| x.as_str()).unwrap_or("");
-            push_convo(s, "user", p, 2000);
+            // Claude Code's own turns (reports from other sessions, task notices) are not something you typed
+            let sys = system_prompt(p);
+            if !sys { push_convo(s, "user", p, 2000); }
             // a session without a name is called after its first prompt, not after the folder every session shares
             let first = p.trim();
             if !s.contains_key("first_prompt") && !first.is_empty() && !first.starts_with('<') {
                 s.insert("first_prompt".into(), json!(clip(first, 48)));
             }
-            s.insert("detail".into(), json!(format!("Inutusan: {}", clip(p, 140))));
+            s.insert("detail".into(), json!(if sys { "Binabasa ang ulat ng ibang session.".to_string() } else { format!("Inutusan: {}", clip(p, 140)) }));
         }
         "PreToolUse" => {
             let tool = v.get("tool_name").and_then(|x| x.as_str()).unwrap_or("tool");
@@ -331,10 +356,12 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<St
             persist = false;
         }
         "SubagentStop" => {
-            if s.get("status").and_then(|x| x.as_str()) == Some("idle") {
-                s.insert("status".into(), json!("working"));
-                s.insert("short".into(), json!("Binabasa ang resulta ng agent."));
+            // An agent ending does not start a turn of the parent: a parent whose turn is over stays free
+            // (it used to be marked busy here, and messages to it waited up to ten minutes).
+            if s.get("status").and_then(|x| x.as_str()) == Some("working") {
                 s.insert("detail".into(), json!("Tapos na ang isang agent; binabasa ang resulta."));
+            } else {
+                s.insert("recent".into(), json!("Tapos na ang isang agent sa background."));
             }
             persist = false;
         }
@@ -360,6 +387,7 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<St
             push_convo(s, "assistant", &text, 4000);
             s.insert("recent".into(), json!(clip(&text, 300)));
             s.insert("detail".into(), json!(""));
+            s.insert("short".into(), json!(""));
             match last_question(&text) {
                 Some(q) => { s.insert("status".into(), json!("needs")); s.insert("ask".into(), json!(q)); }
                 None => { s.insert("status".into(), json!("idle")); s.insert("ask".into(), json!("")); }
@@ -483,6 +511,17 @@ fn hook_reply(req: Request, st: &Mutex<State>, v: &Value) {
 }
 
 /// The visible conversation: your prompts and the session's replies at the end of each turn (newest 40).
+/// A prompt Claude Code wrote itself (wrapped in one of its tags), not something the user typed.
+fn system_prompt(p: &str) -> bool {
+    const TAGS: [&str; 16] = ["system-reminder", "command-name", "command-message", "command-args", "command-contents", "local-command-stdout",
+        "local-command-stderr", "local-command-caveat", "side-sessions-event", "task-notification", "user-prompt-submit-hook", "bash-input",
+        "bash-stdout", "bash-stderr", "wake", "event"];
+    let t = p.trim_start();
+    let Some(rest) = t.strip_prefix('<') else { return false };
+    let name: String = rest.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_').collect();
+    TAGS.contains(&name.as_str()) || (name.contains('-') && rest[name.len()..].starts_with(['>', ' ']))
+}
+
 fn push_convo(s: &mut Map<String, Value>, role: &str, text: &str, max: usize) {
     let text = text.trim();
     if text.is_empty() { return; }
@@ -1048,7 +1087,7 @@ fn transcript_line(v: &Value) -> Option<(&'static str, String)> {
         "assistant" => texts(content).map(|t| ("assistant", t)),
         "user" => {
             let t = content.as_str().map(String::from).or_else(|| texts(content))?;
-            (!t.trim_start().starts_with('<')).then_some(("user", t))
+            (!t.trim_start().starts_with('<') && !system_prompt(&t)).then_some(("user", t))
         }
         _ => None,
     }
