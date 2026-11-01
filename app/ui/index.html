@@ -68,6 +68,13 @@ html,body{overflow-x:hidden}
   linear-gradient(var(--ink),var(--ink)) 3px 24px/20px 2px no-repeat}
 h1{font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1;margin:0;letter-spacing:.5px}
 .sub{margin:3px 0 0;color:var(--muted);font-size:12px}
+.units{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:8px 0 0;padding-bottom:2px}
+.units::-webkit-scrollbar{display:none}
+.units[hidden]{display:none}
+.units button{flex:none;font:inherit;font-size:12.5px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:5px 12px;cursor:pointer;display:inline-flex;gap:6px;align-items:center;min-height:32px}
+.units button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.units .un{font-family:var(--f-mono);font-size:11px;opacity:.75}
+.units .ub{background:var(--need);color:#fff;border-radius:999px;font-size:10.5px;font-weight:700;padding:0 6px}
 .remotebox{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:10px 0}
 .remotebox .hint{grid-column:1/-1;margin:0}
 .remotebox .rs{font-size:12.5px;color:var(--muted)}
@@ -433,7 +440,7 @@ body{margin:0}
     <header class="top">
       <div class="brand">
         <span class="logo" aria-hidden="true"></span>
-        <div><h1>Dev Room · Unit 1</h1><p class="sub">Unit 1 · live mula sa PC mo<span id="via"></span> · <button type="button" class="updpill" id="ver" data-act="updinfo" data-st="wait">Tinitingnan ang update…</button> · <span class="clock" id="clock"></span></p></div>
+        <div><h1>Dev Room · Unit 1</h1><p class="sub"><span id="unitName">Unit 1</span> · live mula sa PC mo<span id="via"></span> · <button type="button" class="updpill" id="ver" data-act="updinfo" data-st="wait">Tinitingnan ang update…</button> · <span class="clock" id="clock"></span></p><div class="units" id="units" hidden role="tablist" aria-label="Mga office"></div></div>
       </div>
       <div class="counts" id="counts"></div>
       <div class="controls">
@@ -1043,6 +1050,43 @@ function autoLead(rs){
   const pool=named.length?named:(roled.length?cands:[]);
   return pool.sort((a,b)=>(b.updated_at||0)-(a.updated_at||0))[0]||null;
 }
+// Units: one office per team or project, in the same app. Unit 1 is your chosen team (or the biggest project);
+// every other project folder gets its own unit. Same art, its own colours.
+const THEMES=[{n:'Klasiko',f:'none'},{n:'Gabi',f:'hue-rotate(185deg) saturate(.85) brightness(.95)'},{n:'Gubat',f:'hue-rotate(65deg) saturate(.9)'},
+  {n:'Rosas',f:'hue-rotate(295deg) saturate(.85)'},{n:'Dagat',f:'hue-rotate(140deg) saturate(.8)'},{n:'Ginto',f:'sepia(.45) saturate(1.3)'}];
+let UNIT='';try{UNIT=localStorage.getItem('devroom.unit')||'';}catch(e){}
+let UNITS=[];
+function computeUnits(records){
+  const proj=r=>r.cwd?baseName(r.cwd):'Iba pa';
+  const units=[];let rest=records;
+  if(TEAM.ids&&TEAM.ids.length){const t=pickTeam(records);const counts={};t.list.forEach(r=>{const k=proj(r);counts[k]=(counts[k]||0)+1;});
+    const name=Object.keys(counts).sort((a,b)=>counts[b]-counts[a])[0]||'Team';
+    units.push({key:'team',label:name,lead:t.lead,list:t.list});rest=records.filter(r=>!t.list.includes(r));}
+  const groups=new Map();for(const r of rest){const k=proj(r);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(r);}
+  [...groups.entries()].sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0])).forEach(([k,list])=>{
+    const lead=autoLead(list);const ordered=lead?[lead,...list.filter(r=>r!==lead)]:list;
+    units.push({key:'p:'+k,label:k,lead:lead?lead.id:null,list:ordered.slice(0,MAXN+1)});});
+  if(!units.length)units.push({key:'team',label:'Team',lead:null,list:[]});
+  units.forEach((u,i)=>{u.n=i+1;u.scene=['office','resort'][i%2];u.theme=THEMES[Math.floor(i/2)%THEMES.length];u.need=u.list.filter(r=>r.status_bucket==='SESSION_STATUS_BUCKET_BLOCKED'||r.status_bucket==='SESSION_STATUS_BUCKET_FAILED').length;});
+  return units;
+}
+let themeNow='none';
+// recolour the baked office (floor, walls, furniture) once per switch; characters keep their own colours
+function applyTheme(f){
+  if(f===themeNow)return;themeNow=f;
+  const recolor=(src,dst)=>{const g=dst.getContext('2d');g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,dst.width,dst.height);g.filter=f;g.drawImage(src,0,0);g.filter='none';};
+  if(!bg.orig){const c=document.createElement('canvas');c.width=bg.width;c.height=bg.height;c.getContext('2d').drawImage(bg,0,0);bg.orig=c;}
+  recolor(bg.orig,bg);
+  for(const o of STAT){if(!o.img)continue;if(!o.img.orig){const c=document.createElement('canvas');c.width=o.img.width;c.height=o.img.height;c.getContext('2d').drawImage(o.img,0,0);o.img.orig=c;}recolor(o.img.orig,o.img);}
+  if(typeof redrawAll==='function')redrawAll();
+}
+function renderUnits(){
+  const el=$('units');if(!el)return;const cur=UNITS.find(u=>u.key===UNIT)||UNITS[0];
+  const h=UNITS.length<2?'':UNITS.map(u=>`<button type="button" data-unit="${esc(u.key)}" aria-pressed="${u===cur}"><b>Unit ${u.n}</b> · ${esc(u.label)} <span class="un">${u.list.length}</span>${u!==cur&&u.need?`<span class="ub">${u.need}</span>`:''}</button>`).join('');
+  if(el.dataset.h!==h){el.dataset.h=h;el.innerHTML=h;el.hidden=!h;}
+  const t=`Dev Room · Unit ${cur?cur.n:1}`;const h1=document.querySelector('.top h1');if(h1&&h1.textContent!==t)h1.textContent=t;
+  const u1=$('unitName');if(u1&&cur&&u1.textContent!==cur.label)u1.textContent=cur.label;
+}
 function pickTeam(records){
   if(TEAM.ids&&TEAM.ids.length){const list=records.filter(r=>TEAM.ids.includes(r.id));const l=TEAM.lead||(autoLead(list)||{}).id||null;return{lead:l,list};}
   const lead=(TEAM.lead&&records.find(r=>r.id===TEAM.lead))||autoLead(records);
@@ -1055,7 +1099,15 @@ function dropSession(s,why){
 }
 function applyRecords(records){
   allRecords=records;
-  const {lead,list}=pickTeam(records);
+  UNITS=computeUnits(records);
+  let cur=UNITS.find(u=>u.key===UNIT)||UNITS[0];
+  if(cur.key!==applyRecords.unit){
+    // switching office: everyone of the old unit leaves quietly, the new unit's people are already at work
+    if(applyRecords.unit!==undefined){for(const s of sessions.slice())dropSession(s,'');firstLoad=true;logs.length=0;}
+    applyRecords.unit=cur.key;setScene(cur.scene);applyTheme(cur.theme.f);
+  }
+  renderUnits();
+  const {lead,list}=cur;
   for(const s of sessions.slice()){if(!list.some(r=>r.id===s.sid)||(s.lead!==(s.sid===lead)))dropSession(s,firstLoad?'':`Umalis muna sa office si ${s.short}.`);}
   for(const r of list){
     let s=sessions.find(x=>x.sid===r.id);
@@ -1082,7 +1134,7 @@ function applyRecords(records){
     s.short=n>1?base.replace(/[.…]$/,'')+' '+n:base;s.role=m>1?baseRole+' '+m:baseRole;}}
   if(!sessions.some(x=>x.id===selected)){const q=sessions.filter(x=>x.status==='needs').sort((a,b)=>b.at-a.at)[0]||sessions.find(x=>x.lead)||sessions[0];selected=q?q.id:0;}
   if(firstLoad){
-    log('Guard',`Bukas na ang office. ${sessions.length} na session ang naka-duty.`);
+    log(guard.name,`Bukas na ang ${SCENE==='resort'?'resort':'office'}. ${sessions.length} na session ang naka-duty.`);
     sessions.slice().sort((a,b)=>a.at-b.at).forEach(s=>log(s.short,statusLine(s),s,s.at));
     sessions.filter(x=>x.status==='needs'||x.status==='failed').forEach(toast);
   }
@@ -1346,7 +1398,7 @@ function flat(g,u,v,w,d,col,stroke){poly(g,[iso(u,v),iso(u+w,v),iso(u+w,v+d),iso
 
 /* static floor + back walls */
 const BGRES=2;const bg=document.createElement('canvas');bg.width=SW*BGRES;bg.height=SH*BGRES;
-(function drawBG(){
+function drawOfficeBG(){
   const g=bg.getContext('2d');
   // fully opaque: the map canvas is not cleared each frame, so a transparent corner would keep old pixels (the alarm light piled up into a red disk)
   g.fillStyle='#1c140f';g.fillRect(0,0,bg.width,bg.height);g.scale(BGRES,BGRES);
@@ -1394,7 +1446,7 @@ const BGRES=2;const bg=document.createElement('canvas');bg.width=SW*BGRES;bg.hei
   g.font='bold 14px monospace';g.fillStyle='rgba(15,18,22,.5)';g.textAlign='center';g.textBaseline='middle';
   [['CONTROL ROOM',4,10.5],['TEAM SUPERVISOR',19.5,10.5],['OPISINA MO',25,10.5],['LIBRARY',31.5,10.5],['TULUGAN',38.5,10.5],
    ['GATE',2.5,22.4],['CR',7,22.4],['PANTRY',12.5,22.4],['LOUNGE',19,22.4],['REC ROOM',25,22.4],['GYM',31,22.4],['HALF COURT',38,22.6]].forEach(([t,u,v])=>{const p=iso(u,v-.55);g.save();g.translate(p.x,p.y);g.transform(1,TH/TW,-1,TH/TW,0,0);g.fillText(t,0,0);g.restore();});
-})();
+}
 
 /* furniture as depth-sorted objects */
 const objs=[];
@@ -1405,6 +1457,16 @@ function wallSeg(u1,v1,u2,v2,h,glass){
   if(v1===v2)for(let u=u1;u<u2-1e-6;u+=1){const w=Math.min(1,u2-u);addBox(u,v1-th/2,w,th,h,'#454b52',0,opt);}
   else for(let v=v1;v<v2-1e-6;v+=1){const d=Math.min(1,v2-v);addBox(u1-th/2,v,th,d,h,'#454b52',0,opt);}
 }
+function wallText(u,z,txt,size,col){const p=iso(u,0,z);ctx.save();ctx.transform(1,TH/TW,0,1,p.x,p.y);ctx.fillStyle=col;ctx.font=`bold ${size}px monospace`;ctx.textAlign='center';ctx.fillText(txt,0,0);ctx.restore();}
+function screenColor(s,t){
+  if(!s||s.path.length||s.status==='idle'||s.status==='needs')return'#26313a';
+  if(s.status==='working')return Math.floor(t*3+s.seed)%2?'#3f8aa5':'#367b94';
+  if(s.status==='failed')return Math.floor(t*4)%2?'#d0473a':'#6a1f19';
+  if(s.status==='done')return'#5f8a6c';
+  return'#26313a';
+}
+let tvCh=0,MWV=0;const TVC=['#6f8fb0','#b08a5f','#7fa07a','#a06f8a','#c9b27a'];
+function buildOffice(){
 // top band partitions (glass for the control room and supervisor), front walls with doors to the corridor
 wallSeg(17,0,17,4,18,true);wallSeg(17,6,17,11,18,true);wallSeg(22,0,22,11,18,true);wallSeg(28,0,28,11,18);wallSeg(35,0,35,11,18);
 wallSeg(0,11,1,11,10);wallSeg(4,11,8,11,10);wallSeg(11,11,13,11,10);wallSeg(17,11,18.5,11,10);wallSeg(21,11,23,11,10);wallSeg(27,11,29,11,10);wallSeg(31,11,32,11,10);wallSeg(34.5,11,36,11,10);wallSeg(39,11,42,11,10);
@@ -1413,13 +1475,6 @@ wallSeg(0,13,1.5,13,9);wallSeg(3.5,13,5.5,13,9);wallSeg(8,13,9.5,13,9);wallSeg(1
 for(const x of [5,9,16,22,28,34])wallSeg(x,13,x,23,10);
 wallSeg(42,0,42,23,5);wallSeg(0,23,1.5,23,5);wallSeg(3.5,23,42,23,5);
 
-function screenColor(s,t){
-  if(!s||s.path.length||s.status==='idle'||s.status==='needs')return'#26313a';
-  if(s.status==='working')return Math.floor(t*3+s.seed)%2?'#3f8aa5':'#367b94';
-  if(s.status==='failed')return Math.floor(t*4)%2?'#d0473a':'#6a1f19';
-  if(s.status==='done')return'#5f8a6c';
-  return'#26313a';
-}
 function addConsole(dk,ownerFn){
   const u=dk.x,v=dk.y+.25,w=dk.w;
   add(u+w/2+v+.45,(g,t)=>{
@@ -1473,7 +1528,7 @@ addBox(14.2,13.3,1.2,.8,26,'#d9dde0');
 const table=(u,v)=>add(u+v+.9,g=>{box(g,u+.35,v+.35,.2,.2,7,'#3a2a20');box(g,u,v,.9,.9,2,'#7a5338',7,{top:'#8d6443'});box(g,u+.2,v+.2,.15,.15,3,'#efe6d8',9);box(g,u+.55,v+.5,.15,.15,3,'#efe6d8',9);});
 table(11.8,18.8);table(11.8,21.0);
 // lounge: TV wall, sofas, plants
-let tvCh=0;const TVC=['#6f8fb0','#b08a5f','#7fa07a','#a06f8a','#c9b27a'];
+tvCh=0;
 add(17.2+13.2,(g,t)=>{box(g,17.2,13.15,3.6,.4,5,'#3a2a20');const on=sessions.some(s=>s.idle==='tv'&&!s.path.length);const c=on?(Math.floor(t*2)%2?TVC[tvCh%TVC.length]:shade(TVC[tvCh%TVC.length],.85)):'#25282c';box(g,17.4,13.2,3.2,.12,12,'#1d1d22',5,{front:c});});
 addBox(16.8,18.3,4.4,.7,5,'#6b4a35',0,{top:'#7d5840'});addBox(16.8,18.3,4.4,.25,10,'#5a3e2c');
 addBox(16.4,21.4,2.4,.8,5,'#6b4a35',0,{top:'#7d5840'});
@@ -1495,8 +1550,7 @@ addBox(34.6,21.8,3,.6,5,'#6b4a35',0,{top:'#7d5840'});
 const plant=(u,v)=>add(u+v+.5,g=>{box(g,u,v,.5,.5,6,'#7a5338');box(g,u+.05,v+.05,.4,.4,10,'#5f7a4f',6,{top:'#7a9466'});});
 [[.4,.4],[16.2,.4],[21.3,.4],[34.3,.4],[41.3,9.9],[.4,13.4],[15.3,13.4],[21.3,22.2],[33.3,22.2]].forEach(([u,v])=>plant(u,v));
 // video wall content
-function wallText(u,z,txt,size,col){const p=iso(u,0,z);ctx.save();ctx.transform(1,TH/TW,0,1,p.x,p.y);ctx.fillStyle=col;ctx.font=`bold ${size}px monospace`;ctx.textAlign='center';ctx.fillText(txt,0,0);ctx.restore();}
-let MWV=0;
+MWV=0;
 add(-1e9,(g,t)=>{
   const P=(u1,u2,z1,z2,col)=>poly(g,[iso(u1,0,z1),iso(u2,0,z1),iso(u2,0,z2),iso(u1,0,z2)],col);
   P(2,6.4,13,55,'#1d2a33');P(6.8,11,13,55,'#1d2a33');P(11.4,15,13,55,'#1d2a33');
@@ -1509,6 +1563,7 @@ add(-1e9,(g,t)=>{
   box(g,8.7,.05,.4,.3,2,'#2a2f35',60,{top:un&&Math.floor(t*3)%2?'#ff4a3e':'#5a2222',front:un&&Math.floor(t*3)%2?'#e0392f':'#4a1c1c'});
   if(un){const c=iso(8.9,.2,62),a=(t*4)%(Math.PI*2);g.fillStyle='rgba(255,74,62,.08)';g.beginPath();g.moveTo(c.x,c.y);g.arc(c.x,c.y,90,a,a+.5);g.fill();}
 });
+}
 
 /* characters: pixel sprite with a dark outline */
 const spr=document.createElement('canvas');spr.width=24;spr.height=32;const sg=spr.getContext('2d');
@@ -1719,7 +1774,11 @@ function resizeMap(){
   const narrow=VW<560;if(narrow!==resizeMap.narrow){resizeMap.narrow=narrow;cam.z=narrow?2.6:1.25;const p=cam.follow?isoP(cam.follow):iso(14,9);centerOn(p.x,p.y);}
   clampCam();cam.x=cam.tx;cam.y=cam.ty;
 }
-function clampCam(){const vw=viewW(),vh=viewH();cam.tx=vw>=SW?(SW-vw)/2:Math.max(0,Math.min(SW-vw,cam.tx));cam.ty=vh>=SH?(SH-vh)/2:Math.max(0,Math.min(SH-vh,cam.ty));}
+// The office can be dragged anywhere, up to most of the view past its edges (for example out from under the
+// panel); at least a third of the view keeps some office in sight.
+function clampCam(){const vw=viewW(),vh=viewH(),sx=vw*.65,sy=vh*.65;
+  cam.tx=Math.max(Math.min(0,(SW-vw)/2)-sx,Math.min(Math.max(SW-vw,(SW-vw)/2)+sx,cam.tx));
+  cam.ty=Math.max(Math.min(0,(SH-vh)/2)-sy,Math.min(Math.max(SH-vh,(SH-vh)/2)+sy,cam.ty));}
 function centerOn(x,y){cam.tx=x-viewW()/2;cam.ty=y-viewH()/2;clampCam();}
 function updateCam(dt){
   if(cam.follow){const p=isoP(cam.follow);centerOn(p.x,p.y-20);}
@@ -1746,7 +1805,183 @@ const bounds=(()=>{const Q=.25,sc=document.createElement('canvas');sc.width=Math
     return x1<0?null:{bx:Math.floor(x0/Q-M),by:Math.floor(y0/Q-M),bw:Math.ceil((x1-x0+1)/Q+2*M),bh:Math.ceil((y1-y0+1)/Q+2*M)};};})();
 const hit=(a,b)=>a.bx<b.bx+b.bw&&b.bx<a.bx+a.bw&&a.by<b.by+b.bh&&b.by<a.by+a.bh;
 const STAT=[],DYN=[];
-(function bake(){
+/* ---------- scenes: each unit is its own kind of place, same pixel art and the same people ----------
+   The resort keeps the office's floor plan (so walking, desks and hangout spots work the same) but every room
+   is something else: a beachfront co-working deck, nipa huts, a beach bar, videoke, a pool and a sand court. */
+let SCENE='';
+const SCENE_TXT={
+  office:null,
+  resort:{
+    l:{read:'Nasa duyan',gym:'Lumalangoy',basketball:'Nagva-volleyball',coffee:'Umiinom ng buko',eat:'Kumakain sa kubo',tv:'Nagva-videoke',sleep:'Natutulog sa cabin',chismis:'Nakikipagkwentuhan',wander:'Naglalakad sa boardwalk'},
+    s:{read:'Nagpapahinga sa duyan sa lilim ng niyog.',gym:'Lumalangoy sa pool.',basketball:'Naglalaro ng beach volleyball.',coffee:'Umiinom ng buko juice sa beach bar.',eat:'Kumakain sa kubo.',tv:'Kumakanta sa videoke.',sleep:'Natutulog sa cabin.',wander:'Naglalakad-lakad sa boardwalk.'},
+    p:{read:'Duyan',gym:'Pool',basketball:'Volleyball court',coffee:'Beach bar',eat:'Beach bar',chismis:'Boardwalk',cr:'Shower',sleep:'Cabin',wander:'Boardwalk',tv:'Videoke',billiards:'Laro',chess:'Laro',darts:'Laro',stretch:'Boardwalk',phone:'Boardwalk'},
+    npc:{guard:'Bantay',hr:'Lifeguard',janitor:'Housekeeping',barista:'Bartender',tech:'Maintenance'}}};
+const BASE_TXT={l:Object.assign({},IDLE_LBL),s:Object.assign({},IDLE_SENT),p:Object.assign({},IDLE_PLACE)};
+function applySceneText(k){
+  const t=SCENE_TXT[k];
+  for(const [dst,src] of [[IDLE_LBL,'l'],[IDLE_SENT,'s'],[IDLE_PLACE,'p']]){Object.assign(dst,BASE_TXT[src]);if(t)Object.assign(dst,t[src]);}
+  const names={guard:'Guard',hr:'Safety',janitor:'Janitor',barista:'Pantry',tech:'Maintenance'},npc={guard,hr,janitor,barista,tech};
+  for(const key in npc){if(npc[key])npc[key].name=(t&&t.npc[key])||names[key];}
+}
+function setScene(k){
+  if(k===SCENE)return;SCENE=k;
+  const g=bg.getContext('2d');g.setTransform(1,0,0,1,0,0);g.filter='none';bg.orig=null;themeNow='none';
+  objs.length=0;
+  if(k==='resort'){drawResortBG();buildResort();}else{drawOfficeBG();buildOffice();}
+  bake();
+  if(typeof guard!=='undefined')applySceneText(k);
+}
+
+function drawResortBG(){
+  const g=bg.getContext('2d');
+  g.fillStyle='#16222b';g.fillRect(0,0,bg.width,bg.height);g.scale(BGRES,BGRES);
+  const room=(u0,v0,w,d,a,b,style)=>{for(let u=u0;u<u0+w;u++)for(let v=v0;v<v0+d;v++){
+    const c=style==='tile'?((u+v)%2?a:b):style==='sand'?(((u*7+v*13)%5)?a:b):(v%2?a:b);flat(g,u,v,1,1,c);
+    if(style==='plank'){g.strokeStyle='rgba(60,36,18,.22)';g.lineWidth=.6;const m1=iso(u,v+.5),m2=iso(u+1,v+.5);g.beginPath();g.moveTo(m1.x,m1.y);g.lineTo(m2.x,m2.y);g.stroke();}}};
+  room(0,0,17,11,'#b98a5b','#b28454','plank');     // co-working deck
+  room(17,0,5,11,'#cdb071','#c6a96b','plank');     // lead's nipa hut (bamboo mat)
+  room(22,0,6,11,'#a8835f','#a37e5a','plank');     // your villa
+  room(28,0,7,11,'#e6d29d','#dccb93','sand');      // hammock grove
+  room(35,0,7,11,'#b49470','#ad8e6a','plank');     // cabins
+  room(0,11,42,2,'#9a7350','#936d4a','plank');     // boardwalk
+  room(0,13,5,10,'#bdb6a6','#b5ae9e','tile');      // entrance
+  room(5,13,4,10,'#d3e6e8','#c8dcdf','tile');      // showers
+  room(9,13,7,10,'#e6d29d','#dccb93','sand');      // beach bar
+  room(16,13,6,10,'#b98a5b','#b28454','plank');    // videoke
+  room(22,13,6,10,'#cdb071','#c6a96b','plank');    // games hut
+  room(28,13,6,10,'#ddd6c6','#d4cdbd','tile');     // pool deck
+  room(34,13,8,10,'#ecd9a3','#e4d19b','sand');     // volleyball sand
+  // the pool
+  flat(g,28.8,14.2,4.4,7.4,'#2f86a8','rgba(20,40,50,.5)');flat(g,29,14.4,4,7,'#43a6c6');
+  g.strokeStyle='rgba(230,248,255,.55)';g.lineWidth=.8;
+  for(let k=0;k<6;k++){const a=iso(29.3,15+k*1.1),b=iso(32.7,15.3+k*1.1);g.beginPath();g.moveTo(a.x,a.y);g.quadraticCurveTo((a.x+b.x)/2,(a.y+b.y)/2-2,b.x,b.y);g.stroke();}
+  // volleyball court lines (rope)
+  g.strokeStyle='rgba(255,255,255,.8)';g.lineWidth=1;
+  const L=pts=>{g.beginPath();pts.forEach(([u,v],i)=>{const p=iso(u,v);i?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y);});g.stroke();};
+  L([[35,14],[41,14],[41,22],[35,22],[35,14]]);
+  // mats, towels, a beach rug
+  flat(g,22.6,5.2,4.8,2.6,'#3f7f86','rgba(20,24,28,.35)');flat(g,22.8,5.4,4.4,2.2,'#4f969c');
+  flat(g,16.4,15.6,5.2,3.2,'#a0523f','rgba(20,24,28,.35)');flat(g,16.6,15.8,4.8,2.8,'#b8654e');
+  // backdrop: sky and sea behind the resort, jungle on the side
+  const face=(pts,col)=>poly(g,pts,col);
+  face([iso(0,0),iso(42,0),iso(42,0,22),iso(0,0,22)],'#2f8bb0');
+  face([iso(0,0,22),iso(42,0,22),iso(42,0,26),iso(0,0,26)],'#5fb3cf');
+  face([iso(0,0,26),iso(42,0,26),iso(42,0,WALL),iso(0,0,WALL)],'#a9dcec');
+  face([iso(0,0),iso(0,23),iso(0,23,WALL),iso(0,0,WALL)],'#4f7f4a');
+  for(let v=1;v<23;v+=2){const p=iso(0,v,WALL*.55+((v*37)%9));g.fillStyle=v%4?'#5f9257':'#456f40';g.beginPath();g.ellipse(p.x,p.y,10,8,0,0,Math.PI*2);g.fill();}
+  // waves and the sun
+  g.strokeStyle='rgba(235,250,255,.6)';g.lineWidth=.8;
+  for(let k=0;k<14;k++){const u=1.5+k*2.9,z=6+((k*5)%13);const a=iso(u,0,z),b=iso(u+1.2,0,z);g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();}
+  const sun=iso(33,0,WALL-10);g.fillStyle='#ffd77a';g.beginPath();g.arc(sun.x,sun.y,9,0,Math.PI*2);g.fill();
+  g.fillStyle='rgba(255,255,255,.85)';[[8,WALL-8],[20,WALL-5],[27,WALL-11]].forEach(([u,z])=>{const c=iso(u,0,z);g.beginPath();g.ellipse(c.x,c.y,9,3,0,0,Math.PI*2);g.ellipse(c.x+7,c.y-2,6,3,0,0,Math.PI*2);g.fill();});
+  // low sea wall along the back
+  face([iso(0,0),iso(42,0),iso(42,0,4),iso(0,0,4)],'#c9b48a');
+  g.font='bold 14px monospace';g.fillStyle='rgba(60,40,20,.45)';g.textAlign='center';g.textBaseline='middle';
+  [['CO-WORKING',4,10.5],['KUBO NI LEAD',19.5,10.5],['VILLA MO',25,10.5],['DUYAN',31.5,10.5],['CABINS',38.5,10.5],
+   ['ENTRANCE',2.5,22.4],['SHOWER',7,22.4],['BEACH BAR',12.5,22.4],['VIDEOKE',19,22.4],['LARO',25,22.4],['POOL',31,22.4],['VOLLEYBALL',38,22.6]].forEach(([t,u,v])=>{const p=iso(u,v-.55);g.save();g.translate(p.x,p.y);g.transform(1,TH/TW,-1,TH/TW,0,0);g.fillText(t,0,0);g.restore();});
+}
+
+function buildResort(){
+  const BAM='#b8945a',BAMT='#d3b27a',THATCH='#a8864a';
+  // low bamboo fences instead of walls (same openings as the office doors)
+  const fence=(u1,v1,u2,v2,h)=>{const th=.14;
+    if(v1===v2)for(let u=u1;u<u2-1e-6;u+=1){const w=Math.min(1,u2-u);addBox(u,v1-th/2,w,th,h,BAM,0,{top:BAMT});}
+    else for(let v=v1;v<v2-1e-6;v+=1){const d=Math.min(1,v2-v);addBox(u1-th/2,v,th,d,h,BAM,0,{top:BAMT});}};
+  fence(17,0,17,4,8);fence(17,6,17,11,8);fence(22,0,22,11,8);fence(28,0,28,11,6);fence(35,0,35,11,6);
+  fence(0,11,1,11,5);fence(4,11,8,11,5);fence(11,11,13,11,5);fence(21,11,23,11,5);fence(27,11,29,11,5);fence(39,11,42,11,5);
+  fence(0,13,1.5,13,5);fence(3.5,13,5.5,13,5);fence(8,13,9.5,13,5);fence(19.5,13,22.5,13,5);fence(25.5,13,28.5,13,5);
+  for(const x of [5,9,16,22,28,34])fence(x,13,x,23,5);
+  fence(42,0,42,23,4);fence(0,23,1.5,23,4);fence(3.5,23,42,23,4);
+  // co-working: bamboo tables with laptops; the screen shows what each session is doing
+  const laptopDesk=(dk,ownerFn)=>{
+    const u=dk.x,v=dk.y+.25,w=dk.w;
+    add(u+w/2+v+.45,(g,t)=>{
+      box(g,u+.1,v+.1,.12,.12,7,'#7a5530');box(g,u+w-.22,v+.1,.12,.12,7,'#7a5530');
+      box(g,u,v,w,.8,1.2,'#a7824f',7,{top:'#c29a5e'});
+      const s=ownerFn(),sc=screenColor(s,t);
+      for(let i=0;i<2;i++){box(g,u+.35+i*1.3,v+.3,.9,.45,.3,'#3a3f45',8.2);box(g,u+.35+i*1.3,v+.22,.9,.08,6,'#2a2f35',8.5,{front:sc});}
+      box(g,u+w-.55,v+.45,.22,.22,2.2,'#e9e1cf',8.2,{top:'#f4ead2'});   // buko with a straw
+      if(s&&(s.status==='needs'||s.status==='failed')){const un=!s.acked;const on=!un||Math.floor(t*2)%2;box(g,u+.05,v+.05,.2,.2,3,'#5a3a20',8.2,{top:on?(s.status==='failed'||s.prio===1?'#ff4a3e':'#f2b23a'):'#3a2020',front:on?(s.status==='failed'?'#c8382f':'#d79a1c'):'#3a2020'});}
+    });
+    const sx=dk.seat.x/T,sy=dk.seat.y/T;
+    add(sx+sy-.25,g=>{box(g,sx-.22,sy-.3,.44,.4,5,'#8a6438',0,{top:'#b8945a'});});
+  };
+  DESKS.forEach(d=>laptopDesk(d,()=>d.owner));
+  laptopDesk(LEAD_DESK,()=>sessions.find(s=>s.lead));
+  // umbrellas over the deck (high, so people stay visible)
+  const umbrella=(u,v,c)=>add(u+v+.3,g=>{box(g,u,v,.12,.12,30,'#7a5530');const p=iso(u+.06,v+.06,46);g.fillStyle=c;g.beginPath();g.ellipse(p.x,p.y,22,9,0,0,Math.PI*2);g.fill();g.strokeStyle='rgba(0,0,0,.25)';g.stroke();g.fillStyle='rgba(255,255,255,.35)';g.beginPath();g.ellipse(p.x-6,p.y-2,8,3,0,0,Math.PI*2);g.fill();});
+  umbrella(4.4,4.9,'#d9593f');umbrella(8.9,4.9,'#2f8bb0');umbrella(13.2,4.9,'#e2b23a');
+  // the lead's hut: hanging lamp post and a small shelf
+  addBox(17.4,1.0,.6,2.4,10,'#7a5530',0,{top:THATCH});addBox(20.6,8.6,1,1,5,'#a7824f',0,{top:'#c29a5e'});
+  // your villa: desk, chair, beach lounger
+  add(24.7+.3+3.7+.2,g=>{box(g,24.7,3.7,.6,.4,6,'#7a5530');box(g,24.7,3.7,.6,.12,14,'#7a5530',6);});
+  add(25+4.65,g=>{box(g,23.5,4.3,3,.7,8,'#8a6438',0,{top:'#a7824f'});box(g,23.7,4.42,.6,.08,8,'#9a9086',8);box(g,26.2,4.5,.22,.22,2.4,'#e9e1cf',8,{top:'#f4ead2'});});
+  addBox(22.5,8.8,3,.8,3,'#2f8bb0',0,{top:'#4fa7c6'});
+  // hammock grove: palms and hammocks
+  const palm=(u,v,h)=>add(u+v+.4,g=>{for(let k=0;k<6;k++)box(g,u+k*.04,v,.22,.22,h/6,'#8a6438',k*h/6);const top=iso(u+.3,v+.1,h*HS+2);
+    g.fillStyle='#4f8a45';for(let a=0;a<6;a++){const ang=a*Math.PI/3;g.beginPath();g.ellipse(top.x+Math.cos(ang)*9,top.y+Math.sin(ang)*4,10,3.2,ang,0,Math.PI*2);g.fill();}
+    g.fillStyle='#6b4a2a';g.beginPath();g.arc(top.x,top.y+2,2.2,0,Math.PI*2);g.fill();});
+  const hammock=(u,v)=>add(u+v+.8,g=>{box(g,u,v,.12,.12,10,'#7a5530');box(g,u+2,v,.12,.12,10,'#7a5530');
+    const a=iso(u+.06,v+.06,9*HS),b=iso(u+2.06,v+.06,9*HS),m=iso(u+1.06,v+.06,4*HS);g.strokeStyle='#d9593f';g.lineWidth=3;g.beginPath();g.moveTo(a.x,a.y);g.quadraticCurveTo(m.x,m.y+6,b.x,b.y);g.stroke();
+    g.strokeStyle='#f2c14e';g.lineWidth=1;g.beginPath();g.moveTo(a.x,a.y+1);g.quadraticCurveTo(m.x,m.y+7,b.x,b.y+1);g.stroke();});
+  hammock(29.4,6.4);hammock(31.6,8.6);palm(28.8,1.2,30);palm(33.6,1.6,34);palm(30.2,3.6,28);palm(34.2,9.6,30);
+  // cabins: low beds with bright sheets
+  const bed=(u,v,c)=>add(u+v+1.3,g=>{box(g,u,v,2.2,1,3,'#8a6438',0,{top:c});box(g,u+.05,v+.1,.5,.8,1,'#f4ead2',3);});
+  bed(35.6,2.6,'#2f8bb0');bed(35.6,5.6,'#d9593f');bed(38.8,2.6,'#e2b23a');bed(38.8,5.6,'#4f8a45');
+  addBox(39.4,8.4,2.2,.7,7,'#8a6438',0,{top:'#a7824f'});addBox(40,8.45,.7,.1,6,'#2a2f35',7,{front:'#3f8aa5'});
+  // boardwalk: tiki torches
+  const torch=(u,v)=>add(u+v+.2,(g,t)=>{box(g,u,v,.1,.1,14,'#6b4a2a');const p=iso(u+.05,v+.05,15*HS+2);const f=Math.sin(t*9+u)*1.2;g.fillStyle='#f2a33a';g.beginPath();g.ellipse(p.x,p.y-2,2.4,3.6+f,0,0,Math.PI*2);g.fill();g.fillStyle='#ffe08a';g.beginPath();g.ellipse(p.x,p.y-1,1.2,2+f*.5,0,0,Math.PI*2);g.fill();});
+  [2,9,15.5,24,30,37,41].forEach(u=>torch(u,11.15));
+  // entrance: welcome arch and the guard's hut counter
+  addBox(1.8,15.2,1.9,.6,8,'#8a6438',0,{top:'#a7824f'});addBox(2.3,15.25,.6,.1,6,'#2a2f35',8,{front:'#2f5c70'});
+  add(1.5+13.2,g=>{box(g,1.5,13.1,.18,.18,26,'#7a5530');box(g,3.5,13.1,.18,.18,26,'#7a5530');box(g,1.5,13.1,2.2,.18,4,'#a8864a',26);
+    const p=iso(2.6,13.15,30*HS);g.save();g.translate(p.x,p.y);g.transform(1,TH/TW,0,1,0,0);g.fillStyle='#4a2f17';g.font='bold 6px monospace';g.textAlign='center';g.fillText('MABUHAY!',0,0);g.restore();});
+  // showers
+  for(let i=0;i<2;i++)add(5.6+i*1.6+21.8,g=>{const u=5.6+i*1.6,v=21.8;box(g,u,v,1.1,.9,.3,'#b8c9cc');box(g,u+.5,v+.1,.1,.1,18,'#9aa3ab');box(g,u+.3,v+.1,.5,.2,.5,'#9aa3ab',18);});
+  addBox(5.4,17.0,.5,1.6,6,'#d3e6e8');
+  // beach bar: thatched counter, coconuts, tables with umbrellas
+  add(9.4+13.6+.4,(g,t)=>{box(g,9.4,13.3,4.2,.7,8,'#7a5530',0,{top:'#a7824f'});box(g,9.3,13.2,4.4,.9,1.2,THATCH,8);
+    for(let k=0;k<5;k++)box(g,9.7+k*.7,13.45,.3,.3,1.6,k%2?'#5f7a3a':'#6b4a2a',9.2);});
+  addBox(14.2,13.3,1.2,.8,18,'#e9e1cf',0,{top:'#f4ead2'});
+  const btable=(u,v,c)=>{add(u+v+.9,g=>{box(g,u+.35,v+.35,.2,.2,6,'#6b4a2a');box(g,u,v,.9,.9,1.4,'#a7824f',6,{top:'#c29a5e'});box(g,u+.25,v+.3,.25,.25,1.8,'#e9e1cf',7.4,{top:'#f4ead2'});});umbrella(u+.4,v+.4,c);};
+  btable(11.8,18.8,'#2f8bb0');btable(11.8,21.0,'#d9593f');
+  // videoke: the screen (same channel logic as the lounge TV), speakers, benches
+  add(17.2+13.2,(g,t)=>{box(g,17.2,13.15,3.6,.4,4,'#6b4a2a');const on=sessions.some(s=>s.idle==='tv'&&!s.path.length);
+    const c=on?(Math.floor(t*2)%2?TVC[tvCh%TVC.length]:shade(TVC[tvCh%TVC.length],.85)):'#25282c';box(g,17.6,13.2,2.8,.12,10,'#1d1d22',4,{front:c});
+    box(g,17.25,13.2,.35,.3,9,'#2a2f35');box(g,20.4,13.2,.35,.3,9,'#2a2f35');
+    if(on){const p=iso(19,13.25,10*HS);g.fillStyle='#fff';g.font='bold 4px monospace';g.textAlign='center';g.fillText('♪ ♫ ♪',p.x,p.y-6+Math.sin(t*4));}});
+  addBox(16.8,18.3,4.4,.7,4,'#8a6438',0,{top:'#a7824f'});addBox(16.4,21.4,2.4,.8,4,'#8a6438',0,{top:'#a7824f'});
+  // games hut: billiards, chess, darts (same spots as the rec room)
+  add(23.4+15.05+.65,g=>{box(g,23.5,14.5,.25,.25,6,'#6b4a2a');box(g,25.5,14.5,.25,.25,6,'#6b4a2a');box(g,23.5,15.5,.25,.25,6,'#6b4a2a');box(g,25.5,15.5,.25,.25,6,'#6b4a2a');
+    box(g,23.4,14.4,2.4,1.3,2,'#7a5530',6,{top:'#3f7f52'});box(g,24,14.8,.12,.12,1,'#efe6d8',8);box(g,24.8,15.0,.12,.12,1,'#b03a2e',8);});
+  add(23.6+20.4+.9,g=>{box(g,23.95,20.75,.2,.2,6,'#6b4a2a');box(g,23.6,20.4,.9,.9,1.5,'#a7824f',6,{top:'#e9e1cf'});for(let i=0;i<4;i++)box(g,23.7+(i%2)*.4,20.5+(i>>1)*.4,.12,.12,1.5,i%3?'#2a201a':'#efe6d8',7.5);});
+  add(27.84+20.2+.5,g=>{box(g,27.8,20.0,.06,.7,6,'#6b4a2a',5,{front:'#d9593f'});box(g,27.79,20.25,.06,.2,2,'#efe6d8',7);});
+  // pool: ladder and loungers
+  add(32.9+14.4,g=>{box(g,32.9,14.3,.08,.08,8,'#cfd6dc');box(g,33.2,14.3,.08,.08,8,'#cfd6dc');for(let k=0;k<3;k++)box(g,32.9,14.3,.38,.06,.4,'#cfd6dc',2+k*2);});
+  const lounger=(u,v,c)=>add(u+v+.6,g=>{box(g,u,v,.6,1.5,1.6,'#f4ead2',0,{top:c});box(g,u,v,.6,.4,3.2,'#f4ead2',0,{top:c});});
+  lounger(28.3,21.8,'#2f8bb0');lounger(29.2,21.8,'#e2b23a');lounger(33.4,21.6,'#d9593f');
+  // volleyball: posts and net across the middle of the court
+  add(38+18,(g,t)=>{box(g,34.9,17.9,.14,.14,26,'#9aa3ab');box(g,41,17.9,.14,.14,26,'#9aa3ab');
+    const a=iso(35,18,26*HS),b=iso(41.1,18,26*HS),a2=iso(35,18,18*HS),b2=iso(41.1,18,18*HS);poly(g,[a,b,b2,a2],'rgba(255,255,255,.22)');
+    g.strokeStyle='#f4ead2';g.lineWidth=1.2;g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();
+    g.strokeStyle='rgba(255,255,255,.5)';g.lineWidth=.5;for(let k=1;k<12;k++){const p=iso(35+k*.5,18,26*HS),q=iso(35+k*.5,18,18*HS);g.beginPath();g.moveTo(p.x,p.y);g.lineTo(q.x,q.y);g.stroke();}});
+  addBox(34.6,21.8,3,.6,4,'#8a6438',0,{top:'#a7824f'});
+  // more palms around the resort
+  [[.6,.8,30],[16.3,.6,26],[41.2,10,28],[.6,13.8,26],[15.4,13.6,24],[21.2,22,26],[33.4,22.2,24],[41.4,22,30]].forEach(([u,v,h])=>palm(u,v,h));
+  // status board at the back: one tile per session, like the control room's video wall
+  add(-1e9,(g,t)=>{
+    const P=(u1,u2,z1,z2,col)=>poly(g,[iso(u1,0,z1),iso(u2,0,z1),iso(u2,0,z2),iso(u1,0,z2)],col);
+    P(1.6,15.4,12,56,'#6b4a2a');P(2,15,14,54,'#2a3b44');
+    sessions.slice(0,9).forEach((s,i)=>{const u=2.3+(i%3)*1.4,z=48-Math.floor(i/3)*12;const c=s.status==='working'?'#9fe0c0':s.status==='failed'?(Math.floor(t*2)%2?'#ff4a3e':'#7a1d18'):s.status==='needs'?((s.acked||Math.floor(t*2)%2)?(s.prio===1?'#ff4a3e':'#f2b23a'):'#3a3020'):'#55606a';P(u,u+1.1,z-8,z,c);});
+    const n=sessions.filter(s=>s.status==='working').length;
+    wallText(10.5,40,n+' NAGTATRABAHO',8,'#ffd77a');wallText(10.5,28,'BEACH RESORT',6,'#9fd8e6');
+    const un=sessions.some(s=>(s.status==='needs'||s.status==='failed')&&!s.acked);
+    box(g,8.7,.05,.4,.3,2,'#6b4a2a',58,{top:un&&Math.floor(t*3)%2?'#ff4a3e':'#5a2222',front:un&&Math.floor(t*3)%2?'#e0392f':'#4a1c1c'});
+  });
+}
+
+function bake(){
+  STAT.length=0;DYN.length=0;
   const R=BGRES,g=bg.getContext('2d');
   for(const o of objs.slice().sort((a,b)=>a.d-b.d)){
     if(o.draw.length>=2){const bb=bounds(o.draw,24,[0,.37,.81,1.6]);Object.assign(o,bb||{bx:0,by:0,bw:SW,bh:SH});DYN.push(o);continue;}
@@ -1757,7 +1992,8 @@ const STAT=[],DYN=[];
   }
   // every piece is drawn exactly once per frame, in depth order (drawing a piece twice made glass and edges flicker)
   objs.length=0;objs.push(...STAT,...DYN);
-})();
+}
+setScene('office');
 
 /* ---------- loop ---------- */
 let last=performance.now();
@@ -2057,6 +2293,7 @@ async function saveTeam(t){
   catch(e){connMsg='Hindi na-save ang team.';}
   version=0;setConn();
 }
+function switchUnit(k){if(k===UNIT&&applyRecords.unit===k)return;UNIT=k;try{localStorage.setItem('devroom.unit',k);}catch(e){}applyRecords(allRecords);firstLoad=false;chatKey='';render();setConn();}
 function rebuildTeam(){for(const s of sessions.slice())dropSession(s,'');firstLoad=true;logs.length=0;applyRecords(allRecords);setConn();}
 function collectNames(){const n=Object.assign({},TEAM.names||{});document.querySelectorAll('#teamPanel .tname').forEach(i=>{const r=allRecords.find(x=>x.id===i.dataset.id);const v=i.value.trim();if(!v||(r&&v===r.title&&!n[i.dataset.id]))delete n[i.dataset.id];else n[i.dataset.id]=v;});return n;}
 function dockCard(s){
@@ -2110,6 +2347,7 @@ document.addEventListener('click',e=>{
   if(e.target.closest('[data-act="hooks"]')){installHooks();return;}
   if(e.target.closest('[data-act="restart"]')){restartApp(false);return;}
   if(e.target.closest('[data-act="remote-toggle"]')){toggleRemote();return;}
+  const un=e.target.closest('[data-unit]');if(un){switchUnit(un.dataset.unit);return;}
   if(e.target.closest('[data-act="updinfo"]')){const ap=apkUpd(),pc=pcUpd();
     if(ap&&ap.act){try{window.parent.postMessage({type:'devroom:update'},'*');}catch(x){}}
     connMsg=[pc&&('PC: '+pc.d),ap&&('Phone: '+ap.d)].filter(Boolean).join(' ');setConn();clearTimeout(showUpd.t);showUpd.t=setTimeout(()=>{connMsg='';setConn();},12000);return;}
