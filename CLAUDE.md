@@ -50,6 +50,9 @@ The user's real team is **LOGIC_SIM_PROJECT**: a leader plus subsessions (CODE F
     - Working sessions get messages through the PostToolUse `additionalContext`.
     - The Chat tab is Dev Room's own chat; never replace it with claude.ai.
   - Subagent hooks (`agent_id`, or a `subagents` transcript) carry the parent's session id: they only update its detail text while it works, never its status or transcript, so a lead with agents in the background stays free for messages. Prompts Claude Code writes itself (`system_prompt()`, `SYS_PROMPT` in the UI) are not shown as the user's messages.
+  - **Progress:** `track_tasks` keeps each session's task list (`tasks`: id, t, a, st) from TodoWrite / TaskCreate / TaskUpdate; the UI's `prog()` drives tile bars, map bars, the Detalye checklist and the report walk to the Boss (`reportToBoss`).
+  - **Queue reason:** `queue_why` (answering, step, nocli, busy, soon) is shown under a waiting message (`queueText`).
+  - **Plan limits:** `fetch_usage` reads the 5-hour and weekly utilization every 2 minutes with the token in `~/.claude/.credentials.json` (never passed on); `usage` in `/api/state`, shown by `renderUsage`. `DEVROOM_USAGE_URL` points it at a stand-in for tests.
   - A liveness thread marks a session as working while its transcript keeps being written after Stop.
   - State lives in `%APPDATA%\DevRoom\state.json` and is written atomically.
 - **`app/src-tauri/src/main.rs`:**

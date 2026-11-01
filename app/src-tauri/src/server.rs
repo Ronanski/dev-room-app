@@ -317,6 +317,9 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<St
     let gen = s.get("listen_gen").and_then(|x| x.as_u64()).unwrap_or(0) + 1;
     s.insert("listen_gen".into(), json!(gen));
     let mut persist = true;
+    if ev == "PreToolUse" { s.insert("step_at".into(), json!(now)); s.insert("step".into(), json!(v.get("tool_name").and_then(|x| x.as_str()).unwrap_or(""))); }
+    if ev == "PostToolUse" || ev == "Stop" { s.remove("step_at"); }
+    let tasks_changed = track_tasks(s, ev, v);
     match ev {
         "SessionStart" => {
             s.insert("status".into(), json!("idle"));
@@ -396,7 +399,7 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<St
         _ => {}
     }
     st.bump();
-    if persist { st.save(); }
+    if persist || tasks_changed { st.save(); }
 }
 
 /* ---------- messages from the app to a session ----------
@@ -511,6 +514,60 @@ fn hook_reply(req: Request, st: &Mutex<State>, v: &Value) {
 }
 
 /// The visible conversation: your prompts and the session's replies at the end of each turn (newest 40).
+/// The session's own task list, from its TodoWrite / TaskCreate / TaskUpdate calls: what it set out to do and
+/// how far it got (shown as progress on its tile, its desk and in Detalye). Returns whether the list changed.
+fn track_tasks(s: &mut Map<String, Value>, ev: &str, v: &Value) -> bool {
+    let tool = v.get("tool_name").and_then(|x| x.as_str()).unwrap_or("");
+    let input = v.get("tool_input").cloned().unwrap_or(Value::Null);
+    let st_ok = |x: &str| ["pending", "in_progress", "completed"].contains(&x);
+    let mut list: Vec<Value> = s.get("tasks").and_then(|x| x.as_array()).cloned().unwrap_or_default();
+    let before = list.clone();
+    match (ev, tool) {
+        ("PreToolUse", "TodoWrite") => {
+            if let Some(todos) = input.get("todos").and_then(|x| x.as_array()) {
+                list = todos.iter().take(40).enumerate().map(|(i, t)| json!({
+                    "id": format!("t{i}"),
+                    "t": clip(t.get("content").and_then(|x| x.as_str()).unwrap_or(""), 120),
+                    "a": clip(t.get("activeForm").and_then(|x| x.as_str()).unwrap_or(""), 120),
+                    "st": t.get("status").and_then(|x| x.as_str()).filter(|x| st_ok(x)).unwrap_or("pending")})).collect();
+            }
+        }
+        ("PostToolUse", "TaskCreate") => {
+            // the new task's number is in the reply ("Task #3 created…" or {"task":{"id":"3"}})
+            let r = v.get("tool_response").cloned().unwrap_or(Value::Null);
+            let id = r.pointer("/task/id").or_else(|| r.get("id")).map(|x| x.as_str().map(String::from).unwrap_or_else(|| x.to_string()))
+                .or_else(|| { let t = r.to_string(); let i = t.find('#')?; let d: String = t[i + 1..].chars().take_while(|c| c.is_ascii_digit()).collect(); (!d.is_empty()).then_some(d) })
+                .unwrap_or_else(|| format!("n{}", list.len() + 1));
+            if !list.iter().any(|x| x.get("id").and_then(|i| i.as_str()) == Some(id.as_str())) {
+                // a fresh list once the previous one was all done
+                if !list.is_empty() && list.iter().all(|x| x.get("st").and_then(|t| t.as_str()) == Some("completed")) { list.clear(); }
+                list.push(json!({"id": id, "t": clip(input.get("subject").and_then(|x| x.as_str()).unwrap_or(""), 120),
+                    "a": clip(input.get("activeForm").and_then(|x| x.as_str()).unwrap_or(""), 120), "st": "pending"}));
+                if list.len() > 40 { let n = list.len() - 40; list.drain(..n); }
+            }
+        }
+        ("PreToolUse", "TaskUpdate") => {
+            let id = input.get("taskId").map(|x| x.as_str().map(String::from).unwrap_or_else(|| x.to_string())).unwrap_or_default();
+            let new = input.get("status").and_then(|x| x.as_str()).unwrap_or("");
+            if new == "deleted" { list.retain(|x| x.get("id").and_then(|i| i.as_str()) != Some(id.as_str())); }
+            else if let Some(t) = list.iter_mut().find(|x| x.get("id").and_then(|i| i.as_str()) == Some(id.as_str())) {
+                if st_ok(new) { t["st"] = json!(new); }
+                if let Some(sub) = input.get("subject").and_then(|x| x.as_str()) { t["t"] = json!(clip(sub, 120)); }
+                if let Some(a) = input.get("activeForm").and_then(|x| x.as_str()) { t["a"] = json!(clip(a, 120)); }
+            }
+        }
+        ("UserPromptSubmit", _) => {
+            // new work from you after everything was done: start a new list
+            let p = v.get("prompt").and_then(|x| x.as_str()).unwrap_or("");
+            if !system_prompt(p) && !list.is_empty() && list.iter().all(|x| x.get("st").and_then(|t| t.as_str()) == Some("completed")) { list.clear(); }
+        }
+        _ => {}
+    }
+    if list == before { return false; }
+    s.insert("tasks".into(), json!(list));
+    true
+}
+
 /// A prompt Claude Code wrote itself (wrapped in one of its tags), not something the user typed.
 fn system_prompt(p: &str) -> bool {
     const TAGS: [&str; 16] = ["system-reminder", "command-name", "command-message", "command-args", "command-contents", "local-command-stdout",
@@ -539,6 +596,17 @@ fn push_convo(s: &mut Map<String, Value>, role: &str, text: &str, max: usize) {
     s.insert("convo_n".into(), json!(n));
 }
 
+/// Why a message from you is still waiting (shown under it), or "" when nothing waits.
+fn queue_why(s: &Value) -> &'static str {
+    let queued = s.get("inbox").and_then(|i| i.as_array()).map(|a| a.iter().any(|m| m.get("state").and_then(|x| x.as_str()) == Some("queued"))).unwrap_or(false);
+    if !queued { return ""; }
+    let id = s.get("id").and_then(|x| x.as_str()).unwrap_or("");
+    if RUNS.lock().map(|r| r.iter().any(|x| x == id)).unwrap_or(false) { return "answering"; }
+    let o = s.as_object();
+    if o.map(resumable).unwrap_or(false) { return if claude_bin().is_some() { "soon" } else { "nocli" }; }
+    if s.get("step_at").and_then(|x| x.as_u64()).unwrap_or(0) > 0 { "step" } else { "busy" }
+}
+
 fn record(s: &Value, names: &Value) -> Value {
     let id = s.get("id").and_then(|x| x.as_str()).unwrap_or("");
     let cwd = s.get("cwd").and_then(|x| x.as_str()).unwrap_or("");
@@ -562,6 +630,10 @@ fn record(s: &Value, names: &Value) -> Value {
         "inbox": s.get("inbox").cloned().unwrap_or(json!([])),
         "convo_n": s.get("convo_n").cloned().unwrap_or(json!(0)),
         "listening": s.get("listening").cloned().unwrap_or(json!(false)),
+        "tasks": s.get("tasks").cloned().unwrap_or(json!([])),
+        "step": s.get("step").cloned().unwrap_or(json!("")),
+        "step_at": s.get("step_at").cloned().unwrap_or(json!(0)),
+        "queue_why": queue_why(s),
         "post_turn_summary": {
             "status_detail": s.get("detail").cloned().unwrap_or(json!("")),
             "recent_action": s.get("recent").cloned().unwrap_or(json!("")),
@@ -698,7 +770,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16, tun: bool) {
                 "lan_url": lan, "ts_url": tailscale_ip().map(|ip| format!("http://{ip}:{port}/")),
                 "app_build": crate::updater::BUILD, "app_version": crate::updater::VERSION, "ui_build": crate::updater::ui_build(),
                 "remote": if local { crate::tunnel::info() } else { Value::Null },
-                "instant_chat": claude_bin().is_some(),
+                "instant_chat": claude_bin().is_some(), "usage": usage(),
                 "update_ready": crate::updater::exe_ready(), "update_note": crate::updater::note(),
                 "latest": crate::updater::latest()});
             drop(s);
@@ -949,6 +1021,14 @@ pub fn start(port: u16) -> Option<u16> {
     std::thread::spawn(move || loop { std::thread::sleep(std::time::Duration::from_millis(900)); tail_transcripts(&tail); });
     let live = st.clone();
     std::thread::spawn(move || loop { std::thread::sleep(std::time::Duration::from_secs(3)); liveness(&live); });
+    // plan limits: now, then every 2 minutes (shown in the header on every device)
+    let us = st.clone();
+    std::thread::spawn(move || loop {
+        let u = fetch_usage();
+        let changed = USAGE.lock().map(|mut g| { let ch = g.as_ref().map(|o| o.get("five") != u.get("five") || o.get("week") != u.get("week") || o.get("err") != u.get("err")).unwrap_or(true); *g = Some(u); ch }).unwrap_or(false);
+        if changed { lk(&us).bump(); }
+        std::thread::sleep(std::time::Duration::from_secs(120));
+    });
     // Malayo mode: a loopback-only port for the tunnel, where every request counts as a phone
     if let Ok(ts) = Server::http(("127.0.0.1", crate::tunnel::PORT)) {
         let st2 = st.clone();
@@ -1186,9 +1266,59 @@ pub fn claude_bin() -> Option<PathBuf> {
             cands.extend(v);
         }
     }
-    let found = cands.into_iter().find(|p| p.is_file());
+    let mut found = cands.into_iter().find(|p| p.is_file());
+    // Not in the usual places: ask Windows where the running Claude Code is (its sessions are running now).
+    #[cfg(windows)]
+    if found.is_none() {
+        use std::os::windows::process::CommandExt;
+        let out = std::process::Command::new("powershell").args(["-NoProfile", "-NonInteractive", "-Command",
+            "Get-CimInstance Win32_Process -Filter \"Name='claude.exe'\" | ForEach-Object { $_.ExecutablePath }"])
+            .creation_flags(0x0800_0000).output();
+        if let Ok(o) = out {
+            // the Claude desktop app is also claude.exe: keep the Claude Code ones (a claude-code or .local folder)
+            found = String::from_utf8_lossy(&o.stdout).lines().map(|l| PathBuf::from(l.trim())).filter(|p| p.is_file())
+                .find(|p| { let t = p.display().to_string().to_lowercase(); t.contains("claude-code") || t.contains(".local") || t.contains("npm") || t.contains(".claude") });
+        }
+    }
     if let Ok(mut c) = CACHE.lock() { *c = Some((found.clone().unwrap_or_default(), now_ms())); }
     found
+}
+
+/* ---------- your Claude plan limits (5-hour window and weekly) ----------
+   Read with the sign-in Claude Code keeps on this PC (~/.claude/.credentials.json), from the same usage service
+   the Claude apps use. Only the percentages and reset times leave this module; the sign-in never does. */
+static USAGE: Mutex<Option<Value>> = Mutex::new(None);
+pub fn usage() -> Value { USAGE.lock().ok().and_then(|u| u.clone()).unwrap_or(Value::Null) }
+
+fn claude_token() -> Result<String, &'static str> {
+    let dir = std::env::var_os("CLAUDE_CONFIG_DIR").map(PathBuf::from)
+        .or_else(|| std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")).map(|h| PathBuf::from(h).join(".claude")))
+        .ok_or("nohome")?;
+    let raw = fs::read_to_string(dir.join(".credentials.json")).map_err(|_| "nosignin")?;
+    let v: Value = serde_json::from_str(&raw).map_err(|_| "nosignin")?;
+    v.pointer("/claudeAiOauth/accessToken").and_then(|x| x.as_str()).filter(|t| !t.is_empty()).map(String::from).ok_or("nosignin")
+}
+
+fn fetch_usage() -> Value {
+    let tok = match claude_token() { Ok(t) => t, Err(e) => return json!({"err": e, "at": now_ms()}) };
+    let agent = ureq::AgentBuilder::new().timeout(std::time::Duration::from_secs(15)).build();
+    // DEVROOM_USAGE_URL: a stand-in service for tests
+    let url = std::env::var("DEVROOM_USAGE_URL").unwrap_or_else(|_| "https://api.anthropic.com/api/oauth/usage".into());
+    let resp = agent.get(&url)
+        .set("Authorization", &format!("Bearer {tok}")).set("anthropic-beta", "oauth-2025-04-20").set("Accept", "application/json").call();
+    let body = match resp {
+        Ok(r) => r.into_string().unwrap_or_default(),
+        Err(ureq::Error::Status(401, _)) | Err(ureq::Error::Status(403, _)) => return json!({"err": "expired", "at": now_ms()}),
+        Err(_) => return json!({"err": "offline", "at": now_ms()}),
+    };
+    let v: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
+    let part = |k: &str| v.get(k).filter(|x| x.is_object()).map(|x| json!({
+        "pct": x.get("utilization").and_then(|u| u.as_f64()).map(|u| (u * 10.0).round() / 10.0),
+        "reset": x.get("resets_at").cloned().unwrap_or(Value::Null)}));
+    match (part("five_hour"), part("seven_day")) {
+        (None, None) => json!({"err": "format", "at": now_ms()}),
+        (f, w) => json!({"five": f, "week": w, "at": now_ms()}),
+    }
 }
 
 /// A session can be continued from here when its turn is over (not working, not waiting on a permission prompt).
