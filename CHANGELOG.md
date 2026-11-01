@@ -7,6 +7,33 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.5.0 (2026-11-01)
+
+### Added
+- **Off-duty shift crew:** Bea, Mika, Trish and Joy, each from a different shift. Hunger, sleepiness, the need to move, boredom and the CR build up over time and with the clock, and each of them picks what to do next from those needs plus her own favorites. So the office always has someone eating, sleeping in the tulugan, on the treadmill or lifting, or shooting hoops, without a fixed loop. They also join a chess, billiards or basketball game when someone is waiting for a partner.
+- **Work you can see, by kind of work:**
+  - Running a build or tests: the character stands behind the chair and watches.
+  - Coding: typing, with a short stretch at the desk now and then.
+  - Reading or researching: leaning in.
+  - Each kind of work has its own lines.
+- **Called back from a break:** a session that gets a new task says so ("Pause muna ang laro, may utos.") and hurries back to its PC.
+- **New hooks:** PostToolUse and SubagentStop. Dev Room adds them to existing setups by itself; it keeps your other hooks.
+- **Fullscreen shows a one-line strip of the session cards** under the map.
+
+### Changed
+- **New character art:** bigger 24 × 32 sprites with hair highlights and bangs, eye shine, blush, collar and cloth shading, hands and shoes.
+- Sessions now take real breaks (gym, basketball, eating, napping) after a few idle minutes. The same activity does not come up twice in a row.
+- Your character is labelled **Boss**.
+
+### Fixed
+- **Lag:** a frame takes about 2 ms instead of about 12 ms.
+  - Furniture is drawn once into the background, and a piece is drawn again only when someone walks in front of it.
+  - The map canvas is opaque.
+  - Name tags and bubbles move with transforms.
+  - A slow device lowers the map resolution by itself.
+- **An active session sitting at chess or coffee.** A session can keep working after its turn ends: background agents or tasks, or a turn the session resumes on its own. Dev Room now treats any new writing to the session's transcript, or to its subagents' transcripts, as work, and goes back to idle once the writing stops for a minute.
+- **Permission alarms clear as soon as the tool runs** after you approve it.
+
 ## 0.4.0 (2026-11-01)
 
 ### Added
