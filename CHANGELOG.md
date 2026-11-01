@@ -9,6 +9,15 @@ The version lives in `VERSION`. Each build is published as release `v<VERSION>-b
 
 ## 0.9.0 (2026-11-01)
 
+- **Units: several playrooms in one app.**
+  - Unit 1 is your chosen team (or the biggest project). Every other project folder gets its own unit, shown as tabs under the title, with a red count when someone there needs you.
+  - Units alternate between scenes:
+    - **Office:** the power plant office.
+    - **Beach Resort:** a co-working deck by the sea, nipa huts, a hammock grove, cabins, a beach bar, videoke, a pool and a sand volleyball court.
+  - Same floor plan, people and pixel art. The resort has its own place names, activity words and staff (Bantay, Lifeguard, Housekeeping, Bartender).
+  - A scene that repeats gets another colour.
+  - The chosen unit is remembered on each device.
+- **Free drag:** the playroom can be pulled well past its edges (for example out from under the panel).
 - **Pictures and artifacts in the chat:**
   - Screenshots and images a session looks at (tool results), and pictures you paste, show inline.
   - Pages a session publishes (the Artifact tool) and files it sends (SendUserFile) show as cards, opened full screen inside the app.
