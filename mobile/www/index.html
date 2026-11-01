@@ -134,7 +134,21 @@ const canView=!!(DevRoom&&window.Capacitor&&Capacitor.isPluginAvailable&&Capacit
 // the office shows whether this phone app is up to date (and offers the update) in its header
 let apk=null;
 function sendApk(){const w=$('office').contentWindow;if(w&&apk&&current)try{w.postMessage(Object.assign({type:'devroom:apk'},apk),new URL(current).origin);}catch(e){}}
-function getApk(){DevRoom?DevRoom.openExternal({url:APK_URL}):location.assign(APK_URL);}
+// The update downloads inside the app and opens Android's installer: no browser, nothing piling up in Downloads.
+let updBusy=false;
+async function getApk(){
+  if(!DevRoom){location.assign(APK_URL);return;}
+  if(updBusy)return;updBusy=true;
+  const b=$('bar');b.style.display='flex';b.innerHTML='<span id="updMsg">Dina-download ang update…</span>';
+  let h=null;try{h=await DevRoom.addListener('updateProgress',e=>{const m=$('updMsg');if(m)m.textContent=e.pct>=0?`Dina-download ang update… ${e.pct}%`:'Dina-download ang update…';});}catch(e){}
+  try{
+    const r=await DevRoom.installUpdate({url:APK_URL});
+    if(r&&r.needsPermission){b.innerHTML='<span>Isang beses lang: i-on ang <b>Allow from this source</b> para sa Dev Room, bumalik dito, at pindutin ulit ang I-update.</span><button id="upd">I-update</button>';$('upd').onclick=getApk;}
+    else{b.innerHTML='<span>Pindutin ang <b>Update</b> o <b>Install</b> sa screen ng Android. Mananatili ang pairing mo.</span><button class="ghost" id="later">Sige</button>';$('later').onclick=()=>{b.style.display='none';};}
+  }catch(e){
+    b.innerHTML='<span id="updMsg"></span><button id="upd">Subukan ulit</button>';$('updMsg').textContent=String(e&&e.message||e||'Hindi na-download ang update.');$('upd').onclick=getApk;
+  }finally{updBusy=false;try{h&&h.remove();}catch(e){}}
+}
 function sendCaps(){const w=$('office').contentWindow;if(w&&canView&&current)try{w.postMessage({type:'devroom:caps',claudeView:true},new URL(current).origin);}catch(e){}}
 $('office').addEventListener('load',()=>{sendCaps();sendApk();sendVia();});
 let claudeOn=false;
