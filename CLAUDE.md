@@ -44,6 +44,11 @@ The user's real team is **LOGIC_SIM_PROJECT**: a leader plus subsessions (CODE F
     - Every request on that port is treated as remote: token required, hooks and PC-only routes refused.
     - The address is published to the ntfy topic `devroom-<sha256("devroom-relay:"+token)[:16 bytes hex]>`.
     - The phone shell and `WatchService` use it as the last fallback.
+  - **Real-time chat:**
+    - `tail_transcripts` follows each transcript (every 0.9 s) and pushes prompts and replies to the conversation.
+    - `deliver_now` continues an idle session with `claude -p --resume <sid>`, in its cwd and `perm_mode`.
+    - Working sessions get messages through the PostToolUse `additionalContext`.
+    - The Chat tab is Dev Room's own chat; never replace it with claude.ai.
   - A liveness thread marks a session as working while its transcript keeps being written after Stop.
   - State lives in `%APPDATA%\DevRoom\state.json` and is written atomically.
 - **`app/src-tauri/src/main.rs`:**
@@ -82,7 +87,7 @@ The user's real team is **LOGIC_SIM_PROJECT**: a leader plus subsessions (CODE F
 - **Real-time sync:** what a character does must match its session; working means at a desk.
 - **Light on resources:** 60 fps, with no lag or blinking on the PC, phone or tablet.
 - **Life in the office:** realistic, non-repetitive office life, plus the off-duty crew (Bea, Mika, Trish, Joy).
-- **Real chat:** the real Claude Code chat inside the app, with nothing opening outside.
+- **Real chat:** Dev Room's own chatbox, in real time and with no waiting. Chatting there must feel the same as in the Claude app. Do not embed claude.ai instead.
 - **Polish:** complete and polished. The user dislikes "3rd world" half-done work.
 
 ## Backlog

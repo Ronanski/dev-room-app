@@ -198,6 +198,13 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .chatpanel.embed .cp-body,.chatpanel.embed .claudebar,.chatpanel.embed .composer{display:none!important}
 /* with the real Claude chat inside the app, the Chat tab is Claude itself: no extra Claude buttons */
 .app.hasclaude .claudebtn,.app.hasclaude .claudebar{display:none!important}
+.typing{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:4px 2px}
+.typing i{width:8px;height:8px;border-radius:50%;flex:none}
+.typing .dots{display:inline-flex;gap:3px;margin-left:2px}
+.typing .dots span{width:4px;height:4px;border-radius:50%;background:var(--muted);animation:tdot 1.2s infinite}
+.typing .dots span:nth-child(2){animation-delay:.2s}.typing .dots span:nth-child(3){animation-delay:.4s}
+@keyframes tdot{0%,60%,100%{opacity:.25}30%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.typing .dots span{animation:none}}
 .zoom .claudebtn{background:var(--accent);color:var(--panel);border-color:var(--accent);font-weight:700}
 .app.typing .claudebar{display:none}
 /* team chat: every session's conversation in one feed */
@@ -953,7 +960,7 @@ function parseTitle(title,isLead){
 // Claude Code's English hook text, in plain Tagalog
 function askText(t){
   t=String(t||'');let m=t.match(/needs your permission to use (.+?)\.?$/i);
-  if(m)return`Humihingi ng pahintulot na gamitin ang ${m[1]}. Sagutin sa Claude.`;
+  if(m)return`Humihingi ng pahintulot na gamitin ang ${m[1]}. Pindutin ang Allow sa PC.`;
   if(/waiting for your input/i.test(t))return'Naghihintay ng sagot mo.';
   return t;
 }
@@ -1123,7 +1130,7 @@ async function poll(){
       const j=await r.json();
       const teamChanged=JSON.stringify(j.team)!==JSON.stringify(TEAM);
       updates(j);
-      version=j.version;TEAM=j.team||TEAM;isLocal=!!j.local;hooksOk=j.hooks_installed;embedClaude=!!j.embed_claude||shellEmbed;$('app').classList.toggle('hasclaude',embedClaude);REMOTE=j.remote||null;if(!$('teamPanel').hidden&&$('remoteBox'))remoteBox();settingsPath=j.settings_path||'';lanUrl=j.lan_url||'';tsUrl=j.ts_url||'';
+      version=j.version;TEAM=j.team||TEAM;isLocal=!!j.local;hooksOk=j.hooks_installed;embedClaude=false;instantChat=!!j.instant_chat;$('app').classList.add('hasclaude');REMOTE=j.remote||null;if(!$('teamPanel').hidden&&$('remoteBox'))remoteBox();settingsPath=j.settings_path||'';lanUrl=j.lan_url||'';tsUrl=j.ts_url||'';
       mode='live';lastSync=Date.now();
       if(teamChanged&&!firstLoad){allRecords=j.sessions;rebuildTeam();}else applyRecords(j.sessions);
       awayMode=j.away||awayMode;
@@ -1135,6 +1142,12 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.8.0':{news:['<b>Real-time na ang chat ng Dev Room.</b> Bumalik ang dating chatbox, pero wala nang hintayan:',
+    '<b>Sagot nila:</b> lumalabas agad habang isinusulat nila, hindi na sa dulo ng turn lang. Kita ang lahat ng session sa <b>Lahat</b>, o pumili ng isa.',
+    '<b>Mensahe mo:</b> kung tapos na ang session, agad siyang sasagot (ang Dev Room mismo ang nagpapatuloy sa session). Kung nagtatrabaho pa, matatanggap niya sa loob ng ilang segundo.',
+    'May <b>•••</b> kapag nagtatrabaho ang session, at <b>Natanggap na niya ✓</b> sa bawat mensahe mo.',
+    'Wala na ang claude.ai sa Chat tab at ang mga dagdag na Claude button.'],
+    todo:['Sa PC, wala kang gagawin: kusa itong nag-a-update.','Kung lumabas ang "Hindi naipasa… /login", buksan ang terminal sa PC, i-type ang <b>claude</b>, at mag-login isang beses.','Ang sagot na pinatuloy mula sa Dev Room ay lalabas sa Claude app sa PC kapag binuksan mo ulit ang session doon.']},
   '0.7.0':{news:['<b>Malayo mode: kita at makakausap mo ang office kahit naka-mobile data ka.</b> Walang ibang app at walang account. Ang Dev Room sa PC mismo ang gumagawa ng ligtas na daan sa internet, at kusang hinahanap ito ng phone kapag wala ka sa Wi-Fi.',
     'Sa itaas ng phone, nakasulat kung paano ka nakakonekta: <b>(Wi-Fi)</b> o <b>(malayo, internet)</b>.',
     'Naka-on ito agad. Para i-off: <b>I-connect ang phone</b> → <b>Malayo mode</b> → <b>I-off</b>.'],
@@ -1181,11 +1194,11 @@ function showWhatsNew(){
   el.hidden=false;
 }
 // chatTo and the filter hold session ids from the PC (sid), which survive a team rebuild; PENDING keeps sends until the PC lists them
-let embedClaude=false,shellEmbed=false,claudeRect='';
+let embedClaude=false,shellEmbed=false,claudeRect='',instantChat=false;
 // Android app: the shell can lay the real Claude chat over the Chat tab (same as the PC's embedded view).
 if(window.parent!==window){
   addEventListener('message',e=>{if(e.source!==window.parent)return;const d=e.data||{};
-    if(d.type==='devroom:caps'&&d.claudeView&&!shellEmbed){shellEmbed=embedClaude=true;$('app').classList.add('hasclaude');claudeRect='';chatKey='';render();}});
+    /* the Chat tab is Dev Room's own real-time chat; the native claude.ai view is not used */});
   try{window.parent.postMessage({type:'devroom:hello'},'*');}catch(e){}
 }
 let convoKey='',CONVO={},awayMode='off',chatFilter='all',chatTo='',PENDING=[],forceScroll=false,convoBusy=false;
@@ -1852,6 +1865,7 @@ function syncClaude(){
 }
 setInterval(syncClaude,400);addEventListener('resize',syncClaude);document.addEventListener('visibilitychange',syncClaude);
 function openClaude(id){
+  {const s=id!=null?sessions.find(x=>x.id===id):sel();if(s){if(compact()){chatFilter=s.sid;}chatTo=s.sid;openChat(s.id);}else setDrawer(true,'chat');return;}
   if(embedClaude){const s=id!=null?sessions.find(x=>x.id===id):sel();if(s)openChat(s.id);else setDrawer(true,'chat');setTimeout(syncClaude,60);return;}
   const url='https://claude.ai/code';
   if(window.parent!==window){window.parent.postMessage({type:'devroom:openClaude',url},'*');connMsg='Kung walang bumukas, i-update muna ang Dev Room app (pindutin ang I-update sa banner sa ibaba ng app).';setConn();setTimeout(()=>{connMsg='';setConn();},8000);return;}
@@ -1870,21 +1884,25 @@ function chatFeed(){
   PENDING=PENDING.filter(p=>!(p.id&&(bySid(p.sid)?.inbox||[]).some(m=>m.id===p.id)));
   const items=[];
   for(const s of list){
-    for(const m of (CONVO[s.sid]||[])){const text=cleanMsg(m.text);if(text)items.push({s,t:m.at,you:m.role==='user',text});}
+    // a message you sent from the app also comes back as the session's prompt: show it once (with its status)
+    const sent=new Set((s.inbox||[]).map(m=>String(m.text||'').trim()));
+    for(const m of (CONVO[s.sid]||[])){const text=cleanMsg(m.text);if(!text||(m.role==='user'&&sent.has(text)))continue;items.push({s,t:m.at,you:m.role==='user',sys:m.role==='sys',text});}
     for(const m of (s.inbox||[]))items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true});
     PENDING.forEach((m,pi)=>{if(m.sid===s.sid)items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true,why:m.why,pi});});
   }
   items.sort((a,b)=>a.t-b.t);
   const out=items.slice(-120).map(it=>{
     const who=it.you?`<b>Boss</b> → ${esc(it.s.short)}`:`<i style="background:${it.s.pal.shirt}"></i><b>${esc(it.s.short)}</b>`;
-    const st=it.app?`<span class="st">${{sending:'Ipinapadala…',queued:'Naghihintay maipasa',sent:'Ipinasa na, hinihintay ang session',delivered:'Naipasa ✓',failed:'Hindi naipadala.'}[it.st]||''}${it.st==='failed'&&it.pi!=null?` <button type="button" class="linkbtn" data-retry="${it.pi}">Subukan ulit</button> <button type="button" class="linkbtn" data-drop="${it.pi}">Alisin</button>`:''}${it.why?' ('+esc(it.why)+')':''}${it.app?' · mula sa app':''}</span>`:'';
+    const st=it.app?`<span class="st">${{sending:'Ipinapadala…',queued:'Ipinapasa…',sent:'Natanggap na niya ✓',delivered:'Natanggap na niya ✓',failed:'Hindi naipadala.'}[it.st]||''}${it.st==='failed'&&it.pi!=null?` <button type="button" class="linkbtn" data-retry="${it.pi}">Subukan ulit</button> <button type="button" class="linkbtn" data-drop="${it.pi}">Alisin</button>`:''}${it.why?' ('+esc(it.why)+')':''}${it.app?' · mula sa app':''}</span>`:'';
+    if(it.sys)return `<div class="msg sys" data-chatto="${esc(it.s.sid)}">${esc(it.s.short)}: ${esc(it.text)} · ${simLabel(it.t)}</div>`;
     return `<div class="cmsg ${it.you?'you':''}" data-chatto="${esc(it.s.sid)}"><span class="who">${who} · ${simLabel(it.t)}</span><div class="msg ${it.you?'you':'agent'}">${esc(it.text)}</div>${st}</div>`;
   });
   // a queued message to a session that already stopped (and is not waiting) only arrives with its next turn
-  const stuck=list.filter(s=>!s.listening&&s.status!=='working'&&((s.inbox||[]).some(m=>m.state==='queued')||PENDING.some(p=>p.sid===s.sid&&p.state==='queued'))).map(s=>`<div class="listen">Tapos na ang turn ni <b>${esc(s.short)}</b> bago mo binuksan ang app, kaya hindi pa niya natatanggap ang mensahe. Papasok ito sa susunod niyang kilos (halimbawa, kapag may in-utos ka sa kanya sa PC). Sa mga susunod na turn, kapag bukas ang app, aabangan na niya ang mensahe mo.</div>`);
+  const typing=list.filter(s=>s.status==='working').map(s=>`<div class="typing" data-chatto="${esc(s.sid)}"><i style="background:${s.pal.shirt}"></i><b>${esc(s.short)}</b> ${esc(s.detail&&s.detail.length<90?s.detail:'nagtatrabaho')}<span class="dots"><span></span><span></span><span></span></span></div>`);
+  const stuck=instantChat?[]:list.filter(s=>!s.listening&&s.status!=='working'&&((s.inbox||[]).some(m=>m.state==='queued')||PENDING.some(p=>p.sid===s.sid&&p.state==='queued'))).map(s=>`<div class="listen">Tapos na ang turn ni <b>${esc(s.short)}</b> bago mo binuksan ang app, kaya hindi pa niya natatanggap ang mensahe. Papasok ito sa susunod niyang kilos (halimbawa, kapag may in-utos ka sa kanya sa PC). Sa mga susunod na turn, kapag bukas ang app, aabangan na niya ang mensahe mo.</div>`);
   const listening=list.filter(s=>s.listening).map(s=>`<div class="listen">📱 Naka-abang si <b>${esc(s.short)}</b> sa utos mo. Mag-type sa ibaba para ituloy niya.</div>`);
   const asks=list.filter(s=>s.status==='needs'&&s.ask).map(s=>`<div class="cmsg" data-chatto="${esc(s.sid)}"><span class="who"><i style="background:${s.pal.shirt}"></i><b>${esc(s.short)}</b> · tanong</span><div class="msg agent asking"><b>Tanong:</b> ${esc(s.ask)}</div></div>`);
-  return (out.length?out.join(''):'<div class="msg sys">Wala pang usapan. Lalabas dito ang mga utos mo at ang sagot ng bawat session.</div>')+asks.join('')+listening.join('')+stuck.join('');
+  return (out.length?out.join(''):'<div class="msg sys">Wala pang usapan. Lalabas dito ang mga utos mo at ang sagot ng bawat session.</div>')+asks.join('')+listening.join('')+typing.join('')+stuck.join('');
 }
 function msgHTML(s,m){
   if(m.from==='sys')return `<div class="msg sys">${esc(m.text)} · ${simLabel(m.t)}</div>`;
@@ -1909,7 +1927,7 @@ function renderPanel(){
     if(renderPanel.sel!==s.sid){renderPanel.sel=s.sid;chatTo=s.sid;}
     if(!bySid(chatTo))chatTo=s.sid;
     if(chatFilter!=='all'&&!bySid(chatFilter))chatFilter='all';
-    const key='c'+chatFilter+'|'+convoKey+'|'+PENDING.map(p=>p.state).join('')+'|'+sessions.map(x=>x.sid+':'+(x.listening?1:0)+':'+(x.status==='needs'?x.ask:'')+':'+(x.inbox||[]).map(m=>m.state).join('')).join(',');
+    const key='c'+chatFilter+'|'+convoKey+'|'+PENDING.map(p=>p.state).join('')+'|'+sessions.map(x=>x.sid+':'+(x.listening?1:0)+':'+x.status+':'+(x.status==='working'?x.detail:'')+':'+(x.status==='needs'?x.ask:'')+':'+(x.inbox||[]).map(m=>m.state).join('')).join(',');
     if(key!==chatKey){chatKey=key;
       const near=body.scrollHeight-body.scrollTop-body.clientHeight<80,top=body.scrollTop;
       body.innerHTML=`<div class="cfilter"><button type="button" data-cf="all" aria-pressed="${chatFilter==='all'}">Lahat</button>${sessions.map(x=>`<button type="button" data-cf="${esc(x.sid)}" aria-pressed="${chatFilter===x.sid}"><i style="background:${x.pal.shirt}"></i>${esc(x.short)}</button>`).join('')}</div><div class="msgs">${chatFeed()}</div>`;

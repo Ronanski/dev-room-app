@@ -11,11 +11,15 @@ Dev Room shows them all in one place instead. Each session is a character in a s
 - who needs the user's input,
 - what each session is doing right now, and how far along it is.
 
-## Current state (v0.7.0, 2026-11-01)
+## Current state (v0.8.0, 2026-11-01)
 
 Shipped and auto-updating:
 - **Windows tray app:** hooks give live status, the map is an isometric power plant, there is a chat feed, and the real claude.ai chat is embedded in the panel.
-- **Android app:** shows the office and sends alerts. The real claude.ai chat sits right on the Chat tab, as a native view over it.
+- **Android app:** shows the office and sends alerts.
+- **Chat (0.8.0):** Dev Room's own chatbox, in real time.
+  - Live transcript reading shows replies as they are written.
+  - Instant sending continues an idle session with `claude -p --resume`; a working session gets the message on its next tool call.
+  - The user rejected the embedded claude.ai approach ("parang nilagay mo lng claude app"). Do not bring it back.
 - **Update status:** a pill in the header says whether the PC app and the phone app are up to date.
 - **How the phone connects:** Dev Room runs in the PC's tray (window closed is fine) and the PC must be on and awake.
   - At home, the phone uses Wi-Fi.
@@ -29,6 +33,7 @@ A full UI/UX, functional and code audit was done, and its fixes went into 0.6.5.
 - The embedded Claude view and its sign-in inside the Windows window (Tauri multiwebview).
 - The Android Claude view on the Chat tab (position, keyboard, Back), its sign-in, and the pairing confirmation.
 - The update status pill on the real PC and phone.
+- Real-time chat on the real PC: that Claude Code is found and logged in for `-p --resume`, and how a turn continued from Dev Room looks in the Claude desktop app (it shows after reopening the session).
 - Malayo mode end to end. The sandbox may not open a tunnel, so this was tested with a simulated tunnel and relay: cloudflared download and start on Windows, ntfy publish, and the phone switching over on mobile data.
 - The auto-restart from the tray on Windows.
 
