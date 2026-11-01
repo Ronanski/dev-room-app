@@ -35,6 +35,8 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline
 
 .stage{max-width:none;margin:0}
 .stage[data-device="desktop"] .app{height:calc(100dvh - 16px);display:flex;flex-direction:column}
+/* phones scroll the page: the app grows with its content (the fixed tab bar sits over the padding) */
+@media (max-width:640px){.stage[data-device="desktop"] .app{height:auto;min-height:calc(100dvh - 16px)}}
 .app:fullscreen{height:100vh!important;padding:10px;box-sizing:border-box}
 .app.focus .top,.app.focus .conn,.app.focus .updbar:not(.counting),.app.focus .legend,.app.focus .rule,.app.focus .tabs,.app.focus .statusbar{display:none!important}
 .app.focus .updbar.counting{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:60;box-shadow:0 8px 24px rgba(42,32,26,.28)}
@@ -155,6 +157,32 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .msg .row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
 .claudebar{display:flex;gap:10px;align-items:center;padding:8px 12px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--accent) 8%,var(--panel))}
 .claudebar .hint{font-size:11.5px}
+.claudebar{padding:6px 12px}
+.claudebar .btn{white-space:nowrap}
+.dcard .rl{display:-webkit-box!important;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.dcard{padding:7px 10px}
+.composer{padding:8px 12px;gap:5px}
+.composer textarea{min-height:44px}
+.composer .to{flex-wrap:nowrap}
+.composer .to label{white-space:nowrap}
+.composer .to select{flex:1;min-width:0;max-width:100%}
+.composer details.away{font-size:11.5px;color:var(--muted)}
+.composer details.away summary{cursor:pointer}
+.composer details.away[open]{display:flex;flex-direction:column;gap:4px;flex:1}
+.okchip{font-size:12px;color:var(--work);font-weight:700;padding:0 4px}
+.alrow:not(.unack){opacity:.62}
+.alrow:not(.unack) i{background:var(--muted)!important}
+/* alarms are already in the open panel: no toasts on top of the map then */
+.app.drawer .toasts{display:none}
+.app.drawer .mlegend{display:none}
+.dock{scroll-behavior:smooth;mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
+.dock.at-end{mask-image:none}
+/* fingers need bigger targets */
+@media (pointer:coarse){
+  .btn,.toast .acts .btn,.zoom button,.drawer-x,.cp-tabs button,.cfilter button,.composer select{min-height:40px}
+  .zoom button{min-width:40px}
+  .app.focus .dcard{min-height:44px}
+}
 /* PC: the real Claude Code chat sits over this box (a second webview inside the Dev Room window) */
 .claudehost{flex:1;min-height:0;display:grid;place-items:center;color:var(--muted);font-size:13px;background:var(--bg)}
 .chatpanel.embed .cp-body,.chatpanel.embed .claudebar,.chatpanel.embed .composer{display:none!important}
@@ -259,7 +287,17 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
   .toast .acts .btn{padding:2px 8px}
   .toast .ti{display:none}
   .toast .acts{margin-top:4px}
-  .app[data-tab="office"] .dockwrap{padding-bottom:64px}
+  /* phone: the tab bar is fixed at the bottom and never covers content; a short header; one toast at a time */
+  .tabs{position:fixed;left:0;right:0;bottom:0;margin:0;padding-bottom:env(safe-area-inset-bottom,0px);z-index:20}
+  .app{padding-bottom:calc(66px + env(safe-area-inset-bottom,0px))}
+  .app[data-tab="office"] .dockwrap{padding-bottom:0}
+  .counts{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .counts .count{white-space:nowrap;flex:none;min-height:0}
+  .counts::-webkit-scrollbar{display:none}
+  #pauseBtn{display:none}
+  .app[data-tab="chat"] .top,.app[data-tab="chat"] .conn{display:none}
+  .app[data-tab="chat"] .chatpanel{height:calc(100dvh - 90px - env(safe-area-inset-bottom,0px))}
+  .toasts .toast:not(:last-child){display:none}
   .app.typing .tabs,.app.typing .cp-head,.app.typing .cp-tabs,.app.typing .composer .away,.app.typing .cfilter{display:none}
   .app.typing .chatpanel{height:calc(100dvh - 16px)}
   .app[data-tab="chat"] .pane[data-pane="office"],.app[data-tab="chat"] .dockwrap,.app[data-tab="office"] .pane[data-pane="chat"]{display:none!important}
@@ -352,7 +390,7 @@ body{margin:0}
           <button type="button" id="devDesktop" data-device="desktop" aria-pressed="true">Desktop</button>
           <button type="button" id="devAndroid" data-device="android" aria-pressed="false">Android</button>
         </div>
-        <button type="button" class="btn" id="pauseBtn">Pause</button>
+        <button type="button" class="btn" id="pauseBtn" title="I-pause ang galaw ng mga tao sa map">Pause</button>
       </div>
     </header>
 
@@ -378,15 +416,15 @@ body{margin:0}
             <button type="button" role="tab" data-ptab="alarms" aria-selected="true">Alarms</button>
             <button type="button" role="tab" data-ptab="chat" aria-selected="false">Chat</button>
             <button type="button" role="tab" data-ptab="info" aria-selected="false">Detalye</button>
-            <button type="button" role="tab" data-ptab="log" aria-selected="false">Lahat ng activity</button>
+            <button type="button" role="tab" data-ptab="log" aria-selected="false">Activity</button>
           </div>
           <div class="cp-body" id="cpBody"></div>
           <div class="claudehost" id="claudeHost" hidden><span>Binubuksan ang Claude…</span></div>
-          <div class="claudebar"><button type="button" class="btn primary" data-act="claude">Kausapin sa Claude</button><span class="hint">Ang mismong Claude Code chat ng mga session sa PC mo: instant, totoong sagot.</span></div>
+          <div class="claudebar"><button type="button" class="btn primary" data-act="claude">Kausapin sa Claude</button><span class="hint">Instant na sagot mula sa mismong Claude Code.</span></div>
           <form class="composer" id="composer">
             <div class="to"><label for="chatTo" id="msgLabel">Para kay</label><select id="chatTo"></select></div>
             <textarea id="msgInput" rows="2" placeholder="Ano ang gusto mong ipagawa?"></textarea>
-            <div class="row"><span class="away"><label for="awaySel">Kapag tapos na ang session, abangan ang utos mula sa app:</label><select id="awaySel"><option value="off">Hindi (normal na tatapusin ang turn)</option><option value="auto">Kapag may phone na nakabukas</option><option value="on">Palagi</option></select></span><button type="submit" class="btn primary">Ipadala</button></div>
+            <div class="row"><details class="away"><summary>Opsyon</summary><label for="awaySel">Kapag tapos na ang session, abangan ang utos mula sa app:</label><select id="awaySel"><option value="off">Hindi (normal na tatapusin ang turn)</option><option value="auto">Kapag may phone na nakabukas</option><option value="on">Palagi</option></select></details><button type="submit" class="btn primary">Ipadala</button></div>
           </form>
         </div>
       </section>
@@ -450,7 +488,7 @@ const ASKS={
  SEC:'May nakalantad na API key sa .env.example. Ire-rotate ko ba?',
  DATA:'Isasama ko ba ang mga test account sa export?'};
 const CHISMIS=['Alam mo ba yung bagong task?','Talaga? Sino nagsabi?','Grabe yung merge conflict kanina.','Kain tayo mamaya.','Sino kaya ang nag-push sa main?','Hindi nga? Seryoso?'];
-const ST={working:{label:'Running',c:'--work'},needs:{label:'Alarm',c:'--need'},idle:{label:'Standby',c:'--idle'},done:{label:'Pa-review',c:'--done'},failed:{label:'Trip',c:'--fail'}};
+const ST={working:{label:'Nagtatrabaho',c:'--work'},needs:{label:'Kailangan ka',c:'--need'},idle:{label:'Naka-break',c:'--idle'},done:{label:'Pa-review',c:'--done'},failed:{label:'May error',c:'--fail'}};
 const IDLE_LBL={read:'Nagbabasa',gym:'Nagdyi-gym',basketball:'Nagba-basketball',coffee:'Nagkakape',wander:'Naglalakad',chismis:'Nakikipagkwentuhan',eat:'Kumakain',cr:'Nasa CR',sleep:'Natutulog',desk:'Nasa desk',check:'Nagche-check',tv:'Nanonood ng TV',billiards:'Nagbi-billiards',chess:'Nagche-chess',darts:'Nagda-darts',stretch:'Nag-i-stretch',phone:'Nagse-cellphone',rounds:'Nag-iikot',doze:'Nakaidlip'};
 const IDLE_SENT={read:'Nagbabasa sa library.',gym:'Nag-eehersisyo sa gym.',basketball:'Naglalaro ng basketball sa half court.',coffee:'Nagkakape muna sa pantry.',wander:'Naglalakad-lakad sa hallway.',chismis:'Nakikipagkwentuhan sa may water cooler.',eat:'Kumakain sa coffee bar.',cr:'Pumunta muna sa CR.',sleep:'Natutulog na sa lounge.',desk:'Nasa desk pa, hinihintay ang susunod na utos.',check:'Bumalik sa desk para tingnan kung may bagong task.',tv:'Nanonood ng TV sa lounge.',billiards:'Naglalaro ng billiards sa lounge.',chess:'Naglalaro ng chess sa HR room.',darts:'Naglalaro ng darts sa lounge.',stretch:'Nag-i-stretch sa hallway.',phone:'Nagse-cellphone muna.',rounds:'Isa-isang sinisilip ang team.',doze:'Nakaidlip sa desk.'};
 const IDLE_PLACE={read:'Library',gym:'Gym',basketball:'Half court',coffee:'Pantry',eat:'Pantry',chismis:'Water cooler',cr:'CR',sleep:'Tulugan',wander:'Hallway',desk:'Desk niya',check:'Desk niya',tv:'Lounge',billiards:'Rec room',chess:'Rec room',darts:'Rec room',stretch:'Hallway',phone:'Hallway',rounds:'Work floor',doze:'Desk niya'};
@@ -895,17 +933,24 @@ const titleCase=w=>w.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
 function parseTitle(title,isLead){
   const m=String(title||'').match(/^([^:]+):\s*(.+)$/);
   if(isLead)return{code:'LEAD',role:'Team Lead',short:'Lead',pal:'LEAD',task:String(title||'Walang pangalan')};
-  if(!m){const t=String(title||'Session');return{code:t.replace(/[^A-Za-z0-9]/g,'').slice(0,4).toUpperCase()||'DEV',role:t,short:t.length>14?t.slice(0,13).trim()+'.':t,pal:'BE',task:''};}
+  if(!m){const t=String(title||'Session');return{code:(t.split(/[\s_:-]+/).filter(Boolean).slice(0,3).map(w=>w[0]).join('')||'S').toUpperCase(),role:t,short:t.length>14?t.slice(0,13).trim()+'…':t,pal:'BE',task:''};}
   const word=m[1].trim(),hit=ROLE_WORDS.find(r=>r[0].test(word));
   if(hit)return{code:hit[1],role:hit[2],short:hit[3],pal:hit[4],task:m[2]};
   return{code:word.replace(/[^A-Za-z]/g,'').slice(0,4).toUpperCase()||'DEV',role:titleCase(word),short:titleCase(word).split(' ')[0],pal:'BE',task:m[2]};
+}
+// Claude Code's English hook text, in plain Tagalog
+function askText(t){
+  t=String(t||'');let m=t.match(/needs your permission to use (.+?)\.?$/i);
+  if(m)return`Humihingi ng pahintulot na gamitin ang ${m[1]}. Sagutin sa Claude.`;
+  if(/waiting for your input/i.test(t))return'Naghihintay ng sagot mo.';
+  return t;
 }
 function infoOf(r){
   const p=r.post_turn_summary||{},sc=r.session_context||{},em=r.external_metadata||{};
   const src=['PC mo',r.cwd?baseName(r.cwd):'Claude Code'];
   const url=(((sc.sources||[])[0]||{}).git_repository||{}).url||'';const repo=url.replace(/^https:\/\/github\.com\//,'');
   const br=em.current_branches||{};
-  const o={prio:/permission/i.test(p.needs_action||'')?1:2,status:BUCKET[r.status_bucket]||'idle',at:(typeof r.updated_at==='number'?r.updated_at:Date.parse(r.updated_at))||now(),cwd:r.cwd||'',act:r.short||'',prompt_at:r.prompt_at||0,ask:sent(p.needs_action),detail:p.status_detail||r.task_summary||'',recent:p.recent_action||'',
+  const o={prio:/permission/i.test(p.needs_action||'')?1:2,status:BUCKET[r.status_bucket]||'idle',at:(typeof r.updated_at==='number'?r.updated_at:Date.parse(r.updated_at))||now(),cwd:r.cwd||'',act:r.short||'',prompt_at:r.prompt_at||0,ask:askText(sent(p.needs_action)),detail:p.status_detail||r.task_summary||'',recent:p.recent_action||'',
     source:src[0],host:src[1],archived:r.session_status==='SESSION_STATUS_ARCHIVED',inbox:r.inbox||[],convo_n:r.convo_n||0,listening:!!r.listening};
   if(repo)o.repo=repo;if(repo&&(br[repo]||br['']))o.branch=br[repo]||br[''];
   if(sc.model)o.model=sc.model;if(em.context_usage)o.ctx=em.context_usage;if(em.artifacts)o.artifacts=em.artifacts;
@@ -973,8 +1018,10 @@ function applyRecords(records){
     else if(i.at!==prevAt&&prevDetail!==(s.detail+'|'+s.recent+'|'+s.ask)&&s.status!=='working'){log(s.short,statusLine(s),s);say2(s,'agent',statusLine(s));}
     else if(s.status==='working'&&prevDetail!==(s.detail+'|'+s.recent+'|'+s.ask))log(s.short,statusLine(s),s);
   }
-  {const seen={};for(const s of sessions.slice().sort((a,b)=>a.id-b.id)){const base=s.baseShort??(s.baseShort=s.short),baseRole=s.baseRole??(s.baseRole=s.role);const n=(seen[base]=(seen[base]||0)+1);
-    s.short=n>1?base.replace(/\.$/,'')+' '+n:base;s.role=n>1?baseRole+' '+n:baseRole;}}
+  // only names that really collide get a number (the short name and the full name separately)
+  {const ss={},sr={};for(const s of sessions.slice().sort((a,b)=>a.id-b.id)){const base=s.baseShort??(s.baseShort=s.short),baseRole=s.baseRole??(s.baseRole=s.role);
+    const n=(ss[base]=(ss[base]||0)+1),m=(sr[baseRole]=(sr[baseRole]||0)+1);
+    s.short=n>1?base.replace(/[.…]$/,'')+' '+n:base;s.role=m>1?baseRole+' '+m:baseRole;}}
   if(!sessions.some(x=>x.id===selected)){const q=sessions.filter(x=>x.status==='needs').sort((a,b)=>b.at-a.at)[0]||sessions.find(x=>x.lead)||sessions[0];selected=q?q.id:0;}
   if(firstLoad){
     log('Guard',`Bukas na ang office. ${sessions.length} na session ang naka-duty.`);
@@ -1044,7 +1091,7 @@ function setConn(){
   const html=`<span class="dot"></span><span class="cm">${esc(msg)}${connMsg?' <span class="'+(/^OK/.test(connMsg)?'okmsg':'errmsg')+'">'+esc(connMsg.replace(/^OK /,''))+'</span>':''}</span>`+
     (mode==='live'?'<button type="button" class="btn" data-act="team">Piliin ang team</button>':'')+
     (isLocal&&hooksOk===false?'<button type="button" class="btn primary" data-act="hooks">I-set up ang hooks</button>':'')+
-    (isLocal&&hooksOk?'<button type="button" class="btn" data-act="hooks">Hooks: OK</button>':'')+
+    (isLocal&&hooksOk?'<span class="okchip" title="Naka-set up ang hooks sa Claude Code">✓ Hooks</span>':'')+
     (isLocal&&mode==='live'?'<button type="button" class="btn" data-act="pair">I-connect ang phone</button>':'')+
     (!isLocal&&mode==='live'&&TOKEN&&window.top===window&&/Android/i.test(navigator.userAgent)?`<a class="btn primary" href="devroom://pair?u=${encodeURIComponent(location.origin)}&t=${encodeURIComponent(TOKEN)}">Buksan sa Dev Room app</a><a class="btn" href="https://github.com/Ronanski/dev-room-app/releases/latest/download/DevRoom.apk">I-download ang app</a>`:'');
   if(el._h!==html){el._h=html;el.innerHTML=html;}
@@ -1332,7 +1379,7 @@ add(-1e9,(g,t)=>{
   g.strokeStyle='#9fd8e6';g.lineWidth=1;g.beginPath();tr.forEach((v,i)=>{const p=iso(11.7+i*(3/39),0,18+Math.min(34,v/600*34*2.2));i?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y);});g.stroke();
   const un=sessions.some(s=>(s.status==='needs'||s.status==='failed')&&!s.acked);
   box(g,8.7,.05,.4,.3,2,'#2a2f35',60,{top:un&&Math.floor(t*3)%2?'#ff4a3e':'#5a2222',front:un&&Math.floor(t*3)%2?'#e0392f':'#4a1c1c'});
-  if(un){const c=iso(8.9,.2,62),a=(t*4)%(Math.PI*2);g.fillStyle='rgba(255,74,62,.08)';g.beginPath();g.moveTo(c.x,c.y);g.arc(c.x,c.y,260,a,a+.5);g.fill();}
+  if(un){const c=iso(8.9,.2,62),a=(t*4)%(Math.PI*2);g.fillStyle='rgba(255,74,62,.08)';g.beginPath();g.moveTo(c.x,c.y);g.arc(c.x,c.y,90,a,a+.5);g.fill();}
 });
 
 /* characters: pixel sprite with a dark outline */
@@ -1779,7 +1826,7 @@ function renderPanel(){
   if(ptab==='alarms'){
     const al=sessions.filter(x=>x.status==='needs'||x.status==='failed').sort((a,b)=>(a.acked-b.acked)||((a.prio||2)-(b.prio||2))||(b.alarmAt||0)-(a.alarmAt||0));
     const key='a'+al.map(x=>x.id+':'+x.status+':'+(x.acked?1:0)).join('|');
-    if(key!==chatKey){chatKey=key;body.innerHTML=al.length?`<ul class="alist">${al.map(x=>`<li class="alrow ${x.status==='failed'||x.prio===1?'p1':'p2'} ${x.acked?'':'unack'}" data-pick="${x.id}"><i></i><span class="m"><b>${esc(x.short)} · ${x.status==='failed'?'TRIP':'NEEDS INPUT'} · ${x.status==='failed'||x.prio===1?'HIGH':'MEDIUM'}</b><span>${esc(x.status==='failed'?(x.detail||'May pumalyang command.'):(x.ask||'May tanong sa iyo.'))}</span></span>${x.acked?'<span class="ackd">ACK</span>':`<button type="button" class="btn" data-ack="${x.id}">ACK</button>`}</li>`).join('')}</ul>`:'<p class="sub2">Walang alarm. Normal ang lahat ng operator.</p>';}
+    if(key!==chatKey){chatKey=key;body.innerHTML=al.length?`<ul class="alist">${al.map(x=>`<li class="alrow ${x.status==='failed'||x.prio===1?'p1':'p2'} ${x.acked?'':'unack'}" data-pick="${x.id}"><i></i><span class="m"><b>${esc(x.short)} · ${x.status==='failed'?'MAY ERROR':'KAILANGAN KA'} · ${x.status==='failed'||x.prio===1?'MATAAS':'KATAMTAMAN'}</b><span>${esc(x.status==='failed'?(x.detail||'May pumalyang command.'):(x.ask||'May tanong sa iyo.'))}</span></span>${x.acked?'<span class="ackd">✓ Nakita na</span>':`<button type="button" class="btn" data-ack="${x.id}">ACK</button>`}</li>`).join('')}</ul>`:'<p class="sub2">Walang alarm. Normal ang lahat ng operator.</p>';}
   }else if(ptab==='chat'){
     if(renderPanel.sel!==s.sid){renderPanel.sel=s.sid;chatTo=s.sid;}
     if(!bySid(chatTo))chatTo=s.sid;
@@ -1819,7 +1866,7 @@ const BLABEL={SESSION_STATUS_BUCKET_WORKING:'Nagtatrabaho',SESSION_STATUS_BUCKET
 function openTeam(){
   const el=$('teamPanel');const {lead,list}=pickTeam(allRecords);const ids=new Set(list.map(r=>r.id));const names=TEAM.names||{};
   const rows=allRecords.map(r=>`<div class="trow"><input type="checkbox" id="tm-${esc(r.id)}" name="tm" value="${esc(r.id)}" ${ids.has(r.id)?'checked':''} aria-label="Isama sa office"><label for="tm-${esc(r.id)}"><input type="text" class="tname" data-id="${esc(r.id)}" value="${esc(names[r.id]||r.title)}" aria-label="Pangalan ng session" style="width:100%;box-sizing:border-box;font:inherit;font-size:13px;font-weight:700;border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:var(--bg);color:var(--ink)"><small>${esc(BLABEL[r.status_bucket]||'')} · ${esc(r.cwd?baseName(r.cwd):'')} · ${esc(simLabel(r.updated_at))}</small></label><span class="lead-pick"><input type="radio" id="tl-${esc(r.id)}" name="tl" value="${esc(r.id)}" ${r.id===lead?'checked':''}><label for="tl-${esc(r.id)}">Leader</label></span></div>`).join('')||'<p class="empty">Wala pang session na nagpadala ng update.</p>';
-  el.innerHTML=`<div class="tp-card" role="dialog" aria-label="Piliin ang team"><h2>Piliin ang team</h2><p class="hint">I-check ang mga session na nasa office at piliin ang leader. Palitan ang pangalan sa format na <b>ROLE: task</b>, halimbawa <b>CODE FIXER: logic at engine</b>, para lumabas ang tamang role. Hanggang ${MAXN} na miyembro at isang leader ang kasya. Naka-save ito sa PC, kaya pareho ang makikita sa phone.</p><div class="tlist">${rows}</div><div class="row"><button type="button" class="btn" data-act="team-reset">Gamitin ang default</button><span style="flex:1"></span><button type="button" class="btn" data-act="team-cancel">Kanselahin</button><button type="button" class="btn primary" data-act="team-save">I-save</button></div></div>`;
+  el.innerHTML=`<div class="tp-card" role="dialog" aria-label="Piliin ang team"><h2>Piliin ang team</h2><p class="hint">I-check ang mga session na nasa office at piliin ang leader. Palitan ang pangalan sa format na <b>ROLE: task</b>, halimbawa <b>CODE FIXER: logic at engine</b>, para lumabas ang tamang role. Hanggang ${MAXN} na miyembro at isang leader ang kasya; ang sobra ay hindi lalabas sa office. Naka-save ito sa PC, kaya pareho ang makikita sa phone.</p><div class="tlist">${rows}</div><div class="row"><button type="button" class="btn" data-act="team-reset">Gamitin ang default</button><span style="flex:1"></span><button type="button" class="btn" data-act="team-cancel">Kanselahin</button><button type="button" class="btn primary" data-act="team-save">I-save</button></div></div>`;
   el.hidden=false;
 }
 async function saveTeam(t){
@@ -1858,14 +1905,14 @@ function toast(s){
   let el=box.querySelector(`[data-sid="${s.id}"]`);
   if(!el){el=document.createElement('div');el.className='toast';el.dataset.sid=s.id;box.appendChild(el);}
   const hi=s.status==='failed'||s.prio===1;el.classList.toggle('p1',hi);el.classList.toggle('p2',!hi);
-  el.innerHTML=`${av(s,28)}<div style="min-width:0"><div class="ti">${s.status==='failed'?'TRIP':'ALARM'} · ${hi?'HIGH':'MEDIUM'} · ${simLabel(now())}</div><b>Kailangan ka ng ${esc(s.role)}.</b><div style="font-size:12.5px">${esc(s.status==='failed'?(s.detail||'May pumalyang command.'):(s.ask||'May tanong siya sa iyo.'))}</div><div class="acts"><button type="button" class="btn" data-ack="${s.id}">ACK</button><button type="button" class="btn primary" data-open-alarm="${s.id}">Tingnan</button></div></div>`;
+  el.innerHTML=`${av(s,28)}<div style="min-width:0"><div class="ti">${s.status==='failed'?'MAY ERROR':'KAILANGAN KA'} · ${hi?'MATAAS':'KATAMTAMAN'} · ${simLabel(now())}</div><b>Kailangan ka ng ${esc(s.role)}.</b><div style="font-size:12.5px">${esc(s.status==='failed'?(s.detail||'May pumalyang command.'):(s.ask||'May tanong siya sa iyo.'))}</div><div class="acts"><button type="button" class="btn" data-ack="${s.id}">ACK</button><button type="button" class="btn" data-open-alarm="${s.id}">Tingnan</button><button type="button" class="btn primary" data-act="claude">Sagutin</button></div></div>`;
   while(box.children.length>4)box.firstChild.remove();
 }
 function pruneToasts(){const box=$('toasts');if(!box)return;for(const el of [...box.children]){const s=sessions.find(x=>x.id===+el.dataset.sid);if(!s||s.acked||(s.status!=='needs'&&s.status!=='failed'))el.remove();}}
 function setDrawer(on,tab){const a=$('app');if(tab){ptab=tab;chatKey='';}a.classList.toggle('drawer',on);const b=$('chatToggle');if(b)b.textContent=on?'Isara ang panel':'Panel';render();}
 function openChat(id){
   selected=id;ptab='chat';chatKey='';const fs=sessions.find(x=>x.id===id);if(fs){cam.follow=fs;if(cam.z<1.5)setZoom(1.8);}
-  if(compact()){$('app').dataset.tab='chat';document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab==='chat'));}
+  if(compact()){const fs2=sessions.find(x=>x.id===id);if(fs2){chatFilter=fs2.sid;chatTo=fs2.sid;}$('app').dataset.tab='chat';document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab==='chat'));}
   $('app').classList.add('drawer');const b=$('chatToggle');if(b)b.textContent='Isara ang panel';
   render();
 }
@@ -1961,6 +2008,19 @@ document.addEventListener('keydown',e=>{
   if(!$('teamPanel').hidden){$('teamPanel').hidden=true;return;}
   if($('app').classList.contains('drawer')){setDrawer(false);return;}
   if($('app').classList.contains('focus'))$('fsBtn').click();});
+// dialogs take the keyboard focus when they open and give it back when they close; Tab stays inside them
+{let opener=null;
+ for(const id of ['teamPanel','whatsNew']){const el=$(id);
+  new MutationObserver(()=>{
+    if(!el.hidden){opener=document.activeElement;setTimeout(()=>{const f=el.querySelector('input,button,select,textarea');f&&f.focus();},0);}
+    else if(opener&&document.contains(opener)){opener.focus();opener=null;}
+  }).observe(el,{attributes:true,attributeFilter:['hidden']});
+  el.addEventListener('keydown',e=>{if(e.key!=='Tab')return;const f=[...el.querySelectorAll('input,button,select,textarea,a[href]')].filter(x=>!x.disabled&&x.offsetParent);if(!f.length)return;
+    const a=f[0],z=f[f.length-1];if(e.shiftKey&&document.activeElement===a){z.focus();e.preventDefault();}else if(!e.shiftKey&&document.activeElement===z){a.focus();e.preventDefault();}});}}
+// the dock scrolls sideways with the mouse wheel and fades at the edge while there is more
+{const d=$('dock');const edge=()=>d.classList.toggle('at-end',d.scrollLeft+d.clientWidth>=d.scrollWidth-4);
+ d.addEventListener('wheel',e=>{if(Math.abs(e.deltaY)>Math.abs(e.deltaX)&&d.scrollWidth>d.clientWidth){d.scrollLeft+=e.deltaY;e.preventDefault();}},{passive:false});
+ d.addEventListener('scroll',edge,{passive:true});new ResizeObserver(edge).observe(d);setInterval(edge,2000);}
 ['teamPanel','whatsNew'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target===e.currentTarget){if(id==='whatsNew')$(id).querySelector('[data-act="wn-ok"]')?.click();else $(id).hidden=true;}}));
 // keep the drawer clear of the session cards
 {const dw=document.querySelector('.dockwrap');const upd=()=>{if(dw)$('app').style.setProperty('--dockh',dw.offsetHeight+'px');};if(window.ResizeObserver&&dw)new ResizeObserver(upd).observe(dw);upd();}
