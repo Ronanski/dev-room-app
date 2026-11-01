@@ -38,6 +38,8 @@ The version lives in `VERSION`. Each build is published as release `v<VERSION>-b
 - **Away from home:** when Tailscale runs on the PC, the pairing QR also carries the Tailscale address. The Android app and its background watcher use home Wi-Fi first and Tailscale when away.
 
 - **Tray app:** closing the Dev Room window keeps it running in the system tray, so phones and tablets stay connected. The tray menu has Buksan ang Dev Room, Simulan kasabay ng Windows (start with Windows, hidden in the tray), and Isara nang tuluyan.
+- **Widescreen map with a slide-over panel:** the Alarms, Chat and Detalye panel opens over the right side of the map only when needed. It opens from a character, a session card, an alarm, the alarm count or the Panel button, and closes with ×, Esc or a tap on the map. The session cards stay at the bottom.
+- **Notifications in the lower right:** alarms stack up with ACK and Tingnan buttons and stay until handled. They move beside the panel when it is open.
 - **Fullscreen is map only:** the header, status bar and dock hide, and the whole plant fits the screen. It also works where the browser blocks real fullscreen, such as the Android app.
 
 ### Fixed

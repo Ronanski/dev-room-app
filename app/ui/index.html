@@ -38,7 +38,7 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline
 .app:fullscreen{height:100vh!important;padding:10px;box-sizing:border-box}
 .app.focus .top,.app.focus .conn,.app.focus .updbar,.app.focus .dockwrap,.app.focus .legend,.app.focus .rule,.app.focus .tabs,.app.focus .statusbar{display:none!important}
 .app.focus{position:fixed;inset:0;z-index:50;height:100%!important;padding:6px;box-sizing:border-box;background:var(--bg)}
-.app.focus .body{grid-template-rows:minmax(0,1fr);grid-template-areas:"office chat";height:100%}
+.app.focus .body{grid-template-rows:minmax(0,1fr);grid-template-areas:"office";height:100%}
 .app.focus .pane[data-pane="office"]{display:flex!important;height:100%}
 .app.focus .mapwrap{height:100%;flex:1}
 .app{container-type:inline-size;container-name:app;position:relative;background:var(--bg)}
@@ -69,8 +69,7 @@ h1{font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1;mar
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
 
 .body{display:grid;grid-template-columns:minmax(0,1fr) clamp(300px,28%,380px);grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"office chat" "dock dock";gap:10px;flex:1;min-height:0}
-.app.nochat .body{grid-template-columns:minmax(0,1fr) 0}
-.app.nochat .pane[data-pane="chat"]{display:none}
+
 .pane[data-pane="office"]{display:flex;flex-direction:column;min-height:0}
 .pane[data-pane="office"]{grid-area:office;min-width:0}
 .pane[data-pane="chat"]{grid-area:chat;min-width:0;position:relative;min-height:540px}
@@ -166,7 +165,14 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .addcard{flex:none;width:150px;border:1px dashed var(--line);border-radius:10px;background:none;color:var(--muted);font-size:13px;padding:10px}
 .addcard:hover{border-color:var(--accent);color:var(--ink)}
 
-.toast{position:absolute;top:12px;right:12px;z-index:5;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--need);border-radius:10px;padding:10px 12px;box-shadow:0 8px 24px rgba(42,32,26,.2);font-size:13px;max-width:320px;display:flex;gap:10px;align-items:flex-start;text-align:left;cursor:pointer}
+.toast-old{position:absolute;top:12px;right:12px;z-index:5;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--need);border-radius:10px;padding:10px 12px;box-shadow:0 8px 24px rgba(42,32,26,.2);font-size:13px;max-width:320px;display:flex;gap:10px;align-items:flex-start;text-align:left;cursor:pointer}
+.toasts{position:absolute;right:10px;bottom:44px;z-index:5;display:flex;flex-direction:column-reverse;gap:8px;max-width:min(340px,calc(100% - 20px));pointer-events:none}
+.toast{pointer-events:auto;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--need);border-radius:10px;padding:9px 11px;box-shadow:0 8px 24px rgba(42,32,26,.28);font-size:13px;display:flex;gap:10px;align-items:flex-start;text-align:left;animation:toastIn .25s ease}
+.toast.p1{border-left-color:#c4573c}.toast.p2{border-left-color:#d99a1c}.toast.info{border-left-color:var(--work)}
+.toast .acts{display:flex;gap:6px;margin-top:6px}
+.toast .acts .btn{padding:3px 9px;font-size:12px}
+@keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.toast{animation:none}}
 .toast .ti{font-family:var(--f-mono);font-size:10px;color:var(--muted)}
 .tabs{display:none}
 
@@ -212,7 +218,7 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
   .tabs button[aria-selected="true"]{color:var(--accent);font-weight:700}
   .tabs i{width:18px;height:3px;border-radius:2px;background:currentColor;opacity:.6}
   .tabs .badge{position:absolute;top:6px;left:calc(50% + 12px);background:var(--need);color:#fff;font-size:10px;font-family:var(--f-mono);border-radius:999px;padding:0 5px}
-  .toast{left:10px;right:10px;max-width:none;top:8px}
+  .toasts{left:10px;right:10px;max-width:none;bottom:10px}
 }
 
 /* ---------- Android preview frame ---------- */
@@ -255,6 +261,21 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .okmsg{color:var(--work);font-weight:700}
 .errmsg{color:var(--need);font-weight:700}
 body{margin:0}
+/* drawer panel and widescreen map (after the base pane rules so these win) */
+.body{position:relative}
+@container app (min-width: 641px){
+  .body{grid-template-columns:minmax(0,1fr);grid-template-areas:"office" "dock"}
+  .pane[data-pane="chat"]{grid-area:auto;position:absolute;top:8px;right:8px;bottom:calc(var(--dockh,120px) + 18px);width:min(380px,calc(100% - 16px));min-height:0;z-index:8;
+    transform:translateX(calc(100% + 24px));opacity:0;pointer-events:none;transition:transform .22s ease,opacity .22s ease}
+  .app.drawer .pane[data-pane="chat"]{transform:none;opacity:1;pointer-events:auto}
+  .app.drawer .chatpanel{box-shadow:0 12px 40px rgba(20,14,10,.35)}
+  .app.focus .pane[data-pane="chat"]{bottom:8px}
+  .app.drawer .toasts,.app.drawer .zoom{right:calc(min(380px,100% - 16px) + 18px)}
+  .chatpanel .cp-head{padding-right:46px}
+}
+.drawer-x{position:absolute;top:8px;right:8px;z-index:2;width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:18px;line-height:1}
+@container app (max-width: 640px){.drawer-x{display:none}}
+@media (prefers-reduced-motion:reduce){.pane[data-pane="chat"]{transition:none}}
 </style>
 </head>
 <body>
@@ -285,14 +306,15 @@ body{margin:0}
           <canvas id="map" width="2240" height="1260" aria-label="Isometric café-style office map with session characters"></canvas>
           <div class="overlay" id="overlay"></div>
           <div class="feed" id="feed" aria-live="polite"></div>
-          <div class="zoom"><button type="button" id="zOut" aria-label="Zoom out">−</button><button type="button" id="zIn" aria-label="Zoom in">+</button><button type="button" id="bsDown" aria-label="Paliitin ang text ng bubbles">A−</button><button type="button" id="bsUp" aria-label="Palakihin ang text ng bubbles">A+</button><button type="button" id="zFit">Buong office</button><button type="button" id="fsBtn">Fullscreen</button><button type="button" id="chatToggle">Itago ang chat</button></div>
+          <div class="zoom"><button type="button" id="zOut" aria-label="Zoom out">−</button><button type="button" id="zIn" aria-label="Zoom in">+</button><button type="button" id="bsDown" aria-label="Paliitin ang text ng bubbles">A−</button><button type="button" id="bsUp" aria-label="Palakihin ang text ng bubbles">A+</button><button type="button" id="zFit">Buong office</button><button type="button" id="fsBtn">Fullscreen</button><button type="button" id="chatToggle">Panel</button></div>
+          <div class="toasts" id="toasts" aria-live="assertive"></div>
           <div class="mlegend"><span><i class="dot" style="background:var(--work)"></i>Nagtatrabaho</span><span><i class="dot" style="background:var(--need)"></i>Kailangan ka</span><span><i class="dot" style="background:var(--idle)"></i>Naka-break</span><span><i class="dot" style="background:var(--sleep)"></i>Tulog</span><span><i class="dot" style="background:var(--done)"></i>Pa-review</span><span><i class="dot" style="background:var(--fail)"></i>May error</span></div>
         </div>
 
       </section>
 
       <section class="pane" data-pane="chat" aria-label="Chat">
-        <div class="chatpanel">
+        <div class="chatpanel"><button type="button" class="drawer-x" data-act="drawer-close" aria-label="Isara ang panel">×</button>
           <div class="cp-head" id="cpHead"></div>
           <div class="cp-tabs" role="tablist">
             <button type="button" role="tab" data-ptab="alarms" aria-selected="true">Alarms</button>
@@ -317,7 +339,7 @@ body{margin:0}
       <button type="button" role="tab" data-tab="chat" aria-selected="false"><i></i>Chat<span class="badge" id="tabBadge" hidden>0</span></button>
     </nav>
     
-<button type="button" class="toast" id="toast" hidden></button>
+<div id="toast" hidden></div>
     <div class="teampanel" id="teamPanel" hidden></div>
   </div>
 </div>
@@ -532,7 +554,7 @@ function setStatus(s,st,why){
   s.talk=null;s.talkNext=now()+1500;
   log(s.short,why||statusLine(s),s);
   addChatFor(s,st,why);
-  if(st==='needs')toast(s);
+  if(st==='needs'||st==='failed')toast(s);
   applyStatus(s,false);render();
 }
 function nextStatus(s){
@@ -746,7 +768,7 @@ function infoOf(r){
   const src=['PC mo',r.cwd?baseName(r.cwd):'Claude Code'];
   const url=(((sc.sources||[])[0]||{}).git_repository||{}).url||'';const repo=url.replace(/^https:\/\/github\.com\//,'');
   const br=em.current_branches||{};
-  const o={status:BUCKET[r.status_bucket]||'idle',at:(typeof r.updated_at==='number'?r.updated_at:Date.parse(r.updated_at))||now(),cwd:r.cwd||'',act:r.short||'',prompt_at:r.prompt_at||0,ask:sent(p.needs_action),detail:p.status_detail||r.task_summary||'',recent:p.recent_action||'',
+  const o={prio:/permission/i.test(p.needs_action||'')?1:2,status:BUCKET[r.status_bucket]||'idle',at:(typeof r.updated_at==='number'?r.updated_at:Date.parse(r.updated_at))||now(),cwd:r.cwd||'',act:r.short||'',prompt_at:r.prompt_at||0,ask:sent(p.needs_action),detail:p.status_detail||r.task_summary||'',recent:p.recent_action||'',
     source:src[0],host:src[1],archived:r.session_status==='SESSION_STATUS_ARCHIVED'};
   if(repo)o.repo=repo;if(repo&&(br[repo]||br['']))o.branch=br[repo]||br[''];
   if(sc.model)o.model=sc.model;if(em.context_usage)o.ctx=em.context_usage;if(em.artifacts)o.artifacts=em.artifacts;
@@ -818,7 +840,7 @@ function applyRecords(records){
   if(firstLoad){
     log('Guard',`Bukas na ang office. ${sessions.length} na session ang naka-duty.`);
     sessions.slice().sort((a,b)=>a.at-b.at).forEach(s=>log(s.short,statusLine(s),s,s.at));
-    const q=sessions.find(x=>x.id===selected);if(q&&q.status==='needs')toast(q);
+    sessions.filter(x=>x.status==='needs'||x.status==='failed').forEach(toast);
   }
   firstLoad=false;render();
 }
@@ -1427,6 +1449,7 @@ function dockCard(s){
   return `<button type="button" class="dcard ${s.id===selected?'sel':''} ${s.status==='needs'?'needcard':''}" data-id="${s.id}">${av(s)}<span style="min-width:0"><span class="nm" style="display:block">${esc(s.role)}${FX.mood?`<span class="mood" title="Energy ${Math.round(energy(s)*100)}%">${moodOf(s)}</span>`:''}</span><span class="rl" style="display:block">${esc(s.task)}</span></span><span class="ft">${pill(s)}<span class="dur">${dur(now()-s.since)}</span></span>${FX.timeline?tlHTML(s):''}</button>`;
 }
 function render(){
+  pruneToasts();
   const by=st=>sessions.filter(s=>s.status===st).length;
   const sleepN=sessions.filter(s=>s.status==='idle'&&(s.idle==='sleep'||s.idle==='doze')).length;
   const needN=by('needs');
@@ -1445,15 +1468,21 @@ function renderLog(){
   const f=$('feed');if(!f)return;
   f.innerHTML=logs.slice(0,3).reverse().map(l=>`<div><b>${esc(l.who)}:</b> ${esc(l.text)}</div>`).join('');
 }
-let toastTimer;
+// Alarm toasts stay in the lower right until acknowledged or opened; one per session.
 function toast(s){
-  const el=$('toast');el.hidden=false;el.dataset.id=s.id;
-  el.innerHTML=`${av(s,28)}<div style="min-width:0"><div class="ti">Dev Room · ngayon</div><b>Kailangan ka ng ${esc(s.role)}.</b><div style="font-size:12.5px">${esc(s.ask||'May tanong siya sa iyo.')}</div></div>`;
-  clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.hidden=true,6000);
+  const box=$('toasts');if(!box)return;
+  let el=box.querySelector(`[data-sid="${s.id}"]`);
+  if(!el){el=document.createElement('div');el.className='toast';el.dataset.sid=s.id;box.appendChild(el);}
+  const hi=s.status==='failed'||s.prio===1;el.classList.toggle('p1',hi);el.classList.toggle('p2',!hi);
+  el.innerHTML=`${av(s,28)}<div style="min-width:0"><div class="ti">${s.status==='failed'?'TRIP':'ALARM'} · ${hi?'HIGH':'MEDIUM'} · ${simLabel(now())}</div><b>Kailangan ka ng ${esc(s.role)}.</b><div style="font-size:12.5px">${esc(s.status==='failed'?(s.detail||'May pumalyang command.'):(s.ask||'May tanong siya sa iyo.'))}</div><div class="acts"><button type="button" class="btn" data-ack="${s.id}">ACK</button><button type="button" class="btn primary" data-open-alarm="${s.id}">Tingnan</button></div></div>`;
+  while(box.children.length>4)box.firstChild.remove();
 }
+function pruneToasts(){const box=$('toasts');if(!box)return;for(const el of [...box.children]){const s=sessions.find(x=>x.id===+el.dataset.sid);if(!s||s.acked||(s.status!=='needs'&&s.status!=='failed'))el.remove();}}
+function setDrawer(on,tab){const a=$('app');if(tab){ptab=tab;chatKey='';}a.classList.toggle('drawer',on);const b=$('chatToggle');if(b)b.textContent=on?'Isara ang panel':'Panel';render();}
 function openChat(id){
   selected=id;ptab='chat';chatKey='';const fs=sessions.find(x=>x.id===id);if(fs){cam.follow=fs;if(cam.z<1.5)setZoom(1.8);}
   if(compact()){$('app').dataset.tab='chat';document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab==='chat'));}
+  $('app').classList.add('drawer');const b=$('chatToggle');if(b)b.textContent='Isara ang panel';
   render();
 }
 
@@ -1474,7 +1503,9 @@ document.addEventListener('click',e=>{
     const l=document.querySelector('#teamPanel input[name="tl"]:checked');let lead=l?l.value:null;
     if(lead&&!ids.includes(lead))ids.unshift(lead);
     saveTeam({lead,ids,names:collectNames()});$('teamPanel').hidden=true;return;}
-  const tst=e.target.closest('#toast');if(tst){tst.hidden=true;openChat(+tst.dataset.id);return;}
+  const oa=e.target.closest('[data-open-alarm]');if(oa){const id=+oa.dataset.openAlarm;openChat(id);ptab='alarms';chatKey='';render();return;}
+  if(e.target.closest('[data-act="drawer-close"]')){setDrawer(false);return;}
+  if(e.target.closest('.count.need')){setDrawer(true,'alarms');return;}
   const a=e.target.closest('[data-act="reply"]');
   if(a){const s=sessions.find(x=>x.id===+a.dataset.id);if(s&&s.status==='needs')answer(s,a.dataset.mode==='approve'?'Approved. Sige, ituloy mo.':'Hindi muna. Huwag mo munang gawin iyan.',a.dataset.mode);return;}
   const pt=e.target.closest('[data-ptab]');if(pt){ptab=pt.dataset.ptab;chatKey='';renderPanel();return;}
@@ -1505,7 +1536,8 @@ cv.addEventListener('pointerup',e=>{
   cv.classList.remove('drag');const d=drag;drag=null;if(wasPinch||!d||d.moved)return;
   const q=toScreen(e);
   let best=null,bd=20;for(const s of sessions){const p=isoP(s);const dd=Math.hypot(p.x-q.x,p.y-16-q.y);if(dd<bd){bd=dd;best=s;}}
-  if(best){selected=best.id;cam.follow=best;ptab='chat';chatKey='';render();}
+  if(best){selected=best.id;cam.follow=best;ptab='chat';chatKey='';$('app').classList.add('drawer');render();}
+  else if($('app').classList.contains('drawer'))setDrawer(false);
 });
 cv.addEventListener('wheel',e=>{e.preventDefault();const q=toScreen(e);cam.follow=null;setZoom(cam.z*(e.deltaY<0?1.15:1/1.15),q.x,q.y);},{passive:false});
 $('zIn').addEventListener('click',()=>setZoom(cam.z*1.25));
@@ -1525,7 +1557,10 @@ applyBS();
    try{if(on&&document.fullscreenEnabled&&app.requestFullscreen)app.requestFullscreen().catch(()=>{});else if(!on&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});}catch(e){}
  });
  document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&app.classList.contains('focus'))setFocus(false);else fit();});}
-$('chatToggle').addEventListener('click',()=>{const a=$('app');a.classList.toggle('nochat');$('chatToggle').textContent=a.classList.contains('nochat')?'Ipakita ang chat':'Itago ang chat';});
+$('chatToggle').addEventListener('click',()=>setDrawer(!$('app').classList.contains('drawer')));
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('app').classList.contains('drawer'))setDrawer(false);});
+// keep the drawer clear of the session cards
+{const dw=document.querySelector('.dockwrap');const upd=()=>{if(dw)$('app').style.setProperty('--dockh',dw.offsetHeight+'px');};if(window.ResizeObserver&&dw)new ResizeObserver(upd).observe(dw);upd();}
 $('pauseBtn').addEventListener('click',()=>{
   if(!paused){paused=true;pauseAt=Date.now();$('pauseBtn').textContent='Ituloy';}
   else{pausedAcc+=Date.now()-pauseAt;paused=false;$('pauseBtn').textContent='Pause';}
