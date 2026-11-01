@@ -480,6 +480,18 @@ body{margin:0}
 .drawer-x{position:absolute;top:8px;right:8px;z-index:2;width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:18px;line-height:1}
 @container app (max-width: 640px){.drawer-x{display:none}}
 @media (prefers-reduced-motion:reduce){.pane[data-pane="chat"]{transition:none}}
+/* Tablet portrait (and any tall window wider than a phone): the panel docks under the office instead of covering
+   half of it. Office on top, session cards, then the chat across the full width. */
+@media (orientation:portrait){@container app (min-width: 641px){
+  .app.drawer .body{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(220px,1fr) auto minmax(0,1.35fr);grid-template-areas:"office" "dock" "chat";row-gap:8px}
+  .app.drawer .pane[data-pane="chat"]{grid-area:chat;position:relative;inset:auto;width:auto;min-height:0;transform:none;transition:none}
+  .app.drawer .chatpanel{box-shadow:none}
+  .app.drawer .toasts{right:10px}
+  .app.drawer .zoom{right:8px}
+  .app.drawer .mapwrap{min-height:0}
+  .app.focus.drawer .body{row-gap:6px}
+  .app.drawer .mlegend{display:none}
+}}
 </style>
 </head>
 <body>
@@ -1339,6 +1351,10 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.11.1':{news:['<b>Agad nang sumasagot ang Lead kahit may agent sa background:</b> dati, kapag may pinapatakbong agent ang Lead, mukha siyang "Nagtatrabaho" at nakapila lang ang mensahe mo. Ngayon, kapag tapos na ang turn niya, ipinapasa agad ang mensahe mo, tulad sa Claude app.',
+    '<b>Wala na ang mahahabang system message</b> (hal. "None of the sessions you started…") na mukhang galing sa iyo. Hindi mo iyon isinulat; galing iyon sa Claude Code mismo.',
+    '<b>Tablet na naka-portrait:</b> nasa ilalim na ng office ang panel (office, session cards, tapos chat sa buong lapad), hindi na nakapatong sa kalahati ng office.'],
+    todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
   '0.11.0':{news:['<b>Bumabalik ang window kung paano mo iniwan:</b> pagkatapos mag-update at mag-restart, babalik ang Dev Room sa dati nitong ayos: nasa tray, naka-minimize sa taskbar, naka-maximize, o sa dating pwesto at laki.',
     '<b>Pop-out na ang artifact at larawan, hindi full screen:</b> sa PC at tablet na naka-landscape, lumulutang na window ito sa tabi ng chat. I-drag sa itaas na bar para ilipat, at hilahin ang kanto para palakihin o paliitin; tatandaan nito kung saan mo inilagay. Sa tablet na naka-portrait, card ito sa gitna. Sa phone, lumalabas ito mula sa ibaba; i-swipe pababa para isara.',
     'Ang <b>⤢</b> ay para gawing full screen. Sa larawan, pindutin para makita sa totoong laki.'],
@@ -1893,7 +1909,9 @@ function resizeMap(){
   DPR=Math.min(Q.cap,window.devicePixelRatio||1);VW=r.width;VH=r.height;
   cv.width=Math.round(VW*DPR);cv.height=Math.round(VH*DPR);
   BASE=Math.min(VW/SW,VH/SH);
-  const narrow=VW<560;if(narrow!==resizeMap.narrow){resizeMap.narrow=narrow;cam.z=narrow?2.6:1.25;const p=cam.follow?isoP(cam.follow):iso(14,9);centerOn(p.x,p.y);}
+  // phone: close up; tall view (tablet portrait): zoom so the office fills the height instead of a thin strip
+  const narrow=VW<560,tall=!narrow&&VH>VW*.75,key=narrow?'n':tall?'t'+Math.round(VH/VW*8):'w';
+  if(key!==resizeMap.key){resizeMap.key=key;cam.z=narrow?2.6:tall?Math.max(1.25,Math.min(2.6,.92*VH*SW/(SH*VW))):1.25;const p=cam.follow?isoP(cam.follow):iso(14,9);centerOn(p.x,p.y);}
   clampCam();cam.x=cam.tx;cam.y=cam.ty;
 }
 // The office can be dragged anywhere, up to most of the view past its edges (for example out from under the
@@ -2362,6 +2380,7 @@ function closeViewer(){const v=$('viewer');if(v.hidden)return;v.hidden=true;$('v
   addEventListener('resize',()=>layoutViewer());
 })();
 // One feed for the whole team: your prompts, the sessions' replies and messages sent from this app.
+const SYS_PROMPT=/^\s*<(wake|event|[a-z][\w]*(?:-[\w]+)+)[\s>]/i;
 function chatFeed(){
   const list=chatFilter==='all'?sessions:sessions.filter(s=>s.sid===chatFilter);
   PENDING=PENDING.filter(p=>!(p.id&&(bySid(p.sid)?.inbox||[]).some(m=>m.id===p.id)));
@@ -2371,6 +2390,7 @@ function chatFeed(){
     const sent=new Set((s.inbox||[]).map(m=>String(m.text||'').trim()));
     for(const m of (CONVO[s.sid]||[])){
       if(m.att){items.push({s,t:m.at,you:m.role==='user',att:m.att,name:m.name||'',title:m.title||''});continue;}
+      if(m.role==='user'&&SYS_PROMPT.test(m.text||''))continue;   // Claude Code's own turns, not something you typed
       const text=cleanMsg(m.text);if(!text||(m.role==='user'&&sent.has(text)))continue;items.push({s,t:m.at,you:m.role==='user',sys:m.role==='sys',text});}
     for(const m of (s.inbox||[]))items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true});
     PENDING.forEach((m,pi)=>{if(m.sid===s.sid)items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true,why:m.why,pi});});
