@@ -9,6 +9,14 @@ The version lives in `VERSION`. Each build is published as release `v<VERSION>-b
 
 ## 0.9.0 (2026-11-01)
 
+- **Updates arrive in seconds, not minutes.**
+  - The PC checks for a new release every 30 seconds, instead of every 3 minutes.
+  - A downloaded update installs within 2 seconds when the window is in the tray or minimized.
+  - With the window open, it installs after 15 seconds without input (never while you are typing a message), after a 5-second countdown.
+- **People walk around things.**
+  - Walls and furniture are recorded on a half-tile grid while a scene is built.
+  - Everyone (sessions, the crew and the staff) walks with A* around them and through the doors, then the path is straightened where the line of sight is clear.
+  - Works in the office and the resort.
 - **The PC app installs updates while minimized.**
   - Before, a minimized window waited for you forever. Only the UI updated; the exe (server features) did not.
   - Now a minimized window counts like the tray: the update installs within about 3 minutes and the window comes back minimized.

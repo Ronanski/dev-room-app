@@ -595,7 +595,56 @@ function mkSession(name,source,host,status,minsAgo,desk){
 /* ---------- movement ---------- */
 function roomOf(p){if(p.y>H)return'out';const tx=p.x/T;if(p.y<11*T)return tx<17?'work':tx<22?'lead':tx<28?'boss':tx<35?'lib':'sleep';if(p.y<13*T)return'corr';return tx<5?'lobby':tx<9?'cr':tx<16?'pantry':tx<22?'lounge':tx<28?'rec':tx<34?'gym':'court';return tx<7?'lounge':tx<11?'cr':tx<17?'lobby':tx<22?'hr':'cafe';}
 function aisle(p){const g=[.8,5.1,9.5,13.6].map(v=>v*T);let best=g[0];for(const x of g)if(Math.abs(x-p.x)<Math.abs(best-p.x))best=x;return{x:best,y:p.y};}
+/* ---------- walking around things ----------
+   Every piece of furniture and wall that stands on the floor is recorded while the scene is baked, on a
+   half-tile grid. People walk with A* around them and through the doors, then the path is straightened where
+   the line of sight is clear. */
+const NAV={rec:null,grid:null,C:84,R:52,S:T/2};
+function buildNav(boxes){
+  const {C,R}=NAV,g=new Uint8Array(C*R);
+  for(const [u,v,w,d] of boxes){
+    // a thin wall still blocks every cell it touches; a small object blocks the cells under it
+    const c0=Math.floor(u*2+.15),c1=Math.max(c0,Math.ceil((u+w)*2-.15)-1),r0=Math.floor(v*2+.15),r1=Math.max(r0,Math.ceil((v+d)*2-.15)-1);
+    for(let r=Math.max(0,r0);r<=Math.min(R-1,r1);r++)for(let c=Math.max(0,c0);c<=Math.min(C-1,c1);c++)g[r*C+c]=1;
+  }
+  // the part of the floor everyone can reach (corners closed in by furniture are never used as a destination)
+  const main=new Uint8Array(C*R);let best=null;const seen=new Uint8Array(C*R);
+  for(let i=0;i<C*R;i++){if(g[i]||seen[i])continue;const comp=[i];seen[i]=1;for(let k=0;k<comp.length;k++){const j=comp[k],c=j%C,r=(j/C)|0;
+    for(const [dc,dr] of [[1,0],[-1,0],[0,1],[0,-1]]){const nc=c+dc,nr=r+dr;if(nc<0||nr<0||nc>=C||nr>=R)continue;const q=nr*C+nc;if(!g[q]&&!seen[q]){seen[q]=1;comp.push(q);}}}
+    if(!best||comp.length>best.length)best=comp;}
+  if(best)for(const i of best)main[i]=1;
+  NAV.grid=g;NAV.main=main;
+}
+const navCell=p=>[Math.max(0,Math.min(NAV.C-1,Math.floor(p.x/NAV.S))),Math.max(0,Math.min(NAV.R-1,Math.floor(p.y/NAV.S)))];
+const navFree=(c,r)=>c>=0&&r>=0&&c<NAV.C&&r<NAV.R&&!NAV.grid[r*NAV.C+c];
+const navOk=(c,r)=>navFree(c,r)&&NAV.main[r*NAV.C+c];
+function navNearest(c,r){if(navOk(c,r))return[c,r];for(let k=1;k<14;k++)for(let dr=-k;dr<=k;dr++)for(let dc=-k;dc<=k;dc++){if(Math.max(Math.abs(dc),Math.abs(dr))!==k)continue;if(navOk(c+dc,r+dr))return[c+dc,r+dr];}return null;}
+// clear line between two cell centres, with a body's width of room on every side
+function navLos(a,b){const n=Math.ceil(Math.max(Math.abs(b[0]-a[0]),Math.abs(b[1]-a[1]))*4);for(let i=1;i<n;i++){const t=i/n;const x=a[0]+.5+(b[0]-a[0])*t,y=a[1]+.5+(b[1]-a[1])*t;
+  for(const [ox,oy] of [[-.35,-.35],[.35,-.35],[-.35,.35],[.35,.35]])if(!navFree(Math.floor(x+ox),Math.floor(y+oy)))return false;}return true;}
+function navPath(a,b){
+  if(!NAV.grid)return null;
+  const s=navNearest(...navCell(a)),e=navNearest(...navCell(b));if(!s||!e)return null;
+  const {C,R}=NAV,N=C*R,start=s[1]*C+s[0],goal=e[1]*C+e[0];
+  const gs=new Float32Array(N).fill(1e9),from=new Int32Array(N).fill(-1),done=new Uint8Array(N);
+  const heap=[];const push=(i,f)=>{heap.push([f,i]);let k=heap.length-1;while(k){const p=(k-1)>>1;if(heap[p][0]<=heap[k][0])break;[heap[p],heap[k]]=[heap[k],heap[p]];k=p;}};
+  const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let k=0;for(;;){const l=2*k+1,r=l+1;let m=k;if(l<heap.length&&heap[l][0]<heap[m][0])m=l;if(r<heap.length&&heap[r][0]<heap[m][0])m=r;if(m===k)break;[heap[m],heap[k]]=[heap[k],heap[m]];k=m;}}return top;};
+  const h=i=>{const dx=Math.abs(i%C-e[0]),dy=Math.abs(((i/C)|0)-e[1]);return Math.max(dx,dy)+.41*Math.min(dx,dy);};
+  gs[start]=0;push(start,h(start));let found=false,steps=0;
+  while(heap.length&&steps++<N*2){const [,i]=pop();if(done[i])continue;done[i]=1;if(i===goal){found=true;break;}
+    const c=i%C,r=(i/C)|0;
+    for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){if(!dc&&!dr)continue;const nc=c+dc,nr=r+dr;if(!navFree(nc,nr))continue;
+      if(dc&&dr&&(!navFree(c+dc,r)||!navFree(c,r+dr)))continue;   // no cutting corners
+      const j=nr*C+nc,ng=gs[i]+(dc&&dr?1.41:1);if(ng<gs[j]){gs[j]=ng;from[j]=i;push(j,ng+h(j));}}}
+  if(!found)return null;
+  const cells=[];for(let i=goal;i!==-1;i=from[i])cells.push([i%C,(i/C)|0]);cells.reverse();
+  // straighten: keep a corner only where the straight line would hit something
+  const out=[];let k=0;while(k<cells.length-1){let j=cells.length-1;while(j>k+1&&!navLos(cells[k],cells[j]))j--;out.push(cells[j]);k=j;}
+  const pts=out.map(([c,r])=>({x:(c+.5)*NAV.S,y:(r+.5)*NAV.S}));
+  pts.push(b);return pts;
+}
 function route(a,b){
+  const p=navPath(a,b);if(p)return p;
   const ra=roomOf(a),rb=roomOf(b);if(ra===rb&&ra!=='out'&&ra!=='work')return[b];
   const cy=CORR-6+Math.random()*12;const pts=[];let sx=a.x;
   if(ra==='work'){const q=aisle(a);pts.push(q);sx=q.x;}
@@ -1231,7 +1280,8 @@ let uiBuild=null;
 const NOTES={
   '0.9.0':{news:['<b>Iba-ibang playroom sa iisang app (Units):</b> bawat project ay may sariling lugar. Ang Unit 1 ay ang office; ang Unit 2 ay <b>Beach Resort</b>: may co-working deck sa tabing-dagat, kubo, duyan, beach bar, videoke, pool at beach volleyball. Pareho ang art at ang mga tao. Pindutin ang Unit sa itaas para lumipat; may pulang bilang kapag may naghihintay sa ibang unit.',
     '<b>Malaya nang i-drag ang playroom</b>, kahit palabas sa ilalim ng panel.',
-    '<b>Kusa nang naa-update ang PC app kahit naka-minimize.</b> Dati, naghihintay ito hanggang buksan mo.',
+    '<b>Mabilis na ang update:</b> bawat 30 segundo nagche-check ang PC, at agad nai-install kapag nasa tray o naka-minimize. Kapag bukas ang window, mai-install ito pagkatapos ng 15 segundong hindi mo ginagalaw, pero hindi habang nagta-type ka.',
+    '<b>Hindi na tumatagos ang mga tao sa dingding at gamit:</b> iniikutan na nila ang mga mesa at dumadaan sa mga pinto, sa office man o sa resort.',
     '<b>Bagong chatbox, tulad ng sa Claude app:</b> isang kahon na lumalaki habang nagta-type ka, may bilog na send button, at mga pindutan sa <b>Para kay</b> imbes na dropdown.',
     '<b>Kita na ang mga larawan at artifact na ipinapadala nila:</b> screenshots at pages, mismo sa chat. Pindutin para buksan nang buo sa loob ng app.',
     '<b>Naka-format na ang mga sagot</b> (bold, listahan, code), at wala nang <b>Opsyon</b>: real time na ang lahat.',
@@ -1335,16 +1385,16 @@ function showUpd(){
 if(window.parent!==window)addEventListener('message',e=>{if(e.source!==window.parent)return;const d=e.data||{};
   if(d.type==='devroom:via'){const v={wifi:' (Wi-Fi)',tailscale:' (Tailscale)',remote:' (malayo, internet)'}[d.via]||'';const el=$('via');if(el&&el.textContent!==v)el.textContent=v;return;}
   if(d.type==='devroom:apk'){UPD.apk={build:Number(d.build)||0,latest:Number(d.latest)||0,ver:String(d.ver||'').replace(/[^0-9A-Za-z.\-]/g,'')};showUpd();}});
-// A downloaded update installs itself: right away when the window is not on screen, otherwise after a
-// minute without input, with a 10 s countdown and a button to wait.
+// A downloaded update installs itself: right away when the window is not on screen, otherwise after 15 s
+// without input (never while you are typing a message), with a 5 s countdown and a button to wait.
 const autoRestart={ready:false,ver:'',left:0,timer:0,waitUntil:0,lastInput:Date.now(),
   tick(){
     if(!this.ready||this.timer||restartApp.going)return;
     if(document.hidden)return;   // minimized or in the background: the app restarts by itself only from the tray
     const el=$('updbar');el.hidden=false;
-    if(Date.now()<this.waitUntil||Date.now()-this.lastInput<60000){
+    if(Date.now()<this.waitUntil||Date.now()-this.lastInput<15000||(document.activeElement&&document.activeElement.id==='msgInput'&&document.activeElement.value)){
       el.innerHTML=`<span>May bagong bersyon ng Dev Room${this.ver?' (v'+this.ver+')':''}. Kusa itong magre-restart kapag hindi mo ginagamit.</span><button type="button" class="btn primary" data-act="restart">I-restart ngayon</button>`;return;}
-    this.left=10;this.show();
+    this.left=5;this.show();
     this.timer=setInterval(()=>{if(--this.left<=0){clearInterval(this.timer);this.timer=0;restartApp(false);}else this.show();},1000);
   },
   show(){const el=$('updbar');el.hidden=false;el.classList.add('counting');el.innerHTML=`<span>Magre-restart ang Dev Room sa loob ng ${this.left} segundo para sa update.</span><button type="button" class="btn" data-act="restart-wait">Mamaya</button><button type="button" class="btn primary" data-act="restart">Ngayon na</button>`;},
@@ -1390,6 +1440,7 @@ const isoP=p=>iso(p.x/T,p.y/T,0);
 function poly(g,pts,fill,stroke){g.beginPath();g.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)g.lineTo(pts[i].x,pts[i].y);g.closePath();if(fill){g.fillStyle=fill;g.fill();}if(stroke){g.strokeStyle=stroke;g.lineWidth=.8;g.lineJoin='round';g.stroke();}}
 function shade(hex,f){const n=parseInt(hex.slice(1),16);const c=[n>>16,n>>8&255,n&255].map(v=>Math.round(Math.min(255,v*f)));return'#'+c.map(v=>v.toString(16).padStart(2,'0')).join('');}
 function box(g,u,v,w,d,h,col,z0,opt){
+  if(NAV.rec&&(z0||0)<2.5&&h>=1.5)NAV.rec.push([u,v,w,d]);
   z0=(z0||0)*HS;h*=HS;opt=opt||{};
   const a=iso(u,v+d,z0),b=iso(u+w,v+d,z0),c=iso(u+w,v,z0);
   const a2=iso(u,v+d,z0+h),b2=iso(u+w,v+d,z0+h),c2=iso(u+w,v,z0+h),d2=iso(u,v,z0+h);
@@ -1525,7 +1576,7 @@ addBox(3.9,14.0,.15,1.2,8,'#9aa3ab');addBox(3.9,16.4,.15,1.2,8,'#9aa3ab');
 for(let i=0;i<3;i++)addBox(5.3+i*.7,13.3,.6,.45,22,['#6f7f8a','#66757f','#6f7f8a'][i]);
 addBox(5.6,21.8,1.2,.8,9,'#b9b0a2');addBox(7.3,21.8,1.2,.8,9,'#b9b0a2');addBox(5.4,17.0,.5,1.6,8,'#e8e4dc');
 // pantry: counter, fridge, coffee machine, tables
-add(9.4+13.6+.4,(g,t)=>{box(g,9.4,13.3,4.2,.7,10,'#4a3f36',0,{top:'#6b5a4c'});box(g,9.7,13.35,.6,.45,8,'#8a7f72',10);box(g,11.4,13.35,.9,.5,5,'#d9cfbd',10);
+add(9.4+13.6+.4,(g,t)=>{box(g,9.4,13.3,3.2,.7,10,'#4a3f36',0,{top:'#6b5a4c'});box(g,9.7,13.35,.6,.45,8,'#8a7f72',10);box(g,11.3,13.35,.9,.5,5,'#d9cfbd',10);
   if(Math.floor(t*1.5)%2){const p=iso(10,13.6,22);g.fillStyle='rgba(239,230,216,.7)';g.fillRect(p.x,p.y,1,3);}});
 addBox(14.2,13.3,1.2,.8,26,'#d9dde0');
 const table=(u,v)=>add(u+v+.9,g=>{box(g,u+.35,v+.35,.2,.2,7,'#3a2a20');box(g,u,v,.9,.9,2,'#7a5338',7,{top:'#8d6443'});box(g,u+.2,v+.2,.15,.15,3,'#efe6d8',9);box(g,u+.55,v+.5,.15,.15,3,'#efe6d8',9);});
@@ -1943,8 +1994,8 @@ function buildResort(){
   for(let i=0;i<2;i++)add(5.6+i*1.6+21.8,g=>{const u=5.6+i*1.6,v=21.8;box(g,u,v,1.1,.9,.3,'#b8c9cc');box(g,u+.5,v+.1,.1,.1,18,'#9aa3ab');box(g,u+.3,v+.1,.5,.2,.5,'#9aa3ab',18);});
   addBox(5.4,17.0,.5,1.6,6,'#d3e6e8');
   // beach bar: thatched counter, coconuts, tables with umbrellas
-  add(9.4+13.6+.4,(g,t)=>{box(g,9.4,13.3,4.2,.7,8,'#7a5530',0,{top:'#a7824f'});box(g,9.3,13.2,4.4,.9,1.2,THATCH,8);
-    for(let k=0;k<5;k++)box(g,9.7+k*.7,13.45,.3,.3,1.6,k%2?'#5f7a3a':'#6b4a2a',9.2);});
+  add(9.4+13.6+.4,(g,t)=>{box(g,9.4,13.3,3.2,.7,8,'#7a5530',0,{top:'#a7824f'});box(g,9.3,13.2,3.4,.9,1.2,THATCH,8);
+    for(let k=0;k<4;k++)box(g,9.7+k*.7,13.45,.3,.3,1.6,k%2?'#5f7a3a':'#6b4a2a',9.2);});
   addBox(14.2,13.3,1.2,.8,18,'#e9e1cf',0,{top:'#f4ead2'});
   const btable=(u,v,c)=>{add(u+v+.9,g=>{box(g,u+.35,v+.35,.2,.2,6,'#6b4a2a');box(g,u,v,.9,.9,1.4,'#a7824f',6,{top:'#c29a5e'});box(g,u+.25,v+.3,.25,.25,1.8,'#e9e1cf',7.4,{top:'#f4ead2'});});umbrella(u+.4,v+.4,c);};
   btable(11.8,18.8,'#2f8bb0');btable(11.8,21.0,'#d9593f');
@@ -1984,7 +2035,7 @@ function buildResort(){
 }
 
 function bake(){
-  STAT.length=0;DYN.length=0;
+  STAT.length=0;DYN.length=0;NAV.rec=[];
   const R=BGRES,g=bg.getContext('2d');
   for(const o of objs.slice().sort((a,b)=>a.d-b.d)){
     if(o.draw.length>=2){const bb=bounds(o.draw,24,[0,.37,.81,1.6]);Object.assign(o,bb||{bx:0,by:0,bw:SW,bh:SH});DYN.push(o);continue;}
@@ -1995,8 +2046,11 @@ function bake(){
   }
   // every piece is drawn exactly once per frame, in depth order (drawing a piece twice made glass and edges flicker)
   objs.length=0;objs.push(...STAT,...DYN);
+  buildNav(NAV.rec);NAV.rec=null;
 }
 setScene('office');
+// test hook (only with ?debug=1): lets automated checks look at walking and the floor grid
+if(/[?&]debug=1/.test(location.search))window.__dr={NAV,navPath,sessions,T,setScene};
 
 /* ---------- loop ---------- */
 let last=performance.now();

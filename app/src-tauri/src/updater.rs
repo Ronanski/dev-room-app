@@ -132,13 +132,14 @@ pub fn start() {
         }
     }
     std::thread::spawn(|| {
-        std::thread::sleep(Duration::from_secs(15));
+        std::thread::sleep(Duration::from_secs(5));
         loop {
             match check_once() { Ok(()) => set_note(""), Err(e) => set_note(&format!("Hindi nakapag-check ng update: {e}")) }
-            for _ in 0..18 {
+            // check every 30 s; once an update is downloaded, install it within 2 s when nobody is looking
+            for _ in 0..15 {
                 let away = HIDDEN.load(Ordering::Relaxed) || MINIMIZED.load(Ordering::Relaxed);
                 if exe_ready() && away && crate::server::LISTENERS.load(Ordering::Relaxed) == 0 { restart(HIDDEN.load(Ordering::Relaxed)); return; }
-                std::thread::sleep(Duration::from_secs(10));
+                std::thread::sleep(Duration::from_secs(2));
             }
         }
     });
