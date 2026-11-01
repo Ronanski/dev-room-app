@@ -7,6 +7,56 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.6.1 (2026-11-01)
+
+### Fixed
+- **The map no longer blinks:**
+  - Each piece of furniture is drawn exactly once per frame. Before, a piece was drawn a second time over the background whenever someone walked near it, which made glass walls and edges flicker.
+  - The map resizes only at the start of a frame, and only when its size really changed. Before, a change in the status line or the update bar could flash a black frame.
+  - The canvas no longer uses the low-latency (desynchronized) mode, which flickers on some GPUs.
+  - The Android app keeps the PC address it is using and switches between Wi-Fi and Tailscale only after two failed checks in a row. Before, one slow reply reloaded the office.
+- **Lighter on phones:**
+  - The map is capped at 60 fps (120 Hz screens drew twice as often).
+  - Cards, counts, the panel header and the status line are no longer rewritten every second, so taps on them are no longer lost.
+  - A hidden page polls every 5 seconds instead of every second.
+  - The background watcher downloads only changes, backs off when the PC is unreachable, tries the address that worked last time first, and stops after the pairing is revoked.
+- **Chat:**
+  - The feed no longer jumps to the bottom while you read.
+  - A failed send stays in the feed and gives its text back to the input box.
+  - The chosen recipient survives a team change; before, the message could go to another session.
+  - The background watcher sends one alert per question, not one per update while a session waits, and no repeats after a restart.
+- **Android app:** no more loop of watcher restarts, permission prompts and pairing-screen flips.
+- **Phone layout:** the Chat tab shows only the chat, with the tab bar at the bottom.
+
+### Security (from an audit)
+- **A web page open on the PC can no longer drive Dev Room.** Before, such a page could read the pairing link, read conversations, send messages to sessions, or change hooks.
+  - The server accepts only requests addressed to this PC by IP address or `localhost`, which blocks DNS rebinding.
+  - Browser requests must come from Dev Room itself or the Android app.
+- Artifact links must be web links, and the update banner's version text is cleaned.
+- Session ids from hooks are checked before use.
+- The number of Stop hooks that can wait for a phone message at once is capped.
+
+### Fixed in the PC server (from an audit)
+- **Messages are not lost when a hook is cancelled.**
+  - A message counts as delivered (**Naipasa ✓**) only after the session's next hook confirms that Claude got it.
+  - Otherwise it goes back to the queue after 3 minutes.
+  - Messages no longer go to a subagent's tool call.
+- **Waiting and restarts:**
+  - A "naka-abang" (waiting) state can no longer stick after a restart or a cancelled hook.
+  - The tray auto-restart waits while a session is waiting for a phone message.
+- **Hooks and `settings.json`:**
+  - Dev Room removes only its own hook commands. Before, it could also remove other local tools' hooks with `/hook` in the URL.
+  - `settings.json` and Dev Room's own state are written atomically, so a crash can no longer unpair phones.
+  - The hook command skips any HTTP proxy.
+- **Server:**
+  - One bad request can no longer stop the whole server.
+  - Transcripts are checked without blocking other requests.
+  - Sessions that ended without saying so are forgotten after 3 quiet days, even while Dev Room keeps running.
+- **Second copy:** a second copy of Dev Room that cannot start its server now just opens the running one's window and exits.
+
+### Not yet
+- Updates are downloaded over HTTPS from this repository's releases but are not signed. Signing needs a key added to the repository secrets.
+
 ## 0.6.0 (2026-11-01)
 
 ### Added

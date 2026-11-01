@@ -117,7 +117,7 @@ pub fn start() {
         loop {
             match check_once() { Ok(()) => set_note(""), Err(e) => set_note(&format!("Hindi nakapag-check ng update: {e}")) }
             for _ in 0..18 {
-                if exe_ready() && HIDDEN.load(Ordering::Relaxed) { restart(true); return; }
+                if exe_ready() && HIDDEN.load(Ordering::Relaxed) && crate::server::LISTENERS.load(Ordering::Relaxed) == 0 { restart(true); return; }
                 std::thread::sleep(Duration::from_secs(10));
             }
         }

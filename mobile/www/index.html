@@ -68,12 +68,17 @@ function parseLink(s){
     const u=new URL(s);const t=u.searchParams.get('t');if(!t)return null;const a=u.searchParams.get('a');return{url:u.origin,token:t,alt:a?a.replace(/\/+$/,''):''};
   }catch(e){return null;}
 }
-function save(p){store.set('devroom.url',p.url);store.set('devroom.token',p.token);store.set('devroom.alt',p.alt||'');}
+let unpaired=false,watchKey='';
+function save(p){store.set('devroom.url',p.url);store.set('devroom.token',p.token);store.set('devroom.alt',p.alt||'');unpaired=false;}
 // Home Wi-Fi first, then the PC's Tailscale address when away from home.
-async function reachable(base,token){try{const c=new AbortController();const tm=setTimeout(()=>c.abort(),2500);const r=await fetch(`${base}/api/state?t=${encodeURIComponent(token)}&v=-1`,{cache:'no-store',signal:c.signal});clearTimeout(tm);return r.status!==0;}catch(e){return false;}}
+async function reachable(base,token){try{const c=new AbortController();const tm=setTimeout(()=>c.abort(),2500);const r=await fetch(`${base}/api/state?bg=1&t=${encodeURIComponent(token)}&v=-1`,{cache:'no-store',signal:c.signal});clearTimeout(tm);return r.status!==0;}catch(e){return false;}}
+// Sticky: keep the address in use while it answers; switch only after it fails twice in a row,
+// so a slow reply never reloads the office (that showed as the map blinking).
+let current='',misses=0;
 async function activeBase(){const url=store.get('devroom.url'),alt=store.get('devroom.alt'),token=store.get('devroom.token');
-  if(await reachable(url,token))return url;if(alt&&await reachable(alt,token))return alt;return url;}
-let current='';
+  if(current){if(await reachable(current,token)){misses=0;return current;}if(++misses<2)return current;}
+  misses=0;
+  if(await reachable(url,token))return url;if(alt&&await reachable(alt,token))return alt;return current||url;}
 function showPair(msg){
   $('office').style.display='none';$('pair').hidden=false;
   const e=$('err');e.hidden=!msg;e.textContent=msg||'';
@@ -81,22 +86,26 @@ function showPair(msg){
 async function showOffice(){
   const url=store.get('devroom.url'),token=store.get('devroom.token');
   if(!url||!token){showPair();return;}
+  if(unpaired)return;   // stay on the pairing screen until a new QR code is scanned
   $('pair').hidden=true;
   const f=$('office');f.style.display='block';
   const base=await activeBase();
   if(base!==current){current=base;f.src=`${base}/?t=${encodeURIComponent(token)}`;}
-  try{if(DevRoom)await DevRoom.startWatch({url,token,alt:store.get('devroom.alt')||''});}catch(e){}
+  // (re)start the background watcher only when the pairing changes
+  const wk=url+'|'+token+'|'+(store.get('devroom.alt')||'');
+  if(wk!==watchKey){watchKey=wk;try{if(DevRoom)await DevRoom.startWatch({url,token,alt:store.get('devroom.alt')||''});}catch(e){}}
   checkUpdate();
 }
 async function checkUpdate(){
   const url=current||store.get('devroom.url'),token=store.get('devroom.token');if(!url)return;
   try{
-    const r=await fetch(`${url}/api/state?t=${encodeURIComponent(token)}`,{cache:'no-store'});
-    if(r.status===401){showPair('Hindi na tinatanggap ng PC ang pairing na ito. I-scan ulit ang QR code.');return;}
+    const r=await fetch(`${url}/api/state?bg=1&t=${encodeURIComponent(token)}`,{cache:'no-store'});
+    if(r.status===401){unpaired=true;showPair('Hindi na tinatanggap ng PC ang pairing na ito. I-scan ulit ang QR code.');return;}
     const j=await r.json();const latest=j.latest&&j.latest.apk||0;
     if(latest>myBuild&&store.get('devroom.skip')!==String(latest)){
       const b=$('bar');b.style.display='flex';
-      b.innerHTML=`<span>May bagong bersyon ng Dev Room app${j.latest.version?' (v'+j.latest.version+')':''}. I-download at i-install ito, at mananatili ang pairing mo.</span>`+'<button id="upd">I-update</button><button class="ghost" id="later">Mamaya</button>';
+      const ver=String(j.latest.version||'').replace(/[^0-9A-Za-z.\-]/g,'');
+      b.innerHTML=`<span>May bagong bersyon ng Dev Room app${ver?' (v'+ver+')':''}. I-download at i-install ito, at mananatili ang pairing mo.</span>`+'<button id="upd">I-update</button><button class="ghost" id="later">Mamaya</button>';
       $('upd').onclick=()=>{DevRoom?DevRoom.openExternal({url:APK_URL}):location.assign(APK_URL);};
       $('later').onclick=()=>{store.set('devroom.skip',String(latest));b.style.display='none';};
     }
