@@ -78,7 +78,13 @@ fn load_cache() {
 fn check_once() -> Result<(), String> {
     let v: Value = serde_json::from_slice(&get(&format!("{BASE}version.json"), 64 * 1024)?).map_err(|e| e.to_string())?;
     let (build, api) = (v["build"].as_u64().unwrap_or(0), v["api"].as_u64().unwrap_or(0));
-    if let Ok(mut s) = STATE.lock() { s.latest = Some(v.clone()); }
+    // when this check happened, so the app can say how fresh "up to date" is
+    let mut seen = v.clone();
+    if let Some(o) = seen.as_object_mut() {
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+        o.insert("checked_at".into(), json!(now));
+    }
+    if let Ok(mut s) = STATE.lock() { s.latest = Some(seen); }
     if build <= BUILD { return Ok(()); }
     // 1. UI hot update (only when the server API it needs is the same as ours)
     if api == API && ui_build() < build {
