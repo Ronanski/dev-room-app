@@ -7,6 +7,14 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.6.3 (2026-11-01)
+
+### Fixed
+- **Sessions looked busy without replying.** Since 0.6.0, a finished session waited up to 20 minutes for a message from the app whenever a phone had Dev Room open. While it waited, the session stayed "running" in Claude Code and could not take prompts. This waiting is now off by default, and existing setups are switched to off once.
+  - Messages from the app still reach a working session at its next step, and a stopped one with its next turn.
+  - You can still turn the waiting on in Chat; it now warns what it does.
+  - Press Esc in a session that is still waiting to end the wait.
+
 ## 0.6.2 (2026-11-01)
 
 ### Fixed

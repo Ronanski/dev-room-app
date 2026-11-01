@@ -362,7 +362,7 @@ body{margin:0}
           <form class="composer" id="composer">
             <div class="to"><label for="chatTo" id="msgLabel">Para kay</label><select id="chatTo"></select></div>
             <textarea id="msgInput" rows="2" placeholder="Ano ang gusto mong ipagawa?"></textarea>
-            <div class="row"><span class="away"><label for="awaySel">Kapag tapos na ang session, abangan ang utos mula sa app:</label><select id="awaySel"><option value="auto">Kapag may phone na nakabukas</option><option value="on">Palagi</option><option value="off">Hindi</option></select></span><button type="submit" class="btn primary">Ipadala</button></div>
+            <div class="row"><span class="away"><label for="awaySel">Kapag tapos na ang session, abangan ang utos mula sa app:</label><select id="awaySel"><option value="off">Hindi (normal na tatapusin ang turn)</option><option value="auto">Kapag may phone na nakabukas</option><option value="on">Palagi</option></select></span><button type="submit" class="btn primary">Ipadala</button></div>
           </form>
         </div>
       </section>
@@ -1041,6 +1041,10 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.6.3':{news:['<b>Naka-off na bilang default ang pag-abang sa utos mula sa app.</b> Dati, kapag may phone na nakabukas, hindi agad natatapos ang turn ng session pagkatapos sumagot (naghihintay ito ng mensahe mo), kaya mukhang may ginagawa pa siya pero walang reply.',
+    'Ngayon, normal nang natatapos ang bawat turn. Ang mensahe mula sa app ay papasok habang nagtatrabaho ang session, o sa susunod niyang turn.',
+    'Kung gusto mo pa rin ang pag-abang, i-on ito sa Chat (may babala).'],
+    todo:['Kung may session na mukhang naka-stuck pa rin ngayon, pindutin ang <b>Esc</b> sa session na iyon sa PC.']},
   '0.6.2':{news:['<b>Ayos na ang chat sa phone.</b> Habang nagta-type ka, tumatabi ang Office/Chat bar at ang header para kita ang mensahe mo at ang usapan.',
     'Malinis na ang usapan: wala nang lumalabas na system text (gaya ng <code>&lt;system-reminder&gt;</code>).',
     'Kapag hindi naipadala ang mensahe, nakasulat na kung bakit. Kapag tapos na ang session bago mo binuksan ang app, sinasabi na kung kailan niya ito matatanggap.'],
@@ -1064,7 +1068,7 @@ function showWhatsNew(){
   el.hidden=false;
 }
 // chatTo and the filter hold session ids from the PC (sid), which survive a team rebuild; PENDING keeps sends until the PC lists them
-let convoKey='',CONVO={},awayMode='auto',chatFilter='all',chatTo='',PENDING=[],forceScroll=false,convoBusy=false;
+let convoKey='',CONVO={},awayMode='off',chatFilter='all',chatTo='',PENDING=[],forceScroll=false,convoBusy=false;
 const bySid=sid=>sessions.find(x=>x.sid===sid);
 async function loadConvo(){if(convoBusy){loadConvo.again=true;return;}convoBusy=true;try{const r=await fetch('/api/convo',{headers:hdr(),cache:'no-store'});if(r.ok){CONVO=await r.json();chatKey='';renderPanel();}}catch(e){}convoBusy=false;if(loadConvo.again){loadConvo.again=false;loadConvo();}}
 function updates(j){
@@ -1660,7 +1664,9 @@ async function answer(s,text){
   chatKey='';renderPanel();
   log('Boss',`Mensahe kay ${s.short}: ${text.length>60?text.slice(0,60)+'…':text}`,s);return true;
 }
-async function setAway(m){awayMode=m;chatKey='';renderPanel();try{await fetch('/api/away',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({mode:m})});}catch(e){}}
+async function setAway(m){
+  if(m!=='off'&&!confirm('Kapag naka-on ito, hindi muna matatapos ang turn ng session pagkatapos niyang sumagot: maghihintay siya ng utos mo mula sa app nang hanggang 20 minuto. Habang naghihintay, mukha siyang "may ginagawa" sa Claude Code at hindi ka makakapag-utos doon nang normal (pindutin ang Esc para ituloy). Ituloy?')){$('awaySel').value=awayMode;return;}
+  awayMode=m;chatKey='';renderPanel();try{await fetch('/api/away',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({mode:m})});}catch(e){}}
 function cleanMsg(t){
   return String(t||'').replace(/<([a-z][\w]*-[\w-]*)[^>]*>[\s\S]*?<\/\1>/gi,'').replace(/<\/?[a-z][\w]*-[\w-]*[^>]*>/gi,'').replace(/\n{3,}/g,'\n\n').trim();
 }
