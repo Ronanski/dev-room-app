@@ -7,6 +7,25 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.6.4 (2026-11-01)
+
+### Changed
+- **On the PC, the Chat tab is the real Claude Code chat.** claude.ai/code, with this PC's sessions through Remote Control, is shown inside the Dev Room window, over a wider panel. It no longer opens a separate window.
+  - Sign-in windows (Google or email) open inside Dev Room in the same profile, so you stay signed in.
+  - The **Claude** button opens this panel.
+
+### Fixed
+- **No more scrollbars at the bottom and right of the window.** The closed panel sat off screen and widened the page.
+- **Red disk and trails on the map:**
+  - A solid red disk appeared above the map. The alarm light piled up where the background was transparent, and other moving things could leave trails there. The background is now opaque.
+- **Labels:**
+  - Name tags no longer overlap; the one in front keeps its tag.
+  - Bubbles stay inside the map.
+- **Phone:**
+  - The map controls fit in one row.
+  - The alarm notice is compact.
+  - The cards are no longer hidden by the tab bar.
+
 ## 0.6.3 (2026-11-01)
 
 ### Added

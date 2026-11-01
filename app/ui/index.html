@@ -155,6 +155,9 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .msg .row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
 .claudebar{display:flex;gap:10px;align-items:center;padding:8px 12px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--accent) 8%,var(--panel))}
 .claudebar .hint{font-size:11.5px}
+/* PC: the real Claude Code chat sits over this box (a second webview inside the Dev Room window) */
+.claudehost{flex:1;min-height:0;display:grid;place-items:center;color:var(--muted);font-size:13px;background:var(--bg)}
+.chatpanel.embed .cp-body,.chatpanel.embed .claudebar,.chatpanel.embed .composer{display:none!important}
 .zoom .claudebtn{background:var(--accent);color:var(--panel);border-color:var(--accent);font-weight:700}
 .app.typing .claudebar{display:none}
 /* team chat: every session's conversation in one feed */
@@ -324,6 +327,9 @@ body{margin:0}
   .app.focus .pane[data-pane="chat"]{bottom:8px}
   .app.drawer .toasts,.app.drawer .zoom{right:calc(min(380px,100% - 16px) + 18px)}
   .chatpanel .cp-head{padding-right:46px}
+  /* the embedded Claude chat gets a wider panel */
+  .app.claudewide .pane[data-pane="chat"]{width:min(560px,calc(100% - 16px))}
+  .app.claudewide.drawer .toasts,.app.claudewide.drawer .zoom{right:calc(min(560px,100% - 16px) + 18px)}
 }
 .drawer-x{position:absolute;top:8px;right:8px;z-index:2;width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:18px;line-height:1}
 @container app (max-width: 640px){.drawer-x{display:none}}
@@ -375,6 +381,7 @@ body{margin:0}
             <button type="button" role="tab" data-ptab="log" aria-selected="false">Lahat ng activity</button>
           </div>
           <div class="cp-body" id="cpBody"></div>
+          <div class="claudehost" id="claudeHost" hidden><span>Binubuksan ang Claude…</span></div>
           <div class="claudebar"><button type="button" class="btn primary" data-act="claude">Kausapin sa Claude</button><span class="hint">Ang mismong Claude Code chat ng mga session sa PC mo: instant, totoong sagot.</span></div>
           <form class="composer" id="composer">
             <div class="to"><label for="chatTo" id="msgLabel">Para kay</label><select id="chatTo"></select></div>
@@ -1046,7 +1053,7 @@ async function poll(){
       const j=await r.json();
       const teamChanged=JSON.stringify(j.team)!==JSON.stringify(TEAM);
       updates(j);
-      version=j.version;TEAM=j.team||TEAM;isLocal=!!j.local;hooksOk=j.hooks_installed;settingsPath=j.settings_path||'';lanUrl=j.lan_url||'';tsUrl=j.ts_url||'';
+      version=j.version;TEAM=j.team||TEAM;isLocal=!!j.local;hooksOk=j.hooks_installed;embedClaude=!!j.embed_claude;settingsPath=j.settings_path||'';lanUrl=j.lan_url||'';tsUrl=j.ts_url||'';
       mode='live';lastSync=Date.now();
       if(teamChanged&&!firstLoad){allRecords=j.sessions;rebuildTeam();}else applyRecords(j.sessions);
       awayMode=j.away||awayMode;
@@ -1058,6 +1065,10 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.6.4':{news:['<b>Ang Chat sa PC ay ang mismong Claude Code na.</b> Buksan ang Panel → Chat (o pindutin ang <b>Claude</b>): nandoon na mismo sa loob ng Dev Room ang Claude Code chat ng mga session mo, hindi na hiwalay na window. Mag-login isang beses; bubukas ang login sa loob ng app.',
+    'Wala nang scrollbar sa ibaba at kanan ng window.',
+    'Naayos ang malaking pulang bilog sa itaas ng map, ang nagpapatong na pangalan at bubbles, at ang mga button sa phone.'],
+    todo:['Wala kang kailangang gawin sa PC. Kusang papasok at magre-restart ang app.']},
   '0.6.3':{news:['<b>Bago: ang mismong Claude Code chat, nasa loob ng Dev Room.</b> Pindutin ang <b>Claude</b> (sa map) o <b>Kausapin sa Claude</b> (sa Chat): bubukas sa loob ng app ang chat ng mga session sa PC mo (Remote Control). Instant at totoong sagot, walang hintayan. Mag-login sa Claude isang beses lang; kung ayaw ng Google login, gamitin ang email.','<b>Naka-off na bilang default ang pag-abang sa utos mula sa app.</b> Dati, kapag may phone na nakabukas, hindi agad natatapos ang turn ng session pagkatapos sumagot (naghihintay ito ng mensahe mo), kaya mukhang may ginagawa pa siya pero walang reply.',
     'Ngayon, normal nang natatapos ang bawat turn. Ang mensahe mula sa app ay papasok habang nagtatrabaho ang session, o sa susunod niyang turn.',
     'Kung gusto mo pa rin ang pag-abang, i-on ito sa Chat (may babala).'],
@@ -1085,6 +1096,7 @@ function showWhatsNew(){
   el.hidden=false;
 }
 // chatTo and the filter hold session ids from the PC (sid), which survive a team rebuild; PENDING keeps sends until the PC lists them
+let embedClaude=false,claudeRect='';
 let convoKey='',CONVO={},awayMode='off',chatFilter='all',chatTo='',PENDING=[],forceScroll=false,convoBusy=false;
 const bySid=sid=>sessions.find(x=>x.sid===sid);
 async function loadConvo(){if(convoBusy){loadConvo.again=true;return;}convoBusy=true;try{const r=await fetch('/api/convo',{headers:hdr(),cache:'no-store'});if(r.ok){CONVO=await r.json();chatKey='';renderPanel();}}catch(e){}convoBusy=false;if(loadConvo.again){loadConvo.again=false;loadConvo();}}
@@ -1693,10 +1705,23 @@ async function answer(s,text){
 }
 // The official Claude Code chat: in the Android app a screen inside the app, on the PC a Dev Room window,
 // in a plain browser a new tab.
+// PC: keep the embedded Claude webview exactly over the panel's chat area (hidden whenever that area is not on screen).
+function syncClaude(){
+  if(!embedClaude)return;
+  const host=$('claudeHost'),panel=document.querySelector('.chatpanel');
+  const on=ptab==='chat'&&$('app').classList.contains('drawer')&&!$('app').classList.contains('focus')&&$('teamPanel').hidden&&$('whatsNew').hidden&&!document.hidden;
+  panel.classList.toggle('embed',ptab==='chat');host.hidden=ptab!=='chat';$('app').classList.toggle('claudewide',ptab==='chat');
+  let key='hide';
+  if(on){const r=host.getBoundingClientRect();if(r.width>50&&r.height>50)key=[r.left,r.top,r.width,r.height].map(Math.round).join(',');}
+  if(key===claudeRect)return;claudeRect=key;
+  const [x,y,w,hh]=key==='hide'?[0,0,0,0]:key.split(',').map(Number);
+  fetch('/api/claude-view',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({show:key!=='hide',x,y,w,h:hh})}).catch(()=>{});
+}
+setInterval(syncClaude,400);addEventListener('resize',syncClaude);document.addEventListener('visibilitychange',syncClaude);
 function openClaude(){
+  if(embedClaude){setDrawer(true,'chat');setTimeout(syncClaude,60);return;}
   const url='https://claude.ai/code';
   if(window.parent!==window){window.parent.postMessage({type:'devroom:openClaude',url},'*');connMsg='Kung walang bumukas, i-update muna ang Dev Room app (pindutin ang I-update sa banner sa ibaba ng app).';setConn();setTimeout(()=>{connMsg='';setConn();},8000);return;}
-  if(isLocal){fetch('/api/open-claude',{method:'POST'}).then(r=>{if(!r.ok)window.open(url,'_blank');}).catch(()=>window.open(url,'_blank'));return;}
   window.open(url,'_blank','noopener');
 }
 async function setAway(m){
