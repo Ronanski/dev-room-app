@@ -562,6 +562,8 @@ body{margin:0}
 .um.hot .ub i{background:var(--need)}
 .um.hot span{color:var(--need);font-weight:700}
 .um.err{color:var(--muted)}
+.qtag{display:block;font-size:10.5px;font-weight:700;color:var(--accent);margin-bottom:3px;letter-spacing:.02em}
+.app:fullscreen{width:100vw;height:100vh;max-width:none}
 .psplit{display:none;position:absolute;left:0;right:0;top:-9px;height:14px;z-index:3;cursor:row-resize;touch-action:none}
 .psplit::after{content:"";position:absolute;left:50%;top:5px;width:46px;height:4px;margin-left:-23px;border-radius:2px;background:var(--muted);opacity:.55}
 .psplit:hover::after,.psplit.on::after{opacity:1;background:var(--accent)}
@@ -1441,6 +1443,9 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.14.0':{news:['<b>Real-time na sagot kahit abala siya:</b> kapag nasa gitna ng mahabang hakbang ang session (hal. naghihintay sa agent o sa test), sasagot agad ang isang kopya niya na alam ang lahat ng ginagawa niya. Makikita ito sa chat bilang <b>⚡ Agarang sagot habang abala</b>. Matatanggap pa rin ng session mismo ang mensahe mo, at gagawin niya ito pagkatapos ng kasalukuyang hakbang.',
+    '<b>Fullscreen sa tablet at phone:</b> hindi na lumiliit ang buong app sa makitid na hanay.'],
+    todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
   '0.13.0':{news:['<b>Kita na ang progress:</b> may progress bar at bilang (hal. 2/4) sa tile ng bawat session, at maliit na bar sa ilalim ng pangalan niya sa office. Sa <b>Detalye</b>, nandoon ang yugto (Sinimulan, Ginagawa, Tapos na) at ang listahan ng mga task niya.',
     '<b>Pagkatapos ng trabaho,</b> pupunta siya sa opisina mo para mag-report bago bumalik sa desk.',
     '<b>Limit ng Claude mo:</b> nasa itaas na ang <b>5 oras</b> at <b>Linggo</b>, kung ilang porsyento na ang nagamit at kailan magre-reset.',
@@ -2516,17 +2521,17 @@ function chatFeed(){
     for(const m of (CONVO[s.sid]||[])){
       if(m.att){items.push({s,t:m.at,you:m.role==='user',att:m.att,name:m.name||'',title:m.title||''});continue;}
       if(m.role==='user'&&SYS_PROMPT.test(m.text||''))continue;   // Claude Code's own turns, not something you typed
-      const text=cleanMsg(m.text);if(!text||(m.role==='user'&&sent.has(text)))continue;items.push({s,t:m.at,you:m.role==='user',sys:m.role==='sys',text});}
-    for(const m of (s.inbox||[]))items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true});
+      const text=cleanMsg(m.text);if(!text||(m.role==='user'&&sent.has(text)))continue;items.push({s,t:m.at,you:m.role==='user',sys:m.role==='sys',text,quick:!!m.quick});}
+    for(const m of (s.inbox||[]))items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true,q:m.quick||''});
     PENDING.forEach((m,pi)=>{if(m.sid===s.sid)items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true,why:m.why,pi});});
   }
   items.sort((a,b)=>a.t-b.t);
   const out=items.slice(-120).map(it=>{
     const who=it.you?`<b>Boss</b> → ${esc(it.s.short)}`:`<i style="background:${it.s.pal.shirt}"></i><b>${esc(it.s.short)}</b>`;
-    const st=it.app?`<span class="st">${(it.st==='queued'?queueText(it.s):{sending:'Ipinapadala…',queued:'Ipinapasa…',sent:'Natanggap na niya ✓',delivered:'Natanggap na niya ✓',failed:'Hindi naipadala.'}[it.st]||'')}${it.st==='failed'&&it.pi!=null?` <button type="button" class="linkbtn" data-retry="${it.pi}">Subukan ulit</button> <button type="button" class="linkbtn" data-drop="${it.pi}">Alisin</button>`:''}${it.why?' ('+esc(it.why)+')':''}${it.app?' · mula sa app':''}</span>`:'';
+    const st=it.app?`<span class="st">${(it.st==='queued'?(it.q==='asking'?'Sumasagot na siya ngayon, habang tinatapos niya ang kasalukuyang hakbang…':it.q==='done'?'Nasagot na niya sa ibaba. Gagawin niya ito pagkatapos ng kasalukuyang hakbang.':queueText(it.s)):{sending:'Ipinapadala…',queued:'Ipinapasa…',sent:'Natanggap na niya ✓',delivered:'Natanggap na niya ✓',failed:'Hindi naipadala.'}[it.st]||'')}${it.st==='failed'&&it.pi!=null?` <button type="button" class="linkbtn" data-retry="${it.pi}">Subukan ulit</button> <button type="button" class="linkbtn" data-drop="${it.pi}">Alisin</button>`:''}${it.why?' ('+esc(it.why)+')':''}${it.app?' · mula sa app':''}</span>`:'';
     if(it.att)return `<div class="cmsg ${it.you?'you':''}"><span class="who">${who} · ${simLabel(it.t)}</span>${attHTML(it)}</div>`;
     if(it.sys)return `<div class="msg sys" data-chatto="${esc(it.s.sid)}">${esc(it.s.short)}: ${esc(it.text)} · ${simLabel(it.t)}</div>`;
-    return `<div class="cmsg ${it.you?'you':''}" data-chatto="${esc(it.s.sid)}"><span class="who">${who} · ${simLabel(it.t)}</span><div class="msg md ${it.you?'you':'agent'}">${md(it.text)}</div>${st}</div>`;
+    return `<div class="cmsg ${it.you?'you':''}" data-chatto="${esc(it.s.sid)}"><span class="who">${who} · ${simLabel(it.t)}</span><div class="msg md ${it.you?'you':'agent'}">${it.quick?'<span class="qtag">⚡ Agarang sagot habang abala</span>':''}${md(it.text)}</div>${st}</div>`;
   });
   // a queued message to a session that already stopped (and is not waiting) only arrives with its next turn
   const typing=list.filter(s=>s.status==='working').map(s=>`<div class="typing" data-chatto="${esc(s.sid)}"><i style="background:${s.pal.shirt}"></i><b>${esc(s.short)}</b> ${esc(s.detail&&s.detail.length<90?s.detail:'nagtatrabaho')}<span class="dots"><span></span><span></span><span></span></span></div>`);
@@ -2797,15 +2802,20 @@ function applyBS(){overlay.style.setProperty('--bs',BS[bsI]);$('bsDown').disable
 $('bsUp').addEventListener('click',()=>{bsI=Math.min(BS.length-1,bsI+1);applyBS();});
 $('bsDown').addEventListener('click',()=>{bsI=Math.max(0,bsI-1);applyBS();});
 applyBS();
+// The Fullscreen API is not used inside the Android app (an iframe in its WebView): there it collapsed the page
+// to a narrow strip. Fullscreen view still fills the screen there with CSS alone.
+const FS_OK=window.top===window&&!/; wv\)|Capacitor/i.test(navigator.userAgent);
 {const fb=$('fsBtn');const app=$('app');
  // Map-only mode. Uses the Fullscreen API when allowed, and fills the window anyway when it is not (phones, the Android app).
  const fit=()=>setTimeout(()=>{resizeMap();cam.follow=null;setZoom(1);},60);
  const setFocus=on=>{app.classList.toggle('focus',on);fb.textContent=on?'Lumabas sa fullscreen':'Fullscreen';fit();};
  fb.addEventListener('click',()=>{
    const on=!app.classList.contains('focus');setFocus(on);
-   try{if(on&&document.fullscreenEnabled&&app.requestFullscreen)app.requestFullscreen().catch(()=>{});else if(!on&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});}catch(e){}
+   try{if(on&&FS_OK&&document.fullscreenEnabled&&app.requestFullscreen)app.requestFullscreen().catch(()=>{});else if(!on&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});}catch(e){}
  });
- document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&app.classList.contains('focus'))setFocus(false);else fit();});}
+ document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&app._keep){app._keep=false;fit();return;}if(!document.fullscreenElement&&app.classList.contains('focus'))setFocus(false);else fit();});
+ // safety: a fullscreen that leaves the page narrower than the window is undone (the view stays in fullscreen mode)
+ addEventListener('resize',()=>{if(document.fullscreenElement&&app.getBoundingClientRect().width<innerWidth*.6){app._keep=true;document.exitFullscreen().catch(()=>{});}});}
 $('chatToggle').addEventListener('click',()=>setDrawer(!$('app').classList.contains('drawer')));
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape')return;

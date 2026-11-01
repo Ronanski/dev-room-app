@@ -7,6 +7,15 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.14.0 (2026-11-01)
+
+- **Answers in real time, even while a session is busy.** Claude Code takes a new message only between steps. If yours is still waiting after 2.5 seconds (the session is in the middle of a long step, such as an agent or a test run), Dev Room asks a copy of that session right away (`quick_answer`: `claude -p --resume <id> --fork-session --permission-mode plan --settings {"disableAllHooks":true}`):
+  - The copy has all of the session's context, answers in read-only plan mode, and fires no hooks (no extra character, no changes).
+  - Its answer shows in the chat as **⚡ Agarang sagot habang abala**; your message says "Sumasagot na siya ngayon…" and then that it was answered.
+  - The message stays queued for the session itself, which acts on it after its current step (PostToolUse, as before).
+  - Tested with a stand-in `claude`: the answer arrived about 6 seconds after sending (with the old 4-second wait), no extra session appeared, and the next PostToolUse still handed the message to the session.
+- **Fullscreen in the Android app no longer squeezes the page into a narrow strip.** Inside the app (an iframe in its WebView) Dev Room no longer calls the browser's Fullscreen API, which the app's WebView does not support; fullscreen view fills the screen with CSS. Anywhere, a fullscreen that leaves the page narrower than the window is undone while the view stays in fullscreen mode.
+
 ## 0.13.0 (2026-11-01)
 
 - **Progress you can see.** Dev Room follows each session's own task list (its `TodoWrite`, `TaskCreate` and `TaskUpdate` calls, `track_tasks`):

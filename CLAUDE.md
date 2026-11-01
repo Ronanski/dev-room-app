@@ -48,6 +48,7 @@ The user's real team is **LOGIC_SIM_PROJECT**: a leader plus subsessions (CODE F
     - `tail_transcripts` follows each transcript (every 0.9 s) and pushes prompts and replies to the conversation.
     - `deliver_now` continues an idle session with `claude -p --resume <sid>`, in its cwd and `perm_mode`.
     - Working sessions get messages through the PostToolUse `additionalContext`.
+    - **Real-time while busy:** a message still queued after 2.5 s gets an answer from a fork of the session (`quick_answer`: `--fork-session`, plan mode, `disableAllHooks`), shown as ⚡ in the chat; the message stays queued for the session itself.
     - The Chat tab is Dev Room's own chat; never replace it with claude.ai.
   - Subagent hooks (`agent_id`, or a `subagents` transcript) carry the parent's session id: they only update its detail text while it works, never its status or transcript, so a lead with agents in the background stays free for messages. Prompts Claude Code writes itself (`system_prompt()`, `SYS_PROMPT` in the UI) are not shown as the user's messages.
   - **Progress:** `track_tasks` keeps each session's task list (`tasks`: id, t, a, st) from TodoWrite / TaskCreate / TaskUpdate; the UI's `prog()` drives tile bars, map bars, the Detalye checklist and the report walk to the Boss (`reportToBoss`).
@@ -71,6 +72,7 @@ The user's real team is **LOGIC_SIM_PROJECT**: a leader plus subsessions (CODE F
   - With no playrooms saved, it groups sessions by team or project folder, and the units alternate scenes.
   - The **Mga Playroom** editor is `openTeam` / `renderRooms` / `roomsClick`.
   - New scenes must keep the same desk and spot coordinates.
+- **Fullscreen:** the Fullscreen API is not used inside the Android app (`FS_OK`); its WebView collapsed the page. CSS alone fills the screen there.
 - **Tablet portrait:** with the panel open on a portrait screen ≥ 641 px wide, the panel docks under the office (grid `office / dock / chat`) instead of overlaying it. The bar above it (`#pSplit`) sets its height (`--chath`, remembered in localStorage `devroom.chath`).
 - **Session tiles (`#dock`):** an equal-width grid, up to 4 a row (`dockCols`), with the session's face (`faceURL`, cut from her sprite), one short name and a status dot; lower in portrait and fullscreen.
 - **`mobile/`:** the Capacitor Android shell.
