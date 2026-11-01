@@ -68,6 +68,11 @@ html,body{overflow-x:hidden}
   linear-gradient(var(--ink),var(--ink)) 3px 24px/20px 2px no-repeat}
 h1{font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1;margin:0;letter-spacing:.5px}
 .sub{margin:3px 0 0;color:var(--muted);font-size:12px}
+.updpill{font:inherit;font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 9px;margin:0 2px;border:1px solid var(--line);background:var(--panel);color:var(--muted);cursor:pointer;min-height:0;line-height:1.6;vertical-align:baseline}
+.updpill[data-st="ok"]{color:var(--work);border-color:color-mix(in srgb,var(--work) 45%,var(--line))}
+.updpill[data-st="busy"]{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.updpill[data-st="act"]{color:var(--panel);background:var(--need);border-color:var(--need)}
+.updpill[data-st="warn"]{color:var(--need);border-color:color-mix(in srgb,var(--need) 45%,var(--line))}
 .clock{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .counts{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
 .count{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--chip);font-size:12.5px;font-variant-numeric:tabular-nums}
@@ -187,6 +192,8 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 /* PC: the real Claude Code chat sits over this box (a second webview inside the Dev Room window) */
 .claudehost{flex:1;min-height:0;display:grid;place-items:center;color:var(--muted);font-size:13px;background:var(--bg)}
 .chatpanel.embed .cp-body,.chatpanel.embed .claudebar,.chatpanel.embed .composer{display:none!important}
+/* with the real Claude chat inside the app, the Chat tab is Claude itself: no extra Claude buttons */
+.app.hasclaude .claudebtn,.app.hasclaude .claudebar{display:none!important}
 .zoom .claudebtn{background:var(--accent);color:var(--panel);border-color:var(--accent);font-weight:700}
 .app.typing .claudebar{display:none}
 /* team chat: every session's conversation in one feed */
@@ -383,7 +390,7 @@ body{margin:0}
     <header class="top">
       <div class="brand">
         <span class="logo" aria-hidden="true"></span>
-        <div><h1>Dev Room · Unit 1</h1><p class="sub">Unit 1 · live mula sa PC mo · <span id="ver"></span><span class="clock" id="clock"></span></p></div>
+        <div><h1>Dev Room · Unit 1</h1><p class="sub">Unit 1 · live mula sa PC mo · <button type="button" class="updpill" id="ver" data-act="updinfo" data-st="wait">Tinitingnan ang update…</button> · <span class="clock" id="clock"></span></p></div>
       </div>
       <div class="counts" id="counts"></div>
       <div class="controls">
@@ -1112,7 +1119,7 @@ async function poll(){
       const j=await r.json();
       const teamChanged=JSON.stringify(j.team)!==JSON.stringify(TEAM);
       updates(j);
-      version=j.version;TEAM=j.team||TEAM;isLocal=!!j.local;hooksOk=j.hooks_installed;embedClaude=!!j.embed_claude;settingsPath=j.settings_path||'';lanUrl=j.lan_url||'';tsUrl=j.ts_url||'';
+      version=j.version;TEAM=j.team||TEAM;isLocal=!!j.local;hooksOk=j.hooks_installed;embedClaude=!!j.embed_claude||shellEmbed;$('app').classList.toggle('hasclaude',embedClaude);settingsPath=j.settings_path||'';lanUrl=j.lan_url||'';tsUrl=j.ts_url||'';
       mode='live';lastSync=Date.now();
       if(teamChanged&&!firstLoad){allRecords=j.sessions;rebuildTeam();}else applyRecords(j.sessions);
       awayMode=j.away||awayMode;
@@ -1124,6 +1131,11 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.6.6':{news:['<b>Ang Chat tab ay ang mismong Claude Code na, sa PC at sa phone.</b> Pagbukas mo ng Chat, nandoon na agad ang totoong Claude chat: kita mo agad ang huling sagot ng bawat session at nakakausap mo sila nang real time.',
+    'Wala na ang hiwalay na <b>Claude</b> at <b>Kausapin sa Claude</b> button. Ang <b>Sagutin</b> sa alarm ay diretso nang nagbubukas ng Chat.',
+    '<b>Phone:</b> hindi na lumilipat sa ibang screen; nasa loob na mismo ng Chat tab ang Claude. Back button: babalik muna sa loob ng Claude chat.',
+    '<b>Wala nang hulaan sa update:</b> sa itaas, katabi ng "live mula sa PC mo", makikita mo kung <b>✓ Pinakabago</b>, <b>Dina-download</b>, o <b>Ini-install</b>. Sa phone, kung kailangan ng bagong phone app, magiging pula ito: pindutin lang para i-update. Pindutin ito para sa detalye.'],
+    todo:['Sa phone, pindutin ang <b>I-update</b> sa banner at i-install. Pagkatapos, buksan ang Chat tab at mag-login sa Claude isang beses.','Sa PC, wala kang gagawin: kusa itong nag-a-update.']},
   '0.6.5':{news:['<b>Buong audit at testing ng app:</b> UI/UX sa PC, tablet at phone; lahat ng daloy (alarms, chat, team, controls); at ang code. Inayos ang lahat ng nakita.',
     '<b>Phone:</b> hindi na natatakpan ng tab bar ang anumang laman, maikli na ang header, iisang alarm lang ang lumalabas, at mas malalaki ang mga pindutan.',
     '<b>Chat at alarms:</b> isang salita na lang sa bawat status, may <b>Sagutin</b> ang mga humihingi ng pahintulot, naaalala ang ACK, at may <b>Subukan ulit</b> kapag hindi naipadala.',
@@ -1161,17 +1173,51 @@ function showWhatsNew(){
   el.hidden=false;
 }
 // chatTo and the filter hold session ids from the PC (sid), which survive a team rebuild; PENDING keeps sends until the PC lists them
-let embedClaude=false,claudeRect='';
+let embedClaude=false,shellEmbed=false,claudeRect='';
+// Android app: the shell can lay the real Claude chat over the Chat tab (same as the PC's embedded view).
+if(window.parent!==window){
+  addEventListener('message',e=>{if(e.source!==window.parent)return;const d=e.data||{};
+    if(d.type==='devroom:caps'&&d.claudeView&&!shellEmbed){shellEmbed=embedClaude=true;$('app').classList.add('hasclaude');claudeRect='';chatKey='';render();}});
+  try{window.parent.postMessage({type:'devroom:hello'},'*');}catch(e){}
+}
 let convoKey='',CONVO={},awayMode='off',chatFilter='all',chatTo='',PENDING=[],forceScroll=false,convoBusy=false;
 const bySid=sid=>sessions.find(x=>x.sid===sid);
 async function loadConvo(){if(convoBusy){loadConvo.again=true;return;}convoBusy=true;try{const r=await fetch('/api/convo',{headers:hdr(),cache:'no-store'});if(r.ok){CONVO=await r.json();chatKey='';renderPanel();}}catch(e){}convoBusy=false;if(loadConvo.again){loadConvo.again=false;loadConvo();}}
 function updates(j){
-  if(j.app_version){const v=$('ver');const t=`v${j.app_version} (build ${j.app_build}) · `;if(v.textContent!==t)v.textContent=t;}
+  UPD.pc=j;showUpd();
   if(j.ui_build!=null){if(uiBuild===null)uiBuild=j.ui_build;else if(j.ui_build!==uiBuild){location.reload();return;}}
   const el=$('updbar');if(!el)return;
   if(!(j.update_ready&&j.local)){el.hidden=true;return;}
   autoRestart.ready=true;autoRestart.ver=j.latest&&j.latest.version||'';autoRestart.tick();
 }
+// Update status in plain words, always on screen, so nobody has to guess whether an update landed.
+// PC: this PC's Dev Room. Phone: the phone app itself (told by the Android shell) and the PC it shows.
+const UPD={pc:null,apk:null};
+function ago(sec){if(!sec)return'';const m=Math.round((Date.now()/1000-sec)/60);return m<1?'ngayon lang':m<60?m+' min ang nakaraan':Math.round(m/60)+' oras ang nakaraan';}
+function pcUpd(){
+  const j=UPD.pc;if(!j||!j.app_version)return null;
+  const L=j.latest||null,lb=L&&L.build||0,cur=`v${j.app_version} (build ${j.app_build})`;
+  if(j.update_ready)return{st:'busy',t:`Ini-install ang v${L&&L.version||''}…`,d:`Na-download na ang v${L&&L.version||''} (build ${lb}). Kusang magre-restart ang Dev Room sa PC para matapos ito.`};
+  if(L&&lb>j.app_build&&j.app_build>0)return{st:'busy',t:`Dina-download ang v${L.version}…`,d:`Ngayon: ${cur}. Dina-download ang v${L.version} (build ${lb}); kusa itong mai-install.`};
+  if(j.update_note)return{st:'warn',t:`${cur} · hindi ma-check`,d:j.update_note+' Susubukan ulit nang kusa.'};
+  if(!L)return{st:'wait',t:`${cur} · tinitingnan…`,d:'Tinitingnan pa kung may bagong bersyon.'};
+  return{st:'ok',t:`✓ Pinakabago · v${j.app_version}`,d:`${cur} ang naka-install, at ito ang pinakabago. Huling check: ${ago(L.checked_at)}. Kusang nag-a-update ang PC app; wala kang kailangang pindutin.`};
+}
+function apkUpd(){
+  const a=UPD.apk;if(!a)return null;
+  if(a.latest>a.build)return{st:'act',t:'Phone app: pindutin para i-update',d:`Ang phone app ay build ${a.build}; ang pinakabago ay build ${a.latest}${a.ver?' (v'+a.ver+')':''}. Pindutin ito para i-download at i-install. Mananatili ang pairing mo.`,act:true};
+  return{st:'ok',t:'✓ Phone app pinakabago',d:`Ang phone app ay build ${a.build}, ang pinakabago.`};
+}
+function showUpd(){
+  const el=$('ver');if(!el)return;const pc=pcUpd(),ap=apkUpd();
+  // the phone shows its own app first (the one thing you may need to press); the PC side updates itself
+  const main=ap&&ap.st!=='ok'?ap:pc&&pc.st!=='ok'?pc:ap||pc;if(!main)return;
+  const t=ap&&ap.st==='ok'&&pc&&pc.st==='ok'?`✓ Pinakabago · PC v${UPD.pc.app_version} at phone`:ap&&main===ap?main.t:main.t+(ap?' · phone ✓':'');
+  if(el.textContent!==t)el.textContent=t;if(el.dataset.st!==main.st)el.dataset.st=main.st;
+  el.title=[pc&&('PC: '+pc.d),ap&&('Phone: '+ap.d)].filter(Boolean).join('\n');
+}
+if(window.parent!==window)addEventListener('message',e=>{if(e.source!==window.parent)return;const d=e.data||{};
+  if(d.type==='devroom:apk'){UPD.apk={build:Number(d.build)||0,latest:Number(d.latest)||0,ver:String(d.ver||'').replace(/[^0-9A-Za-z.\-]/g,'')};showUpd();}});
 // A downloaded update installs itself: right away when the window is not on screen, otherwise after a
 // minute without input, with a 10 s countdown and a button to wait.
 const autoRestart={ready:false,ver:'',left:0,timer:0,waitUntil:0,lastInput:Date.now(),
@@ -1774,18 +1820,20 @@ async function answer(s,text){
 function syncClaude(){
   if(!embedClaude)return;
   const host=$('claudeHost'),panel=document.querySelector('.chatpanel');
-  const on=ptab==='chat'&&$('app').classList.contains('drawer')&&!$('app').classList.contains('focus')&&$('teamPanel').hidden&&$('whatsNew').hidden&&!document.hidden;
+  const app=$('app'),shown=compact()?app.dataset.tab==='chat':app.classList.contains('drawer')&&!app.classList.contains('focus');
+  const on=ptab==='chat'&&shown&&$('teamPanel').hidden&&$('whatsNew').hidden&&!document.hidden;
   panel.classList.toggle('embed',ptab==='chat');host.hidden=ptab!=='chat';$('app').classList.toggle('claudewide',ptab==='chat');
   let key='hide';
   if(on){const r=host.getBoundingClientRect();if(r.width>50&&r.height>50)key=[r.left,r.top,r.width,r.height].map(Math.round).join(',')+','+devicePixelRatio;}
   if(key===claudeRect)return;claudeRect=key;
   const [x,y,w,hh]=key==='hide'?[0,0,0,0]:key.split(',').slice(0,4).map(Number);
+  if(shellEmbed){try{window.parent.postMessage({type:'devroom:claudeView',show:key!=='hide',x,y,w,h:hh},'*');}catch(e){claudeRect='';}return;}
   fetch('/api/claude-view',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({show:key!=='hide',x,y,w,h:hh})})
     .then(r=>{if(!r.ok)claudeRect='';}).catch(()=>{claudeRect='';});   // try again on the next check
 }
 setInterval(syncClaude,400);addEventListener('resize',syncClaude);document.addEventListener('visibilitychange',syncClaude);
-function openClaude(){
-  if(embedClaude){setDrawer(true,'chat');setTimeout(syncClaude,60);return;}
+function openClaude(id){
+  if(embedClaude){const s=id!=null?sessions.find(x=>x.id===id):sel();if(s)openChat(s.id);else setDrawer(true,'chat');setTimeout(syncClaude,60);return;}
   const url='https://claude.ai/code';
   if(window.parent!==window){window.parent.postMessage({type:'devroom:openClaude',url},'*');connMsg='Kung walang bumukas, i-update muna ang Dev Room app (pindutin ang I-update sa banner sa ibaba ng app).';setConn();setTimeout(()=>{connMsg='';setConn();},8000);return;}
   window.open(url,'_blank','noopener');
@@ -1916,7 +1964,7 @@ function toast(s){
   let el=box.querySelector(`[data-sid="${s.id}"]`);
   if(!el){el=document.createElement('div');el.className='toast';el.dataset.sid=s.id;box.appendChild(el);}
   const hi=s.status==='failed'||s.prio===1;el.classList.toggle('p1',hi);el.classList.toggle('p2',!hi);
-  el.innerHTML=`${av(s,28)}<div style="min-width:0"><div class="ti">${s.status==='failed'?'MAY ERROR':'KAILANGAN KA'} · ${hi?'MATAAS':'KATAMTAMAN'} · ${simLabel(now())}</div><b>Kailangan ka ng ${esc(s.role)}.</b><div style="font-size:12.5px">${esc(s.status==='failed'?(s.detail||'May pumalyang command.'):(s.ask||'May tanong siya sa iyo.'))}</div><div class="acts"><button type="button" class="btn" data-ack="${s.id}">ACK</button><button type="button" class="btn" data-open-alarm="${s.id}">Tingnan</button><button type="button" class="btn primary" data-act="claude">Sagutin</button></div></div>`;
+  el.innerHTML=`${av(s,28)}<div style="min-width:0"><div class="ti">${s.status==='failed'?'MAY ERROR':'KAILANGAN KA'} · ${hi?'MATAAS':'KATAMTAMAN'} · ${simLabel(now())}</div><b>Kailangan ka ng ${esc(s.role)}.</b><div style="font-size:12.5px">${esc(s.status==='failed'?(s.detail||'May pumalyang command.'):(s.ask||'May tanong siya sa iyo.'))}</div><div class="acts"><button type="button" class="btn" data-ack="${s.id}">ACK</button><button type="button" class="btn" data-open-alarm="${s.id}">Tingnan</button><button type="button" class="btn primary" data-act="claude" data-sid="${s.id}">Sagutin</button></div></div>`;
   while(box.children.length>4){const low=[...box.children].find(x=>x.classList.contains('p2'));(low||box.firstChild).remove();}
 }
 function pruneToasts(){const box=$('toasts');if(!box)return;for(const el of [...box.children]){const s=sessions.find(x=>x.id===+el.dataset.sid);if(!s||s.acked||(s.status!=='needs'&&s.status!=='failed'))el.remove();}}
@@ -1937,8 +1985,11 @@ document.addEventListener('click',e=>{
   if(e.target.closest('[data-act="team"]')){openTeam();return;}
   if(e.target.closest('[data-act="hooks"]')){installHooks();return;}
   if(e.target.closest('[data-act="restart"]')){restartApp(false);return;}
+  if(e.target.closest('[data-act="updinfo"]')){const ap=apkUpd(),pc=pcUpd();
+    if(ap&&ap.act){try{window.parent.postMessage({type:'devroom:update'},'*');}catch(x){}}
+    connMsg=[pc&&('PC: '+pc.d),ap&&('Phone: '+ap.d)].filter(Boolean).join(' ');setConn();clearTimeout(showUpd.t);showUpd.t=setTimeout(()=>{connMsg='';setConn();},12000);return;}
   if(e.target.closest('[data-act="restart-wait"]')){autoRestart.wait();return;}
-  if(e.target.closest('[data-act="claude"]')){openClaude();return;}
+  const cb=e.target.closest('[data-act="claude"]');if(cb){cb.closest('.toast')?.remove();openClaude(cb.dataset.sid!=null?+cb.dataset.sid:null);return;}
   if(e.target.closest('[data-act="wn-ok"]')){$('whatsNew').hidden=true;try{localStorage.setItem('devroom.seenNotes',NOTES_VER);}catch(e){}return;}
   if(e.target.closest('[data-act="pair"]')){openPair();return;}
   if(e.target.closest('[data-act="team-cancel"]')){$('teamPanel').hidden=true;return;}
@@ -1954,7 +2005,7 @@ document.addEventListener('click',e=>{
   const a=e.target.closest('[data-act="reply"]');
   if(a){const s=sessions.find(x=>x.id===+a.dataset.id);if(s&&s.status==='needs')answer(s,a.dataset.mode==='approve'?'Approved. Sige, ituloy mo.':'Hindi muna. Huwag mo munang gawin iyan.',a.dataset.mode);return;}
   const pt=e.target.closest('[data-ptab]');if(pt){ptab=pt.dataset.ptab;chatKey='';renderPanel();return;}
-  const tab=e.target.closest('.tabs button');if(tab){$('app').dataset.tab=tab.dataset.tab;chatKey='';document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b===tab));render();return;}
+  const tab=e.target.closest('.tabs button');if(tab){$('app').dataset.tab=tab.dataset.tab;chatKey='';if(embedClaude&&tab.dataset.tab==='chat')ptab='chat';document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b===tab));render();return;}
   const dv=e.target.closest('.seg button');if(dv){$('stage').dataset.device=dv.dataset.device;document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',b===dv));chatKey='';render();return;}
 });
 $('composer').addEventListener('submit',async e=>{e.preventDefault();const s=bySid(chatTo);const v=$('msgInput').value;if(!v.trim())return;

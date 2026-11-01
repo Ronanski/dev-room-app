@@ -80,6 +80,7 @@ async function activeBase(){const url=store.get('devroom.url'),alt=store.get('de
   misses=0;
   if(await reachable(url,token))return url;if(alt&&await reachable(alt,token))return alt;return current||url;}
 function showPair(msg){
+  claudeHide();
   $('office').style.display='none';$('pair').hidden=false;
   const e=$('err');e.hidden=!msg;e.textContent=msg||'';
 }
@@ -102,20 +103,42 @@ async function checkUpdate(){
     const r=await fetch(`${url}/api/state?bg=1&t=${encodeURIComponent(token)}`,{cache:'no-store'});
     if(r.status===401){unpaired=true;showPair('Hindi na tinatanggap ng PC ang pairing na ito. I-scan ulit ang QR code.');return;}
     const j=await r.json();const latest=j.latest&&j.latest.apk||0;
+    apk={build:myBuild,latest,ver:String(j.latest&&j.latest.version||'')};sendApk();
     if(latest>myBuild&&store.get('devroom.skip')!==String(latest)){
       const b=$('bar');b.style.display='flex';
       const ver=String(j.latest.version||'').replace(/[^0-9A-Za-z.\-]/g,'');
       b.innerHTML=`<span>May bagong bersyon ng Dev Room app${ver?' (v'+ver+')':''}. I-download at i-install ito, at mananatili ang pairing mo.</span>`+'<button id="upd">I-update</button><button class="ghost" id="later">Mamaya</button>';
-      $('upd').onclick=()=>{DevRoom?DevRoom.openExternal({url:APK_URL}):location.assign(APK_URL);};
+      $('upd').onclick=getApk;
       $('later').onclick=()=>{store.set('devroom.skip',String(latest));b.style.display='none';};
     }
   }catch(e){}
 }
-// The office runs in an iframe served by the PC; it asks the shell to open the Claude Code chat.
+// The real Claude Code chat sits right on the office's Chat tab: the office tells us where, we lay the
+// native Claude view over that spot. (Old office pages without this still use the full Claude screen.)
+const canView=!!(DevRoom&&window.Capacitor&&Capacitor.isPluginAvailable&&Capacitor.isPluginAvailable('DevRoom'));
+// the office shows whether this phone app is up to date (and offers the update) in its header
+let apk=null;
+function sendApk(){const w=$('office').contentWindow;if(w&&apk&&current)try{w.postMessage(Object.assign({type:'devroom:apk'},apk),new URL(current).origin);}catch(e){}}
+function getApk(){DevRoom?DevRoom.openExternal({url:APK_URL}):location.assign(APK_URL);}
+function sendCaps(){const w=$('office').contentWindow;if(w&&canView&&current)try{w.postMessage({type:'devroom:caps',claudeView:true},new URL(current).origin);}catch(e){}}
+$('office').addEventListener('load',()=>{sendCaps();sendApk();});
+let claudeOn=false;
+function claudeHide(){if(claudeOn&&DevRoom){claudeOn=false;DevRoom.claudeView({show:false}).catch(()=>{});}}
+const num=v=>Math.round(Math.max(0,Math.min(10000,Number(v)||0)));
 window.addEventListener('message',e=>{
   // only the office frame, served by the paired PC, may ask
   if(e.source!==$('office').contentWindow)return;
-  const d=e.data||{};if(d.type!=='devroom:openClaude')return;
+  const d=e.data||{};
+  if(d.type==='devroom:hello'){sendCaps();sendApk();return;}
+  if(d.type==='devroom:update'){getApk();return;}
+  if(d.type==='devroom:claudeView'){
+    if(!canView)return;
+    const r=$('office').getBoundingClientRect();
+    claudeOn=!!d.show&&$('office').style.display!=='none';
+    DevRoom.claudeView({show:claudeOn,x:Math.round(r.left)+num(d.x),y:Math.round(r.top)+num(d.y),w:num(d.w),h:num(d.h)}).catch(()=>{});
+    return;
+  }
+  if(d.type!=='devroom:openClaude')return;
   const url=typeof d.url==='string'&&d.url.startsWith('https://claude.ai/')?d.url:'https://claude.ai/code';
   if(DevRoom&&DevRoom.openClaude)DevRoom.openClaude({url});
 });
