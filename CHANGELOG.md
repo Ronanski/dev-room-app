@@ -7,6 +7,47 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.4.0 (2026-11-01)
+
+### Added
+- **The Dev Room is now a power plant**, still in isometric pixel art. The map is 42 × 23 tiles:
+  - **Top row:** Control Room with a video wall (MW output, trend, alarm beacon) and console rows, Team Supervisor office for the Lead, your office, Library, and sleeping quarters.
+  - **Bottom row:** Gate, CR and lockers, Pantry, Lounge, Rec Room, Gym, and a basketball half court.
+- **Alarms tab with ACK:** a permission prompt or a trip is HIGH, a question is MEDIUM. The alarm blinks until it is acknowledged, on the console lamp and on the beacon.
+- **Characters act out the real tool in use:**
+  - **Typing code:** the screen fills with code.
+  - **Reading or searching:** a scrolling page.
+  - **Running tests or builds:** a progress bar, with a green or red flash for pass or fail.
+  - **Web:** a globe on the screen.
+  - **Planning:** a checklist.
+  - **Delegating:** a small Subagent courier runs to the library and back with a report.
+- **New NPCs, each with a routine:**
+  - The janitor mops, cleans the CR and empties the bins.
+  - Pantry staff brew coffee, serve and wipe tables.
+  - Maintenance does PM on consoles, the video wall and the treadmill.
+  - The guard patrols with a flashlight and signs the logbook.
+  - The Safety officer does inspections and fatigue checks.
+- **Real-time routines:**
+  - Morning coffee, lunch from 11:30 to 1:00 (you included), merienda at 3:00, gym and basketball after 5:00, and a dimmer plant at night.
+  - Activities take real-life minutes.
+  - One thing leads to the next: coffee then CR, gym then CR and pantry.
+  - Tired people pick coffee or sleep.
+  - Nobody waits forever for a chess or billiards partner.
+- **Status icons, effects, energy and mood, a timeline, and walking that faces the direction of travel** (from the 0.4 preview).
+- **Pinch to zoom** on phones and touch screens.
+- **Away from home:** when Tailscale runs on the PC, the pairing QR also carries the Tailscale address. The Android app and its background watcher use home Wi-Fi first and Tailscale when away.
+
+- **Tray app:** closing the Dev Room window keeps it running in the system tray, so phones and tablets stay connected. The tray menu has Buksan ang Dev Room, Simulan kasabay ng Windows (start with Windows, hidden in the tray), and Isara nang tuluyan.
+- **Widescreen map with a slide-over panel:** the Alarms, Chat and Detalye panel opens over the right side of the map only when needed. It opens from a character, a session card, an alarm, the alarm count or the Panel button, and closes with ×, Esc or a tap on the map. The session cards stay at the bottom.
+- **Notifications in the lower right:** alarms stack up with ACK and Tingnan buttons and stay until handled. They move beside the panel when it is open.
+- **Fullscreen is map only:** the header, status bar and dock hide, and the whole plant fits the screen. It also works where the browser blocks real fullscreen, such as the Android app.
+
+### Fixed
+- **Room names are painted flat on the floor**, following the isometric angle, instead of floating horizontally.
+- **Bubbles never overlap each other or other people's name tags.** Colliding bubbles lift up with a leader line, and fewer people talk at once when zoomed out. Alarms and the selected character always get through.
+- **Brighter floors.**
+- **The leader is detected automatically** when no team is saved.
+
 ## 0.3.0 (2026-11-01)
 
 ### Added

@@ -91,15 +91,25 @@ public class WatchService extends Service {
         try { NotificationManagerCompat.from(this).notify(ONGOING_ID, ongoing(text)); } catch (SecurityException ignored) { }
     }
 
+    private HttpURLConnection open(String base, String token) throws Exception {
+        URL url = new URL(base.replaceAll("/+$", "") + "/api/state?t=" + URLEncoder.encode(token, "UTF-8"));
+        HttpURLConnection c = (HttpURLConnection) url.openConnection();
+        c.setConnectTimeout(4000);
+        c.setReadTimeout(8000);
+        c.getResponseCode();
+        return c;
+    }
+
     private void poll() throws Exception {
         SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE);
         String base = p.getString("url", null);
         if (base == null) { stopSelf(); return; }
         String token = p.getString("token", "");
-        URL url = new URL(base.replaceAll("/+$", "") + "/api/state?t=" + URLEncoder.encode(token, "UTF-8"));
-        HttpURLConnection c = (HttpURLConnection) url.openConnection();
-        c.setConnectTimeout(5000);
-        c.setReadTimeout(8000);
+        String alt = p.getString("alt", "");
+        HttpURLConnection c;
+        // Home Wi-Fi first; away from home, the PC's Tailscale address.
+        try { c = open(base, token); }
+        catch (Exception e) { if (alt == null || alt.isEmpty()) throw e; c = open(alt, token); }
         int code = c.getResponseCode();
         if (code == 401) { update("Kailangang i-pair ulit ang phone. I-scan ang QR code sa PC."); return; }
         if (code != 200) { update("Hindi maabot ang Dev Room sa PC mo. Susubukan ulit."); return; }

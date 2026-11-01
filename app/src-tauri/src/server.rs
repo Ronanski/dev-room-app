@@ -317,6 +317,23 @@ fn record(s: &Value, names: &Value) -> Value {
 
 fn lan_ip() -> Option<IpAddr> { local_ip_address::local_ip().ok() }
 
+/// The PC's Tailscale address (100.64.0.0/10), so a paired phone can reach Dev Room away from home.
+fn tailscale_ip() -> Option<IpAddr> {
+    local_ip_address::list_afinet_netifas().ok()?.into_iter().map(|(_, ip)| ip).find(|ip| match ip {
+        IpAddr::V4(v) => { let o = v.octets(); o[0] == 100 && (64..128).contains(&o[1]) }
+        _ => false,
+    })
+}
+
+fn pair_link(port: u16, token: &str) -> Option<String> {
+    let lan = lan_ip().map(|ip| format!("http://{ip}:{port}"));
+    let ts = tailscale_ip().map(|ip| format!("http://{ip}:{port}"));
+    let primary = lan.clone().or(ts.clone())?;
+    let mut link = format!("{primary}/?t={token}");
+    if let (Some(_), Some(t)) = (&lan, &ts) { link.push_str(&format!("&a={}", t.replace(':', "%3A").replace('/', "%2F"))); }
+    Some(link)
+}
+
 fn is_loopback(addr: Option<&SocketAddr>) -> bool { addr.map(|a| a.ip().is_loopback()).unwrap_or(false) }
 
 fn header(k: &str, v: &str) -> Header { Header::from_bytes(k.as_bytes(), v.as_bytes()).unwrap() }
@@ -380,7 +397,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
             let body = json!({"version": s.version, "sessions": list, "team": s.team, "local": local,
                 "hooks_installed": if local { json!(hooks_installed(port)) } else { Value::Null },
                 "settings_path": if local { json!(claude_settings_path().display().to_string()) } else { Value::Null },
-                "lan_url": lan,
+                "lan_url": lan, "ts_url": tailscale_ip().map(|ip| format!("http://{ip}:{port}/")),
                 "app_build": crate::updater::BUILD, "app_version": crate::updater::VERSION, "ui_build": crate::updater::ui_build(),
                 "update_ready": crate::updater::exe_ready(), "update_note": crate::updater::note(),
                 "latest": crate::updater::latest()});
@@ -409,8 +426,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
         (Method::Get, "/pair.svg") => {
             if !local { return respond_json(req, 403, &json!({"error": "loopback only"})); }
             let token = st.lock().unwrap().token.clone();
-            let Some(ip) = lan_ip() else { return respond_json(req, 404, &json!({"error": "no LAN address"})) };
-            let link = format!("http://{ip}:{port}/?t={token}");
+            let Some(link) = pair_link(port, &token) else { return respond_json(req, 404, &json!({"error": "no network address"})) };
             let svg = qrcode::QrCode::new(link.as_bytes()).map(|c| c.render::<qrcode::render::svg::Color>().min_dimensions(240, 240)
                 .dark_color(qrcode::render::svg::Color("#2a201a")).light_color(qrcode::render::svg::Color("#ffffff")).build()).unwrap_or_default();
             let _ = req.respond(Response::from_string(svg).with_header(header("Content-Type", "image/svg+xml")).with_header(header("Cache-Control", "no-store")));
@@ -423,8 +439,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
         (Method::Get, "/pair.json") => {
             if !local { return respond_json(req, 403, &json!({"error": "loopback only"})); }
             let token = st.lock().unwrap().token.clone();
-            let link = lan_ip().map(|ip| format!("http://{ip}:{port}/?t={token}"));
-            respond_json(req, 200, &json!({"link": link}));
+            respond_json(req, 200, &json!({"link": pair_link(port, &token)}));
         }
         _ => respond_json(req, 404, &json!({"error": "not found"})),
     }

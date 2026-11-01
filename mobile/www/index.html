@@ -64,11 +64,16 @@ $('ver').textContent=`Dev Room app v${window.APK_VERSION||'dev'} (build ${myBuil
 function parseLink(s){
   s=String(s||'').trim();
   try{
-    if(s.startsWith('devroom://')){const u=new URL(s.replace('devroom://','http://x/'));return{url:u.searchParams.get('u'),token:u.searchParams.get('t')};}
-    const u=new URL(s);const t=u.searchParams.get('t');if(!t)return null;return{url:u.origin,token:t};
+    if(s.startsWith('devroom://')){const u=new URL(s.replace('devroom://','http://x/'));return{url:u.searchParams.get('u'),token:u.searchParams.get('t'),alt:u.searchParams.get('a')||''};}
+    const u=new URL(s);const t=u.searchParams.get('t');if(!t)return null;const a=u.searchParams.get('a');return{url:u.origin,token:t,alt:a?a.replace(/\/+$/,''):''};
   }catch(e){return null;}
 }
-function save(p){store.set('devroom.url',p.url);store.set('devroom.token',p.token);}
+function save(p){store.set('devroom.url',p.url);store.set('devroom.token',p.token);store.set('devroom.alt',p.alt||'');}
+// Home Wi-Fi first, then the PC's Tailscale address when away from home.
+async function reachable(base,token){try{const c=new AbortController();const tm=setTimeout(()=>c.abort(),2500);const r=await fetch(`${base}/api/state?t=${encodeURIComponent(token)}&v=-1`,{cache:'no-store',signal:c.signal});clearTimeout(tm);return r.status!==0;}catch(e){return false;}}
+async function activeBase(){const url=store.get('devroom.url'),alt=store.get('devroom.alt'),token=store.get('devroom.token');
+  if(await reachable(url,token))return url;if(alt&&await reachable(alt,token))return alt;return url;}
+let current='';
 function showPair(msg){
   $('office').style.display='none';$('pair').hidden=false;
   const e=$('err');e.hidden=!msg;e.textContent=msg||'';
@@ -78,12 +83,13 @@ async function showOffice(){
   if(!url||!token){showPair();return;}
   $('pair').hidden=true;
   const f=$('office');f.style.display='block';
-  f.src=`${url}/?t=${encodeURIComponent(token)}`;
-  try{if(DevRoom)await DevRoom.startWatch({url,token});}catch(e){}
+  const base=await activeBase();
+  if(base!==current){current=base;f.src=`${base}/?t=${encodeURIComponent(token)}`;}
+  try{if(DevRoom)await DevRoom.startWatch({url,token,alt:store.get('devroom.alt')||''});}catch(e){}
   checkUpdate();
 }
 async function checkUpdate(){
-  const url=store.get('devroom.url'),token=store.get('devroom.token');if(!url)return;
+  const url=current||store.get('devroom.url'),token=store.get('devroom.token');if(!url)return;
   try{
     const r=await fetch(`${url}/api/state?t=${encodeURIComponent(token)}`,{cache:'no-store'});
     if(r.status===401){showPair('Hindi na tinatanggap ng PC ang pairing na ito. I-scan ulit ang QR code.');return;}
@@ -103,11 +109,12 @@ $('go').onclick=()=>{const p=parseLink($('link').value);if(!p){showPair('Hindi t
   try{if(DevRoom){const i=await DevRoom.info();if(i&&i.versionCode)myBuild=Math.max(myBuild,Number(i.versionCode));}}catch(e){}
   if(App){
     App.addListener('appUrlOpen',e=>handleUrl(e.url));
-    App.addListener('resume',()=>checkUpdate());
+    App.addListener('resume',()=>{checkUpdate();showOffice();});
     try{const l=await App.getLaunchUrl();if(l&&l.url){handleUrl(l.url);return;}}catch(e){}
   }
   showOffice();
   setInterval(checkUpdate,10*60*1000);
+  setInterval(()=>{if(store.get('devroom.alt'))showOffice();},30000);
 })();
 })();
 </script>
