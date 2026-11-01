@@ -71,9 +71,13 @@ function parseLink(s){
 function save(p){store.set('devroom.url',p.url);store.set('devroom.token',p.token);store.set('devroom.alt',p.alt||'');}
 // Home Wi-Fi first, then the PC's Tailscale address when away from home.
 async function reachable(base,token){try{const c=new AbortController();const tm=setTimeout(()=>c.abort(),2500);const r=await fetch(`${base}/api/state?t=${encodeURIComponent(token)}&v=-1`,{cache:'no-store',signal:c.signal});clearTimeout(tm);return r.status!==0;}catch(e){return false;}}
+// Sticky: keep the address in use while it answers; switch only after it fails twice in a row,
+// so a slow reply never reloads the office (that showed as the map blinking).
+let current='',misses=0;
 async function activeBase(){const url=store.get('devroom.url'),alt=store.get('devroom.alt'),token=store.get('devroom.token');
-  if(await reachable(url,token))return url;if(alt&&await reachable(alt,token))return alt;return url;}
-let current='';
+  if(current){if(await reachable(current,token)){misses=0;return current;}if(++misses<2)return current;}
+  misses=0;
+  if(await reachable(url,token))return url;if(alt&&await reachable(alt,token))return alt;return current||url;}
 function showPair(msg){
   $('office').style.display='none';$('pair').hidden=false;
   const e=$('err');e.hidden=!msg;e.textContent=msg||'';

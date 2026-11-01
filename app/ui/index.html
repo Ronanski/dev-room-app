@@ -382,7 +382,7 @@ body{margin:0}
 <script>
 (()=>{
 const T=16,W=672,H=368,CORR=192;
-const cv=document.getElementById('map'),ctx=cv.getContext('2d',{alpha:false,desynchronized:true});
+const cv=document.getElementById('map'),ctx=cv.getContext('2d',{alpha:false});
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
 const rand=(a,b)=>a+Math.random()*(b-a);
@@ -1461,8 +1461,8 @@ const COARSE=matchMedia('(pointer:coarse)').matches;
 const Q={cap:COARSE?1.5:2,max:COARSE?1.5:2,acc:0,n:0,good:0,
   tick(ms,budget){if(document.hidden||ms>250||budget>40)return;this.acc+=ms;if(++this.n<90)return;const avg=this.acc/this.n;this.acc=this.n=0;
     const slow=Math.max(21,budget*1.25),fast=Math.max(13,budget+4);
-    if(avg>slow&&this.cap>1){this.cap=Math.max(1,this.cap-.5);this.good=0;resizeMap();}
-    else if(avg<fast&&this.cap<this.max&&++this.good>=6){this.cap+=.5;this.good=0;resizeMap();}}};
+    if(avg>slow&&this.cap>1&&Date.now()-(this.last||0)>20000){this.last=Date.now();this.cap=Math.max(1,this.cap-.5);resizeMap();}
+  }};
 const kc=()=>BASE*cam.z;
 const viewW=()=>VW/kc(),viewH=()=>VH/kc();
 function resizeMap(){
