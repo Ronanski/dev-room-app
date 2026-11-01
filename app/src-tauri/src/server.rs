@@ -821,6 +821,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16, tun: bool) {
             g.bump(); g.save(); drop(g);
             respond_json(req, 200, &json!({"ok": true, "id": id}));
             deliver_now(&sid);
+            quick_answer(&sid, id);
         }
         (Method::Get, p) if p.starts_with("/api/att/") => {
             if !token_ok { return respond_json(req, 401, &json!({"error": "pairing"})); }
@@ -1327,6 +1328,70 @@ fn resumable(s: &Map<String, Value>) -> bool {
     let last = s.get("last_event").and_then(|x| x.as_str()).unwrap_or("");
     let listening = s.get("listening").and_then(|x| x.as_bool()).unwrap_or(false);
     !listening && (status == "idle" || (status == "needs" && last == "Stop")) && !s.get("live_guess").and_then(|x| x.as_bool()).unwrap_or(false)
+}
+
+/* ---------- real-time answers while a session is busy ----------
+   Claude Code takes a new message only between steps. If yours is still waiting after a few seconds (the session
+   is in the middle of a long step, such as an agent or a test run), a copy of the session (`--fork-session`, with
+   all of its context) answers you right away in read-only plan mode, with no hooks (so no extra character).
+   The message stays queued for the session itself, which acts on it after its current step. */
+static QUICK: Mutex<Vec<String>> = Mutex::new(Vec::new());
+const QUICK_WAIT_MS: u64 = 2500;
+
+fn quick_answer(sid: &str, id: u64) {
+    let sid = sid.to_string();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(QUICK_WAIT_MS));
+        let Some(st) = SHARED.get().cloned() else { return };
+        let Some(bin) = claude_bin() else { return };
+        {
+            let mut q = QUICK.lock().unwrap_or_else(|e| e.into_inner());
+            if q.iter().any(|x| x == &sid) { return; }   // one quick answer at a time per session
+            q.push(sid.clone());
+        }
+        let done = |sid: &str| QUICK.lock().unwrap_or_else(|e| e.into_inner()).retain(|x| x != sid);
+        // still waiting? (taken by a hook or a resume in the meantime: nothing to do)
+        let job = {
+            let mut g = lk(&st);
+            let Some(s) = g.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()) else { drop(g); return done(&sid) };
+            let cwd = s.get("cwd").and_then(|x| x.as_str()).map(PathBuf::from).filter(|p| p.is_dir());
+            let Some(inbox) = s.get_mut("inbox").and_then(|i| i.as_array_mut()) else { drop(g); return done(&sid) };
+            let Some(m) = inbox.iter_mut().find(|m| m.get("id").and_then(|x| x.as_u64()) == Some(id)) else { drop(g); return done(&sid) };
+            if m.get("state").and_then(|x| x.as_str()) != Some("queued") { drop(g); return done(&sid); }
+            m["quick"] = json!("asking");
+            let text = m.get("text").and_then(|x| x.as_str()).unwrap_or("").to_string();
+            g.bump();
+            (text, cwd)
+        };
+        let (text, cwd) = job;
+        let prompt = format!("[Dev Room] Mensahe ni Boss habang nasa gitna ka ng isang hakbang. Sagutin mo siya NGAYON, maikli at malinaw, batay sa alam mo na (status, progreso, sagot sa tanong niya). Huwag magsimula ng bagong trabaho o mag-edit dito: read-only ang sagot na ito. Matatanggap din ng tunay mong session ang mensaheng ito pagkatapos ng kasalukuyang hakbang, at doon mo ito gagawin.\n\nMensahe ni Boss:\n{text}");
+        let mut c = std::process::Command::new(&bin);
+        c.args(["-p", "--resume", &sid, "--fork-session", "--permission-mode", "plan", "--output-format", "json", "--settings", r#"{"disableAllHooks":true}"#]);
+        if let Some(d) = &cwd { c.current_dir(d); }
+        c.stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped());
+        #[cfg(windows)] { use std::os::windows::process::CommandExt; c.creation_flags(0x0800_0000); }
+        let answer = c.spawn().ok().and_then(|mut child| {
+            if let Some(mut i) = child.stdin.take() { use std::io::Write; let _ = i.write_all(prompt.as_bytes()); }
+            let out = child.wait_with_output().ok()?;
+            let v: Value = serde_json::from_slice(&out.stdout).ok()?;
+            if v.get("is_error").and_then(|x| x.as_bool()).unwrap_or(false) { return None; }
+            v.get("result").and_then(|x| x.as_str()).map(|t| t.trim().to_string()).filter(|t| !t.is_empty())
+        });
+        {
+            let mut g = lk(&st);
+            if let Some(s) = g.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()) {
+                if let Some(a) = &answer {
+                    push_convo(s, "assistant", a, 4000);
+                    if let Some(last) = s.get_mut("convo").and_then(|c| c.as_array_mut()).and_then(|c| c.last_mut()) { last["quick"] = json!(true); }
+                }
+                if let Some(m) = s.get_mut("inbox").and_then(|i| i.as_array_mut()).and_then(|a| a.iter_mut().find(|m| m.get("id").and_then(|x| x.as_u64()) == Some(id))) {
+                    m["quick"] = json!(if answer.is_some() { "done" } else { "failed" });
+                }
+            }
+            g.bump(); g.save();
+        }
+        done(&sid);
+    });
 }
 
 fn deliver_soon(sid: &str) {
