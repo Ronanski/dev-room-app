@@ -270,6 +270,7 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<St
     }));
     let s = entry.as_object_mut().unwrap();
     if let Some(c) = v.get("cwd").and_then(|x| x.as_str()) { s.insert("cwd".into(), json!(c)); }
+    if let Some(m) = v.get("permission_mode").and_then(|x| x.as_str()) { s.insert("perm_mode".into(), json!(m)); }
     let transcript = v.get("transcript_path").and_then(|x| x.as_str()).map(String::from);
     if let Some(t) = &transcript {
         s.insert("transcript".into(), json!(t));
@@ -477,7 +478,7 @@ fn hook_reply(req: Request, st: &Mutex<State>, v: &Value) {
                 g.bump();
             }
         }
-        None => respond_json(req, 200, &json!({})),
+        None => { respond_json(req, 200, &json!({})); deliver_soon(&sid); }
     }
 }
 
@@ -489,8 +490,11 @@ fn push_convo(s: &mut Map<String, Value>, role: &str, text: &str, max: usize) {
     let c = s.entry("convo").or_insert_with(|| json!([]));
     if !c.is_array() { *c = json!([]); }
     let arr = c.as_array_mut().unwrap();
-    if arr.last().map(|m| m.get("text").and_then(|x| x.as_str()) == Some(t.as_str())).unwrap_or(false) { return; }
-    arr.push(json!({"role": role, "text": t, "at": now_ms()}));
+    // the live transcript reader and the hooks report the same lines: keep one
+    let now = now_ms();
+    if arr.iter().rev().take(8).any(|m| m.get("role").and_then(|x| x.as_str()) == Some(role) && m.get("text").and_then(|x| x.as_str()) == Some(t.as_str())
+        && now.saturating_sub(m.get("at").and_then(|x| x.as_u64()).unwrap_or(0)) < 30 * 60 * 1000) { return; }
+    arr.push(json!({"role": role, "text": t, "at": now}));
     if arr.len() > 40 { let n = arr.len() - 40; arr.drain(..n); }
     let n = s.get("convo_n").and_then(|x| x.as_u64()).unwrap_or(0) + 1;
     s.insert("convo_n".into(), json!(n));
@@ -655,6 +659,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16, tun: bool) {
                 "lan_url": lan, "ts_url": tailscale_ip().map(|ip| format!("http://{ip}:{port}/")),
                 "app_build": crate::updater::BUILD, "app_version": crate::updater::VERSION, "ui_build": crate::updater::ui_build(),
                 "remote": if local { crate::tunnel::info() } else { Value::Null },
+                "instant_chat": claude_bin().is_some(),
                 "update_ready": crate::updater::exe_ready(), "update_note": crate::updater::note(),
                 "latest": crate::updater::latest()});
             drop(s);
@@ -694,6 +699,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16, tun: bool) {
             if arr.len() > 30 { let n = arr.len() - 30; arr.drain(..n); }
             g.bump(); g.save(); drop(g);
             respond_json(req, 200, &json!({"ok": true, "id": id}));
+            deliver_now(&sid);
         }
         (Method::Get, "/api/convo") => {
             // Conversations are fetched apart from /api/state, only when a session's convo_n changes.
@@ -858,6 +864,9 @@ pub fn start(port: u16) -> Option<u16> {
     let st = Arc::new(Mutex::new(State::load(data_dir())));
     // Hooks set up by an older version get the newer events too (same consent, same command).
     if !hooks_installed(port) && has_any_ours() { let _ = install_hooks(port); }
+    let _ = SHARED.set(st.clone());
+    let tail = st.clone();
+    std::thread::spawn(move || loop { std::thread::sleep(std::time::Duration::from_millis(900)); tail_transcripts(&tail); });
     let live = st.clone();
     std::thread::spawn(move || loop { std::thread::sleep(std::time::Duration::from_secs(3)); liveness(&live); });
     // Malayo mode: a loopback-only port for the tunnel, where every request counts as a phone
@@ -879,4 +888,206 @@ pub fn start(port: u16) -> Option<u16> {
         }
     });
     Some(port)
+}
+
+
+/* ---------- real-time chat ----------
+   Reading: every session's transcript is followed as it is written, so each reply shows in the app as soon as
+   Claude writes it (not only when the turn ends).
+   Sending: a working session gets the message with its next tool call (seconds). A session that is not working
+   is continued right away by Dev Room itself: `claude -p --resume <session>` with the message, in the session's
+   folder and permission mode, so it answers immediately. */
+
+static SHARED: std::sync::OnceLock<Arc<Mutex<State>>> = std::sync::OnceLock::new();
+static TAIL: Mutex<Option<HashMap<String, (String, u64, bool)>>> = Mutex::new(None);
+static RUNS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// The text a transcript line shows in the chat: your prompts and Claude's replies (not tool calls or results).
+fn transcript_line(v: &Value) -> Option<(&'static str, String)> {
+    if v.get("isSidechain").and_then(|x| x.as_bool()).unwrap_or(false) || v.get("isMeta").and_then(|x| x.as_bool()).unwrap_or(false) { return None; }
+    let kind = v.get("type").and_then(|x| x.as_str())?;
+    let content = v.get("message")?.get("content")?;
+    let texts = |c: &Value| -> Option<String> {
+        let arr = c.as_array()?;
+        if arr.iter().any(|b| b.get("type").and_then(|x| x.as_str()) == Some("tool_result")) { return None; }
+        let t: Vec<&str> = arr.iter().filter(|b| b.get("type").and_then(|x| x.as_str()) == Some("text")).filter_map(|b| b.get("text").and_then(|x| x.as_str())).collect();
+        (!t.is_empty()).then(|| t.join("\n\n"))
+    };
+    match kind {
+        "assistant" => texts(content).map(|t| ("assistant", t)),
+        "user" => {
+            let t = content.as_str().map(String::from).or_else(|| texts(content))?;
+            (!t.trim_start().starts_with('<')).then_some(("user", t))
+        }
+        _ => None,
+    }
+}
+
+fn tail_transcripts(st: &Mutex<State>) {
+    let now = now_ms();
+    // (session, transcript, whether it was active in the last 2 minutes)
+    let list: Vec<(String, String, bool)> = lk(st).sessions.iter()
+        .filter_map(|(k, v)| v.get("transcript").and_then(|x| x.as_str()).map(|t| (k.clone(), t.to_string(),
+            now.saturating_sub(v.get("hook_at").and_then(|x| x.as_u64()).unwrap_or(0)) < 120_000))).collect();
+    let mut found: Vec<(String, &'static str, String)> = Vec::new();
+    {
+        let mut guard = TAIL.lock().unwrap_or_else(|e| e.into_inner());
+        let tails = guard.get_or_insert_with(HashMap::new);
+        tails.retain(|k, _| list.iter().any(|(s, _, _)| s == k));
+        for (sid, path, active) in &list {
+            let len = fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+            // The first look starts at the end (earlier lines are in the saved conversation), except for a session
+            // active right now: its newest lines may have been written just before we looked (repeats are skipped).
+            let e = tails.entry(sid.clone()).or_insert_with(|| (path.clone(), if *active { len.saturating_sub(64 * 1024) } else { len }, *active));
+            if &e.0 != path || len < e.1 { *e = (path.clone(), len, false); continue; }
+            if len == e.1 { continue; }
+            let catch_up = std::mem::replace(&mut e.2, false);
+            let fresh = catch_up && e.1 > 0;
+            let start = e.1.max(len.saturating_sub(4 * 1024 * 1024));
+            let Ok(mut f) = fs::File::open(path) else { continue };
+            if f.seek(SeekFrom::Start(start)).is_err() { continue; }
+            let mut buf = Vec::new();
+            if f.take(len - start).read_to_end(&mut buf).is_err() { continue; }
+            // only whole lines; a line still being written is read next time
+            let Some(end) = buf.iter().rposition(|&b| b == b'\n') else { continue };
+            e.1 = start + end as u64 + 1;
+            // reading from the middle of a file: drop the partial first line
+            let body = if fresh { buf[..end].splitn(2, |&b| b == b'\n').nth(1).unwrap_or(&[]) } else { &buf[..end] };
+            let mut got: Vec<(&'static str, String)> = body.split(|&b| b == b'\n')
+                .filter_map(|line| serde_json::from_slice::<Value>(line).ok()).filter_map(|v| transcript_line(&v)).collect();
+            // catching up on a session that is already running: only its current turn (from your last prompt)
+            if catch_up {
+                if let Some(i) = got.iter().rposition(|(r, _)| *r == "user") { got.drain(..i); } else { got.clear(); }
+            }
+            found.extend(got.into_iter().map(|(r, t)| (sid.clone(), r, t)));
+        }
+    }
+    if found.is_empty() { return; }
+    let mut g = lk(st);
+    for (sid, role, text) in found {
+        if let Some(s) = g.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()) {
+            push_convo(s, role, &text, if role == "user" { 2000 } else { 4000 });
+            if role == "assistant" { s.insert("recent".into(), json!(clip(&text, 300))); s.insert("updated_at".into(), json!(now_ms())); }
+        }
+    }
+    g.bump();
+}
+
+/// The Claude Code program on this PC (the one the sessions use), for continuing a session right away.
+pub fn claude_bin() -> Option<PathBuf> {
+    static CACHE: Mutex<Option<(PathBuf, u64)>> = Mutex::new(None);
+    if let Some((p, at)) = CACHE.lock().ok()?.clone() { if p.exists() || now_ms() - at < 60_000 { return p.exists().then_some(p); } }
+    let exe = if cfg!(windows) { "claude.exe" } else { "claude" };
+    let mut cands: Vec<PathBuf> = Vec::new();
+    if let Some(p) = std::env::var_os("DEVROOM_CLAUDE") { cands.push(PathBuf::from(p)); }
+    if let Some(path) = std::env::var_os("PATH") { for d in std::env::split_paths(&path) { cands.push(d.join(exe)); if cfg!(windows) { cands.push(d.join("claude.cmd")); } } }
+    let home = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")).map(PathBuf::from);
+    if let Some(h) = &home { cands.push(h.join(".local").join("bin").join(exe)); cands.push(h.join(".claude").join("local").join(exe)); }
+    if let Some(a) = std::env::var_os("APPDATA").map(PathBuf::from) { cands.push(a.join("npm").join("claude.cmd")); }
+    // the copy the Claude desktop app keeps (newest version folder)
+    for base in [std::env::var_os("APPDATA"), std::env::var_os("LOCALAPPDATA")].into_iter().flatten().map(PathBuf::from) {
+        if let Ok(rd) = fs::read_dir(base.join("Claude").join("claude-code")) {
+            let mut v: Vec<PathBuf> = rd.flatten().map(|e| e.path().join(exe)).filter(|p| p.exists()).collect();
+            v.sort_by_key(|p| std::cmp::Reverse(fs::metadata(p).and_then(|m| m.modified()).ok()));
+            cands.extend(v);
+        }
+    }
+    let found = cands.into_iter().find(|p| p.is_file());
+    if let Ok(mut c) = CACHE.lock() { *c = Some((found.clone().unwrap_or_default(), now_ms())); }
+    found
+}
+
+/// A session can be continued from here when its turn is over (not working, not waiting on a permission prompt).
+fn resumable(s: &Map<String, Value>) -> bool {
+    let status = s.get("status").and_then(|x| x.as_str()).unwrap_or("idle");
+    let last = s.get("last_event").and_then(|x| x.as_str()).unwrap_or("");
+    let listening = s.get("listening").and_then(|x| x.as_bool()).unwrap_or(false);
+    !listening && (status == "idle" || (status == "needs" && last == "Stop")) && !s.get("live_guess").and_then(|x| x.as_bool()).unwrap_or(false)
+}
+
+fn deliver_soon(sid: &str) {
+    let sid = sid.to_string();
+    // give the session a moment to settle after its Stop hook
+    std::thread::spawn(move || { std::thread::sleep(std::time::Duration::from_millis(1500)); deliver_now(&sid); });
+}
+
+/// Hand the queued messages to a session that is not working: continue it right away with them.
+fn deliver_now(sid: &str) {
+    let Some(st) = SHARED.get().cloned() else { return };
+    if !sid.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') || sid.is_empty() { return; }
+    let Some(bin) = claude_bin() else { return };
+    {
+        let mut runs = RUNS.lock().unwrap_or_else(|e| e.into_inner());
+        if runs.iter().any(|r| r == sid) { return; }   // already answering: the next tool call carries new messages
+        runs.push(sid.to_string());
+    }
+    let done = |sid: &str| { RUNS.lock().unwrap_or_else(|e| e.into_inner()).retain(|r| r != sid); };
+    let job = {
+        let mut g = lk(&st);
+        let Some(s) = g.sessions.get_mut(sid).and_then(|s| s.as_object_mut()) else { drop(g); return done(sid) };
+        if !resumable(s) { drop(g); return done(sid); }
+        let (mut texts, mut ids) = (Vec::new(), Vec::new());
+        if let Some(inbox) = s.get_mut("inbox").and_then(|i| i.as_array_mut()) {
+            for m in inbox.iter_mut() {
+                if m.get("state").and_then(|x| x.as_str()) == Some("queued") {
+                    texts.push(m.get("text").and_then(|x| x.as_str()).unwrap_or("").to_string());
+                    ids.push(m.get("id").cloned().unwrap_or(Value::Null));
+                    m["state"] = json!("delivered");
+                    m["sent_at"] = json!(now_ms());
+                }
+            }
+        }
+        if texts.is_empty() { drop(g); return done(sid); }
+        let text = texts.join("\n\n");
+        let cwd = s.get("cwd").and_then(|x| x.as_str()).map(PathBuf::from).filter(|p| p.is_dir());
+        let mode = s.get("perm_mode").and_then(|x| x.as_str()).filter(|m| ["default", "acceptEdits", "plan", "bypassPermissions", "dontAsk", "auto"].contains(m)).map(String::from);
+        mark_prompted(s, &text);
+        s.insert("short".into(), json!("Sinasagot ang mensahe mo."));
+        g.bump(); g.save();
+        (text, cwd, mode, ids)
+    };
+    let sid = sid.to_string();
+    std::thread::spawn(move || {
+        let (text, cwd, mode, ids) = job;
+        let mut c = std::process::Command::new(&bin);
+        c.args(["-p", "--resume", &sid, "--output-format", "json"]);
+        if let Some(m) = &mode { c.args(["--permission-mode", m]); }
+        if let Some(d) = &cwd { c.current_dir(d); }
+        c.stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped());
+        #[cfg(windows)] { use std::os::windows::process::CommandExt; c.creation_flags(0x0800_0000); }
+        let note = match c.spawn() {
+            Err(e) => Some(format!("Hindi mapatakbo ang Claude Code sa PC: {e}")),
+            Ok(mut child) => {
+                if let Some(mut i) = child.stdin.take() { use std::io::Write; let _ = i.write_all(text.as_bytes()); }
+                match child.wait_with_output() {
+                    Err(e) => Some(format!("Naputol ang sagot: {e}")),
+                    Ok(out) => {
+                        let v: Value = serde_json::from_slice(&out.stdout).unwrap_or(Value::Null);
+                        let err = v.get("is_error").and_then(|x| x.as_bool()).unwrap_or(!out.status.success());
+                        if !err { None } else {
+                            let why = v.get("result").and_then(|x| x.as_str()).map(String::from)
+                                .unwrap_or_else(|| String::from_utf8_lossy(&out.stderr).lines().last().unwrap_or("").to_string());
+                            Some(format!("Hindi naipasa sa session: {}", clip(&why, 200)))
+                        }
+                    }
+                }
+            }
+        };
+        {
+            let mut g = lk(&st);
+            if let Some(s) = g.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()) {
+                if let Some(n) = &note {
+                    push_convo(s, "sys", n, 400);
+                    if let Some(inbox) = s.get_mut("inbox").and_then(|i| i.as_array_mut()) {
+                        for m in inbox.iter_mut() { if ids.contains(m.get("id").unwrap_or(&Value::Null)) { m["state"] = json!("failed"); } }
+                    }
+                    if s.get("status").and_then(|x| x.as_str()) == Some("working") { s.insert("status".into(), json!("idle")); s.insert("short".into(), json!("")); }
+                }
+            }
+            g.bump(); g.save();
+        }
+        RUNS.lock().unwrap_or_else(|e| e.into_inner()).retain(|r| r != &sid);
+        // messages sent while it answered and not picked up by a tool call
+        deliver_soon(&sid);
+    });
 }

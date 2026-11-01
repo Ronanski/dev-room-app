@@ -7,6 +7,24 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.8.0 (2026-11-01)
+
+**Real-time chat in Dev Room's own chatbox.** The Chat tab is Dev Room's chat again, not claude.ai.
+- **Live replies:** every session's transcript is followed as it is written, about once a second. Each reply (and each prompt you type in the Claude app) shows in the feed as soon as Claude writes it, not only when the turn ends.
+  - Repeats from hooks and from the transcript are merged.
+  - A session that is running when Dev Room starts is caught up from your last prompt.
+- **Instant sending:**
+  - A session that is not working is continued right away by Dev Room. It runs `claude -p --resume <session>`, with the message on stdin, in the session's folder and its permission mode (taken from the hooks).
+  - A working session gets the message with its next tool call.
+  - A message still waiting when a turn ends goes out right away.
+  - If Claude Code cannot run (not installed, or not logged in), the message is marked "Hindi naipadala" and the reason is shown in the chat.
+- Dev Room finds the Claude Code program on PATH, in `~/.local/bin`, in npm's folder, or in the Claude desktop app's copy. `DEVROOM_CLAUDE` overrides the choice.
+- **Feed:**
+  - A "•••" indicator shows each working session and what it is doing.
+  - Your messages show once, with "Natanggap na niya ✓".
+  - Errors appear as system notes.
+- The Claude buttons and the claude.ai view on the Chat tab are gone. **Sagutin** opens that session's chat.
+
 ## 0.7.0 (2026-11-01)
 
 **Malayo mode:** the phone reaches the office from anywhere (mobile data), with no extra app and no account.
