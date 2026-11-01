@@ -1151,7 +1151,7 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
-  '0.8.1':{news:['<b>Naka-format na ang mga sagot sa chat, tulad sa Claude app:</b> bold, listahan, numbered list, heading at code. Wala nang <code>**</code> at <code>-</code> na nakakalat.','Hindi na nababali sa dalawang linya ang pangalan ng project sa itaas ng chat.'],
+  '0.8.1':{news:['<b>Naka-format na ang mga sagot sa chat, tulad sa Claude app:</b> bold, listahan, numbered list, heading at code. Wala nang <code>**</code> at <code>-</code> na nakakalat.','Hindi na nababali sa dalawang linya ang pangalan ng project sa itaas ng chat.','<b>Hindi na naiipit ang mensahe mo:</b> kapag nagtatrabaho ang session, nakapila ito at matatanggap niya sa susunod niyang hakbang, tulad sa Claude app. Pagkatapos ng trabaho niya, agad itong naipapadala, kahit pinahinto mo siya gamit ang Esc.'],
     todo:['Wala kang gagawin: kusa itong nag-a-update sa PC, at sabay na nag-a-update ang tablet at phone.']},
   '0.8.0':{news:['<b>Real-time na ang chat ng Dev Room.</b> Bumalik ang dating chatbox, pero wala nang hintayan:',
     '<b>Sagot nila:</b> lumalabas agad habang isinusulat nila, hindi na sa dulo ng turn lang. Kita ang lahat ng session sa <b>Lahat</b>, o pumili ng isa.',
@@ -1930,7 +1930,7 @@ function chatFeed(){
   items.sort((a,b)=>a.t-b.t);
   const out=items.slice(-120).map(it=>{
     const who=it.you?`<b>Boss</b> → ${esc(it.s.short)}`:`<i style="background:${it.s.pal.shirt}"></i><b>${esc(it.s.short)}</b>`;
-    const st=it.app?`<span class="st">${{sending:'Ipinapadala…',queued:'Ipinapasa…',sent:'Natanggap na niya ✓',delivered:'Natanggap na niya ✓',failed:'Hindi naipadala.'}[it.st]||''}${it.st==='failed'&&it.pi!=null?` <button type="button" class="linkbtn" data-retry="${it.pi}">Subukan ulit</button> <button type="button" class="linkbtn" data-drop="${it.pi}">Alisin</button>`:''}${it.why?' ('+esc(it.why)+')':''}${it.app?' · mula sa app':''}</span>`:'';
+    const st=it.app?`<span class="st">${(it.st==='queued'&&it.s.status==='working'?'Nakapila: matatanggap niya sa susunod niyang hakbang, tulad ng pag-type habang nagtatrabaho siya sa Claude app':{sending:'Ipinapadala…',queued:'Ipinapasa…',sent:'Natanggap na niya ✓',delivered:'Natanggap na niya ✓',failed:'Hindi naipadala.'}[it.st]||'')}${it.st==='failed'&&it.pi!=null?` <button type="button" class="linkbtn" data-retry="${it.pi}">Subukan ulit</button> <button type="button" class="linkbtn" data-drop="${it.pi}">Alisin</button>`:''}${it.why?' ('+esc(it.why)+')':''}${it.app?' · mula sa app':''}</span>`:'';
     if(it.sys)return `<div class="msg sys" data-chatto="${esc(it.s.sid)}">${esc(it.s.short)}: ${esc(it.text)} · ${simLabel(it.t)}</div>`;
     return `<div class="cmsg ${it.you?'you':''}" data-chatto="${esc(it.s.sid)}"><span class="who">${who} · ${simLabel(it.t)}</span><div class="msg md ${it.you?'you':'agent'}">${md(it.text)}</div>${st}</div>`;
   });

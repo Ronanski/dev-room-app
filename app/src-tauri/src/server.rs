@@ -792,7 +792,7 @@ fn liveness(st: &Mutex<State>) {
     let todo: Vec<(String, String)> = lk(st).sessions.iter().filter_map(|(k, v)| {
         let st = v.get("status").and_then(|x| x.as_str()).unwrap_or("idle");
         let guess = v.get("live_guess").and_then(|x| x.as_bool()).unwrap_or(false);
-        if st != "idle" && !guess { return None; }
+        if st != "idle" && st != "working" && !guess { return None; }
         v.get("transcript").and_then(|x| x.as_str()).map(|t| (k.clone(), t.to_string()))
     }).collect();
     let writes: HashMap<String, u64> = todo.into_iter().map(|(k, t)| { let w = latest_write(Path::new(&t)); (k, w) }).collect();
@@ -845,7 +845,24 @@ fn liveness(st: &Mutex<State>) {
             if status == "working" && last_hook < now.saturating_sub(180_000) { o.insert("status".into(), json!("idle")); }
             changed = true; save = true;
         }
+        // A turn stopped with Esc sends no Stop hook, so the session would look busy forever and a message
+        // to it would never go out. Ten quiet minutes (no hook, no transcript write) means it is not working.
+        if status == "working" && !guess {
+            let w = writes.get(sid).copied().unwrap_or(0);
+            if now.saturating_sub(hook_at.max(w)) > 600_000 {
+                o.insert("status".into(), json!("idle"));
+                o.insert("short".into(), json!(""));
+                o.insert("detail".into(), json!(""));
+                changed = true; save = true;
+            }
+        }
     }
+    // messages waiting for a session that is free now: send them right away
+    let ready: Vec<String> = s.sessions.iter().filter_map(|(k, v)| {
+        let o = v.as_object()?;
+        let queued = o.get("inbox").and_then(|i| i.as_array()).map(|a| a.iter().any(|m| m.get("state").and_then(|x| x.as_str()) == Some("queued"))).unwrap_or(false);
+        (queued && resumable(o)).then(|| k.clone())
+    }).collect();
     // forget sessions that ended without SessionEnd (3 days quiet)
     let cutoff = now.saturating_sub(3 * 24 * 3600 * 1000);
     let before = s.sessions.len();
@@ -853,6 +870,8 @@ fn liveness(st: &Mutex<State>) {
     if s.sessions.len() != before { changed = true; save = true; }
     if changed { s.bump(); }
     if save { s.save(); }
+    drop(s);
+    for sid in ready { deliver_now(&sid); }
 }
 
 pub fn start(port: u16) -> Option<u16> {

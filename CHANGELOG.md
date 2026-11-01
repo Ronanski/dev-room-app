@@ -13,6 +13,10 @@ The version lives in `VERSION`. Each build is published as release `v<VERSION>-b
   - The text is escaped before formatting, so a reply can never inject HTML.
   - Links show as text.
 - The project name in the chat header stays on one line, with an ellipsis.
+- **Messages no longer get stuck:**
+  - A message waiting for a busy session goes out as soon as that session is free, even when its turn ends without a Stop hook (an idle notification, or background work that stopped).
+  - A turn stopped with Esc sends no Stop hook. A session with no hook and no transcript write for 10 minutes now counts as not working, so a message to it still goes out.
+  - A queued message to a working session now says plainly that it arrives with the session's next step, like typing in the Claude app while it works.
 
 ## 0.8.0 (2026-11-01)
 
