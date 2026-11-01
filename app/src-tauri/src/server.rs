@@ -22,6 +22,11 @@ const MAX_BODY: usize = 4 * 1024 * 1024;
 
 /// Set by the app: opens the Dev Room window (used when DevRoom.exe is started a second time).
 pub static ON_SHOW: std::sync::OnceLock<Box<dyn Fn() + Send + Sync>> = std::sync::OnceLock::new();
+/// A per-launch key the app puts in its own window's URL, so only that window drives the embedded Claude view.
+pub fn app_key() -> &'static str {
+    static K: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    K.get_or_init(|| format!("{:016x}", rand::random::<u64>()))
+}
 /// Set by the app: shows the official Claude Code chat inside the Dev Room window at a rectangle
 /// (CSS pixels of the UI), or hides it (None).
 pub static ON_CLAUDE: std::sync::OnceLock<Box<dyn Fn(Option<(f64, f64, f64, f64)>) + Send + Sync>> = std::sync::OnceLock::new();
@@ -246,7 +251,8 @@ fn last_question(text: &str) -> Option<String> {
     Some(clip(&tail, 220))
 }
 
-fn apply_hook(st: &mut State, v: &Value) {
+/// `pre` is the transcript read done outside the lock by `hook_reply` (last assistant text, title).
+fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<String>)>) {
     let ev = v.get("hook_event_name").and_then(|x| x.as_str()).unwrap_or("");
     let Some(sid) = v.get("session_id").and_then(|x| x.as_str()).map(String::from) else { return };
     if sid.is_empty() || sid.len() > 80 || !sid.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') { return; }
@@ -266,9 +272,10 @@ fn apply_hook(st: &mut State, v: &Value) {
         s.insert("transcript".into(), json!(t));
         // Pick up the session's name (/rename or summary) once, the first time we see its transcript.
         if ev != "Stop" && !s.get("title_scanned").and_then(|x| x.as_bool()).unwrap_or(false) {
-            let (_, title) = read_transcript(t, true);
-            s.insert("title_scanned".into(), json!(true));
-            if let Some(title) = title { s.insert("auto_title".into(), json!(title)); }
+            if let Some((_, title)) = pre {
+                s.insert("title_scanned".into(), json!(true));
+                if let Some(title) = title { s.insert("auto_title".into(), json!(title.clone())); }
+            }
         }
     }
     s.insert("updated_at".into(), json!(now));
@@ -340,12 +347,10 @@ fn apply_hook(st: &mut State, v: &Value) {
         }
         "Stop" => {
             let mut text = v.get("last_assistant_message").and_then(|x| x.as_str()).map(String::from);
-            let scanned = s.get("title_scanned").and_then(|x| x.as_bool()).unwrap_or(false);
-            if let Some(t) = &transcript {
-                let (tx, title) = read_transcript(t, !scanned);
+            if let Some((tx, title)) = pre {
                 s.insert("title_scanned".into(), json!(true));
-                if text.is_none() { text = tx; }
-                if let Some(title) = title { s.insert("auto_title".into(), json!(title)); }
+                if text.is_none() { text = tx.clone(); }
+                if let Some(title) = title { s.insert("auto_title".into(), json!(title.clone())); }
             }
             let text = text.unwrap_or_default();
             push_convo(s, "assistant", &text, 4000);
@@ -420,8 +425,13 @@ fn wants_listen(g: &State, window_ms: u64) -> bool {
 fn hook_reply(req: Request, st: &Mutex<State>, v: &Value) {
     let ev = v.get("hook_event_name").and_then(|x| x.as_str()).unwrap_or("").to_string();
     let sid = v.get("session_id").and_then(|x| x.as_str()).unwrap_or("").to_string();
+    // read the transcript (it can be large) before taking the lock, and only when it is needed
+    let pre = v.get("transcript_path").and_then(|x| x.as_str()).and_then(|t| {
+        let scanned = lk(st).sessions.get(&sid).and_then(|s| s.get("title_scanned")).and_then(|x| x.as_bool()).unwrap_or(false);
+        if ev == "Stop" || !scanned { Some(read_transcript(t, !scanned)) } else { None }
+    });
     let mut g = lk(st);
-    apply_hook(&mut g, v);
+    apply_hook(&mut g, v, &pre);
     // a subagent's tool call carries the parent's session id; messages are for the main session only
     let sub = v.get("agent_id").is_some() || v.get("transcript_path").and_then(|x| x.as_str()).map(|t| t.contains("subagents")).unwrap_or(false);
     if sub { drop(g); return respond_json(req, 200, &json!({})); }
@@ -560,7 +570,7 @@ fn read_body(req: &mut Request) -> Option<Value> {
 
 /// Requests must name this PC (DNS rebinding) and, when a browser sends an Origin, come from Dev Room
 /// itself or the Android app shell. A web page open on the PC therefore cannot drive Dev Room.
-fn request_allowed(req: &Request, port: u16) -> bool {
+fn request_allowed(req: &Request, port: u16, local: bool) -> bool {
     let hv = |k: &'static str| req.headers().iter().find(|h| h.field.equiv(k)).map(|h| h.value.as_str().to_ascii_lowercase());
     let Some(host) = hv("Host") else { return false };
     // An IP address (any of this PC's adapters) or localhost: a rebinding attack always uses a host name.
@@ -569,13 +579,22 @@ fn request_allowed(req: &Request, port: u16) -> bool {
     if !ok_host { return false; }
     match hv("Origin") {
         None => true,
-        Some(o) => o == format!("http://{host}") || o == "http://localhost" || o == "https://localhost" || o == "capacitor://localhost",
+        // the Android app shell's origins only count for phones; on this PC they would be any local web server
+        Some(o) => o == format!("http://{host}") || (!local && (o == "http://localhost" || o == "https://localhost" || o == "capacitor://localhost")),
     }
 }
 
 fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
-    if !request_allowed(&req, port) { return respond_json(req, 403, &json!({"error": "origin"})); }
     let local = is_loopback(req.remote_addr());
+    if !request_allowed(&req, port, local) { return respond_json(req, 403, &json!({"error": "origin"})); }
+    let has = |k: &'static str| req.headers().iter().find(|h| h.field.equiv(k)).map(|h| h.value.as_str().to_string());
+    // Hooks come from curl, never from a browser (browsers always send Origin on POST).
+    if req.url().starts_with("/hook") && has("Origin").is_some() { return respond_json(req, 403, &json!({"error": "origin"})); }
+    // State-changing calls carry a custom header, which a page on another site cannot add without a preflight we never grant.
+    if *req.method() == Method::Post && req.url().starts_with("/api/") && has("X-DevRoom").is_none() {
+        return respond_json(req, 403, &json!({"error": "header"}));
+    }
+    let app_ok = has("X-DevRoom-App").map(|k| k == app_key()).unwrap_or(false);
     let url = req.url().to_string();
     let (path, query) = url.split_once('?').unwrap_or((url.as_str(), ""));
     let path = path.to_string();
@@ -616,7 +635,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
             list.sort_by_key(|r| std::cmp::Reverse(r.get("updated_at").and_then(|t| t.as_u64()).unwrap_or(0)));
             let lan = lan_ip().map(|ip| format!("http://{ip}:{port}/"));
             let body = json!({"version": s.version, "sessions": list, "team": s.team, "local": local,
-                "hooks_installed": if local { json!(hooks_installed(port)) } else { Value::Null }, "embed_claude": local && ON_CLAUDE.get().is_some(), "away": s.away,
+                "hooks_installed": if local { json!(hooks_installed(port)) } else { Value::Null }, "embed_claude": local && app_ok && ON_CLAUDE.get().is_some(), "away": s.away,
                 "settings_path": if local { json!(claude_settings_path().display().to_string()) } else { Value::Null },
                 "lan_url": lan, "ts_url": tailscale_ip().map(|ip| format!("http://{ip}:{port}/")),
                 "app_build": crate::updater::BUILD, "app_version": crate::updater::VERSION, "ui_build": crate::updater::ui_build(),
@@ -663,7 +682,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
             respond_json(req, 200, &Value::Object(all));
         }
         (Method::Post, "/api/claude-view") => {
-            if !local { return respond_json(req, 403, &json!({"error": "loopback only"})); }
+            if !local || !app_ok { return respond_json(req, 403, &json!({"error": "app window only"})); }
             let v = read_body(&mut req).unwrap_or(Value::Null);
             let n = |k: &str| v.get(k).and_then(|x| x.as_f64()).unwrap_or(0.0);
             let rect = if v.get("show").and_then(|x| x.as_bool()).unwrap_or(false) && n("w") > 50.0 && n("h") > 50.0 { Some((n("x"), n("y"), n("w"), n("h"))) } else { None };

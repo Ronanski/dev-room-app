@@ -37,8 +37,9 @@ fn set_autostart(on: bool) {
 
 /// The window is created on demand and destroyed when closed, so a closed Dev Room costs almost nothing:
 /// only the small server keeps running in the tray for phones, tablets and the hooks.
+/// Its URL carries a per-launch key, so only this window can drive the embedded Claude view.
 fn make_window(app: &AppHandle, port: u16) {
-    let url = format!("http://127.0.0.1:{port}/").parse().expect("valid url");
+    let url = format!("http://127.0.0.1:{port}/?app={}", server::app_key()).parse().expect("valid url");
     let _ = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::External(url))
         .title("Dev Room")
         .inner_size(1440.0, 900.0)
@@ -46,45 +47,79 @@ fn make_window(app: &AppHandle, port: u16) {
         .build();
 }
 
+/// Pages the embedded Claude view may show: Claude itself and the sign-in providers it uses.
+fn claude_allowed(url: &tauri::Url) -> bool {
+    if url.scheme() == "about" { return true; }
+    if url.scheme() != "https" { return false; }
+    let h = url.host_str().unwrap_or("");
+    let under = |d: &str| h == d || h.ends_with(&format!(".{d}"));
+    under("claude.ai") || under("anthropic.com") || h == "accounts.google.com" || h == "accounts.youtube.com" || h == "appleid.apple.com"
+}
+
+/// Anything else opens in the user's own browser, with its address bar.
+fn open_outside(url: &tauri::Url) {
+    if !matches!(url.scheme(), "http" | "https") { return; }
+    #[cfg(windows)]
+    { let _ = std::process::Command::new("explorer").arg(url.as_str()).spawn(); }
+}
+
+/// The latest rectangle the UI asked for (None = hidden); applied after a slow first creation too.
+static CLAUDE_WANT: std::sync::Mutex<Option<(f64, f64, f64, f64)>> = std::sync::Mutex::new(None);
+static CLAUDE_BUSY: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// The official Claude Code chat (claude.ai/code, with this PC's sessions through Remote Control),
 /// shown as a second webview inside the Dev Room window, over the panel's chat area.
 /// Runs on a server thread (creating a child webview from the main thread can deadlock on Windows).
 fn claude_view(app: &AppHandle, rect: Option<(f64, f64, f64, f64)>) {
     use tauri::{LogicalPosition, LogicalSize};
-    let existing = app.webviews().get("claude").cloned();
-    let Some((x, y, w, h)) = rect else {
-        if let Some(v) = existing { let _ = v.hide(); }
-        return;
-    };
-    if let Some(v) = existing {
-        let _ = v.set_position(LogicalPosition::new(x, y));
-        let _ = v.set_size(LogicalSize::new(w, h));
-        let _ = v.show();
-        return;
+    *CLAUDE_WANT.lock().unwrap_or_else(|e| e.into_inner()) = rect;
+    let _one_at_a_time = CLAUDE_BUSY.lock().unwrap_or_else(|e| e.into_inner());
+    if app.webviews().get("claude").is_none() {
+        if rect.is_none() { return; }
+        let Some(window) = app.get_window("main") else { return };
+        let app2 = app.clone();
+        let popups = std::sync::atomic::AtomicU32::new(0);
+        let url = "https://claude.ai/code".parse().expect("valid url");
+        let (x, y, w, h) = rect.unwrap();
+        let builder = tauri::webview::WebviewBuilder::new("claude", tauri::WebviewUrl::External(url))
+            .on_navigation(|u| { if claude_allowed(u) { true } else { open_outside(u); false } })
+            // sign-in windows (Google, Apple, email links) open inside Dev Room in the same profile; any other link opens in the browser
+            .on_new_window(move |url, features| {
+                if !claude_allowed(&url) { open_outside(&url); return tauri::webview::NewWindowResponse::Deny; }
+                let n = popups.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                match tauri::WebviewWindowBuilder::new(&app2, format!("claude-signin-{n}"), tauri::WebviewUrl::External("about:blank".parse().unwrap()))
+                    .window_features(features)
+                    .on_navigation(|u| { if claude_allowed(u) { true } else { open_outside(u); false } })
+                    .title(format!("Claude · {}", url.host_str().unwrap_or("sign in")))
+                    .build()
+                {
+                    Ok(window) => tauri::webview::NewWindowResponse::Create { window },
+                    Err(_) => tauri::webview::NewWindowResponse::Deny,
+                }
+            });
+        if window.add_child(builder, LogicalPosition::new(x, y), LogicalSize::new(w, h)).is_err() { return; }
     }
-    let Some(window) = app.get_window("main") else { return };
-    let app2 = app.clone();
-    let popups = std::sync::atomic::AtomicU32::new(0);
-    let url = "https://claude.ai/code".parse().expect("valid url");
-    let builder = tauri::webview::WebviewBuilder::new("claude", tauri::WebviewUrl::External(url))
-        // sign-in pages that open a window (Google, email links) open inside Dev Room, in the same profile
-        .on_new_window(move |url, features| {
-            let n = popups.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            match tauri::WebviewWindowBuilder::new(&app2, format!("claude-signin-{n}"), tauri::WebviewUrl::External("about:blank".parse().unwrap()))
-                .window_features(features)
-                .title(format!("Claude · {}", url.host_str().unwrap_or("sign in")))
-                .build()
-            {
-                Ok(window) => tauri::webview::NewWindowResponse::Create { window },
-                Err(_) => tauri::webview::NewWindowResponse::Allow,
-            }
-        });
-    let _ = window.add_child(builder, LogicalPosition::new(x, y), LogicalSize::new(w, h));
+    // apply whatever was asked last (the UI may have moved or hidden the panel while the view was being created)
+    let want = *CLAUDE_WANT.lock().unwrap_or_else(|e| e.into_inner());
+    let Some(v) = app.webviews().get("claude").cloned() else { return };
+    match want {
+        Some((x, y, w, h)) => {
+            let _ = v.set_position(LogicalPosition::new(x, y));
+            let _ = v.set_size(LogicalSize::new(w, h));
+            let _ = v.show();
+        }
+        None => {
+            let _ = v.hide();
+            // give the keyboard back to Dev Room
+            if let Some(main) = app.webviews().get("main") { let _ = main.set_focus(); }
+        }
+    }
 }
 
 fn show_main(app: &AppHandle, port: u16) {
     updater::set_hidden(false);
-    if let Some(w) = app.get_webview_window("main") {
+    // a plain Window: once the Claude view is added, the window is no longer a single-webview "WebviewWindow"
+    if let Some(w) = app.get_window("main") {
         let _ = w.show();
         let _ = w.unminimize();
         let _ = w.set_focus();
@@ -98,12 +133,12 @@ fn main() {
     if !std::env::args().any(|a| a == "--restarted") {
         let url = format!("http://127.0.0.1:{}/api/show", server::DEFAULT_PORT);
         let agent = ureq::AgentBuilder::new().timeout(std::time::Duration::from_millis(4000)).build();
-        if agent.post(&url).call().is_ok() { return; }
+        if agent.post(&url).set("X-DevRoom", "1").call().is_ok() { return; }
     }
     let Some(port) = server::start(server::DEFAULT_PORT) else {
         // another copy holds the port: show its window and leave
         let url = format!("http://127.0.0.1:{}/api/show", server::DEFAULT_PORT);
-        let _ = ureq::AgentBuilder::new().timeout(std::time::Duration::from_secs(5)).build().post(&url).call();
+        let _ = ureq::AgentBuilder::new().timeout(std::time::Duration::from_secs(5)).build().post(&url).set("X-DevRoom", "1").call();
         return;
     };
     updater::start();

@@ -72,6 +72,9 @@ public class WatchService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         int type = Build.VERSION.SDK_INT >= 34 ? ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE : 0;
         ServiceCompat.startForeground(this, ONGOING_ID, ongoing("Binabantayan ang office mo."), type);
+        // a new pairing starts from scratch: no remembered address or state version
+        good = null;
+        version = -1;
         if (!running) {
             running = true;
             worker = new Thread(this::loop, "devroom-watch");
@@ -128,13 +131,15 @@ public class WatchService extends Service {
         try { c = open(first, token); good = first; }
         catch (Exception e) { if (second == null || second.isEmpty()) throw e; c = open(second, token); good = second; }
         int code = c.getResponseCode();
-        if (code == 204) return;   // nothing changed since the last poll
-        if (code == 401) { update("Kailangang i-pair ulit ang phone. I-scan ang QR code sa PC."); running = false; stopSelf(); return; }
-        if (code != 200) { update("Hindi maabot ang Dev Room sa PC mo. Susubukan ulit."); return; }
+        if (code == 204) { c.disconnect(); return; }   // nothing changed since the last poll
+        if (code == 401) { c.disconnect(); update("Kailangang i-pair ulit ang phone. I-scan ang QR code sa PC."); running = false; stopSelf(); return; }
+        if (code != 200) { c.disconnect(); update("Hindi maabot ang Dev Room sa PC mo. Susubukan ulit."); return; }
         StringBuilder sb = new StringBuilder();
         try (BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"))) {
             String line;
             while ((line = r.readLine()) != null) sb.append(line);
+        } finally {
+            c.disconnect();
         }
         JSONObject j = new JSONObject(sb.toString());
         version = j.optLong("version", -1);

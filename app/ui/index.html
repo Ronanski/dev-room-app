@@ -1025,7 +1025,10 @@ function tlHTML(s){
 let TOKEN='';
 try{TOKEN=new URLSearchParams(location.search).get('t')||localStorage.getItem('devroom.token')||'';
   if(new URLSearchParams(location.search).get('t')){localStorage.setItem('devroom.token',TOKEN);history.replaceState(null,'',location.pathname);}}catch(e){}
-const hdr=()=>TOKEN?{'X-DevRoom-Token':TOKEN}:{};
+// The Dev Room window's own per-launch key (from its URL); only that window drives the embedded Claude view.
+let APPKEY='';try{APPKEY=new URLSearchParams(location.search).get('app')||sessionStorage.getItem('devroom.app')||'';if(APPKEY)sessionStorage.setItem('devroom.app',APPKEY);}catch(e){}
+// X-DevRoom marks requests from this UI: a page on another site cannot add it without a preflight the server never grants.
+const hdr=()=>Object.assign({'X-DevRoom':'1'},TOKEN?{'X-DevRoom-Token':TOKEN}:{},APPKEY?{'X-DevRoom-App':APPKEY}:{});
 function setConn(){
   const el=$('conn');if(!el)return;
   const n=sessions.length,sync=lastSync?` Huling update: ${simLabel(lastSync)}.`:'';
@@ -1117,7 +1120,7 @@ function updates(j){
 const autoRestart={ready:false,ver:'',left:0,timer:0,waitUntil:0,lastInput:Date.now(),
   tick(){
     if(!this.ready||this.timer||restartApp.going)return;
-    if(document.hidden){restartApp(true);return;}
+    if(document.hidden)return;   // minimized or in the background: the app restarts by itself only from the tray
     const el=$('updbar');el.hidden=false;
     if(Date.now()<this.waitUntil||Date.now()-this.lastInput<60000){
       el.innerHTML=`<span>May bagong bersyon ng Dev Room${this.ver?' (v'+this.ver+')':''}. Kusa itong magre-restart kapag hindi mo ginagamit.</span><button type="button" class="btn primary" data-act="restart">I-restart ngayon</button>`;return;}
@@ -1129,10 +1132,10 @@ const autoRestart={ready:false,ver:'',left:0,timer:0,waitUntil:0,lastInput:Date.
 ['pointerdown','keydown','wheel','touchstart'].forEach(ev=>addEventListener(ev,()=>{autoRestart.lastInput=Date.now();},{passive:true,capture:true}));
 document.addEventListener('visibilitychange',()=>autoRestart.tick());
 setInterval(()=>autoRestart.tick(),5000);
-async function restartApp(hidden){if(restartApp.going)return;restartApp.going=true;setTimeout(()=>{restartApp.going=false;},30000);try{await fetch('/api/restart'+(hidden?'?hidden=1':''),{method:'POST'});}catch(e){}$('updbar').hidden=false;$('updbar').innerHTML='<span>Nagre-restart ang Dev Room. Babalik ito sa loob ng ilang segundo.</span>';}
+async function restartApp(hidden){if(restartApp.going)return;restartApp.going=true;setTimeout(()=>{restartApp.going=false;},30000);try{await fetch('/api/restart'+(hidden?'?hidden=1':''),{method:'POST',headers:hdr()});}catch(e){}$('updbar').hidden=false;$('updbar').innerHTML='<span>Nagre-restart ang Dev Room. Babalik ito sa loob ng ilang segundo.</span>';}
 async function installHooks(){
   if(!confirm(`Idadagdag ng Dev Room ang hooks sa ${settingsPath||'settings.json ng Claude'}. Gagawa muna ito ng backup. Ituloy?`))return;
-  try{const r=await fetch('/api/install-hooks',{method:'POST'});const j=await r.json();
+  try{const r=await fetch('/api/install-hooks',{method:'POST',headers:hdr()});const j=await r.json();
     connMsg=r.ok?`OK Naka-set up na ang hooks.${j.backup?' May backup sa '+j.backup+'.':''} I-restart ang mga bukas na Claude Code session para gumana sa kanila.`:(j.error||'Hindi na-set up ang hooks.');
   }catch(e){connMsg='Hindi na-set up ang hooks.';}
   version=0;setConn();
@@ -1473,7 +1476,7 @@ function layoutBubbles(){
   for(const e of PEOPLE()){
     const n=nodes.get(e);if(!n)continue;
     if(n.style.display==='none'||!n._bt){if(n._lift){n._lift=0;n._b.style.translate='';n.classList.remove('lifted');}continue;}
-    const key=n._bt+'|'+bsI+'|'+(n._e&&!n._e.hidden?1:0);if(n._bkey!==key){n._bkey=key;n._bw=n._b.offsetWidth;n._bh=n._b.offsetHeight;n._below=n.offsetHeight-(n._b.offsetTop+n._b.offsetHeight);}
+    const key=n._bt+'|'+bsI+'|'+overlay._zs+'|'+(n._e&&!n._e.hidden?1:0);if(n._bkey!==key){n._bkey=key;n._bw=n._b.offsetWidth;n._bh=n._b.offsetHeight;n._below=n.offsetHeight-(n._b.offsetTop+n._b.offsetHeight);}
     const x=n._x,y=n._y-n._below;
     items.push({n,x,y,w:n._bw,h:n._bh,pri:(e.status==='needs'||e.status==='failed')?0:(e.id===selected?1:e.npc?3:2)});
   }
@@ -1481,7 +1484,7 @@ function layoutBubbles(){
   // name tags stay where they are, so bubbles must not cover them either. Where two tags would overlap,
   // the one in front (session first, then nearest) keeps its tag and the one behind hides it.
   const placed=[],tags=[];
-  for(const [e,n] of nodes){if(n.style.display==='none'||!n._t.textContent)continue;const tk=n._t.textContent+'|'+bsI;if(n._tkey!==tk){n._tkey=tk;n._tw=n._t.offsetWidth;n._tht=n._t.offsetHeight;n._tb=n.offsetHeight-(n._t.offsetTop+n._t.offsetHeight);}
+  for(const [e,n] of nodes){if(n.style.display==='none'||!n._t.textContent)continue;const tk=n._t.textContent+'|'+bsI+'|'+overlay._zs;if(n._tkey!==tk){n._tkey=tk;n._tw=n._t.offsetWidth;n._tht=n._t.offsetHeight;n._tb=n.offsetHeight-(n._t.offsetTop+n._t.offsetHeight);}
     const x=n._x,b=n._y-n._tb;tags.push({n,pri:e.npc?(e.boss?1:2):(e.id===selected||e.status==='needs'?0:1),r:{l:x-n._tw/2,r:x+n._tw/2,t:b-n._tht,b}});}
   tags.sort((a,b)=>a.pri-b.pri||b.r.b-a.r.b);
   for(const tg of tags){const q=tg.r,hide=placed.some(o=>q.l<o.r&&q.r>o.l&&q.t<o.b&&q.b>o.t);
@@ -1584,10 +1587,10 @@ const STAT=[],DYN=[];
 /* ---------- loop ---------- */
 let last=performance.now();
 // At most 60 fps (120 Hz phones would otherwise draw twice as often); the browser pauses the loop when hidden.
-let lastDraw=0;
+let nextDraw=0;
 function frame(ts){
-  if(ts-lastDraw<12){requestAnimationFrame(frame);return;}
-  lastDraw=ts;
+  if(ts<nextDraw-2){requestAnimationFrame(frame);return;}
+  nextDraw=Math.max(nextDraw,ts-16.67)+16.67;
   if(needResize){needResize=false;resizeMap();}
   const budget=16.7;
   Q.tick(ts-last,budget);const dt=Math.min(.05,(ts-last)/1000);last=ts;const t=ts/1000;
@@ -1717,10 +1720,11 @@ function syncClaude(){
   const on=ptab==='chat'&&$('app').classList.contains('drawer')&&!$('app').classList.contains('focus')&&$('teamPanel').hidden&&$('whatsNew').hidden&&!document.hidden;
   panel.classList.toggle('embed',ptab==='chat');host.hidden=ptab!=='chat';$('app').classList.toggle('claudewide',ptab==='chat');
   let key='hide';
-  if(on){const r=host.getBoundingClientRect();if(r.width>50&&r.height>50)key=[r.left,r.top,r.width,r.height].map(Math.round).join(',');}
+  if(on){const r=host.getBoundingClientRect();if(r.width>50&&r.height>50)key=[r.left,r.top,r.width,r.height].map(Math.round).join(',')+','+devicePixelRatio;}
   if(key===claudeRect)return;claudeRect=key;
-  const [x,y,w,hh]=key==='hide'?[0,0,0,0]:key.split(',').map(Number);
-  fetch('/api/claude-view',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({show:key!=='hide',x,y,w,h:hh})}).catch(()=>{});
+  const [x,y,w,hh]=key==='hide'?[0,0,0,0]:key.split(',').slice(0,4).map(Number);
+  fetch('/api/claude-view',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({show:key!=='hide',x,y,w,h:hh})})
+    .then(r=>{if(!r.ok)claudeRect='';}).catch(()=>{claudeRect='';});   // try again on the next check
 }
 setInterval(syncClaude,400);addEventListener('resize',syncClaude);document.addEventListener('visibilitychange',syncClaude);
 function openClaude(){
