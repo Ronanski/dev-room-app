@@ -169,6 +169,7 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .composer details.away{font-size:11.5px;color:var(--muted)}
 .composer details.away summary{cursor:pointer}
 .composer details.away[open]{display:flex;flex-direction:column;gap:4px;flex:1}
+.linkbtn{border:0;background:none;color:var(--accent);text-decoration:underline;font:inherit;font-size:11px;padding:0 2px;cursor:pointer}
 .okchip{font-size:12px;color:var(--work);font-weight:700;padding:0 4px}
 .alrow:not(.unack){opacity:.62}
 .alrow:not(.unack) i{background:var(--muted)!important}
@@ -359,8 +360,8 @@ body{margin:0}
 @container app (min-width: 641px){
   .body{grid-template-columns:minmax(0,1fr);grid-template-areas:"office" "dock"}
   .pane[data-pane="chat"]{grid-area:auto;position:absolute;top:8px;right:8px;bottom:calc(var(--dockh,120px) + 18px);width:min(380px,calc(100% - 16px));min-height:0;z-index:8;
-    transform:translateX(calc(100% + 24px));opacity:0;pointer-events:none;transition:transform .22s ease,opacity .22s ease}
-  .app.drawer .pane[data-pane="chat"]{transform:none;opacity:1;pointer-events:auto}
+    transform:translateX(calc(100% + 24px));opacity:0;pointer-events:none;visibility:hidden;transition:transform .22s ease,opacity .22s ease,visibility 0s linear .22s}
+  .app.drawer .pane[data-pane="chat"]{transform:none;opacity:1;pointer-events:auto;visibility:visible;transition-delay:0s}
   .app.drawer .chatpanel{box-shadow:0 12px 40px rgba(20,14,10,.35)}
   .app.focus .pane[data-pane="chat"]{bottom:8px}
   .app.drawer .toasts,.app.drawer .zoom{right:calc(min(380px,100% - 16px) + 18px)}
@@ -453,7 +454,7 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 const rand=(a,b)=>a+Math.random()*(b-a);
 const pick=a=>a[Math.floor(Math.random()*a.length)];
 let paused=false,pausedAcc=0,pauseAt=0;
-const now=()=>paused?pauseAt-pausedAcc:Date.now()-pausedAcc;
+const now=()=>Date.now();
 const MIN=60000;
 
 /* ---------- data ---------- */
@@ -945,6 +946,10 @@ function askText(t){
   if(/waiting for your input/i.test(t))return'Naghihintay ng sagot mo.';
   return t;
 }
+// ACKs are remembered on this device per session and question, so a reload does not raise them again
+const ackKey=s=>s.sid+'|'+(s.ask||s.detail||'');
+function ackSeen(s){try{return JSON.parse(localStorage.getItem('devroom.acks')||'[]').includes(ackKey(s));}catch(e){return false;}}
+function ackRemember(s){try{const a=JSON.parse(localStorage.getItem('devroom.acks')||'[]').filter(k=>k!==ackKey(s));a.push(ackKey(s));localStorage.setItem('devroom.acks',JSON.stringify(a.slice(-100)));}catch(e){}}
 function infoOf(r){
   const p=r.post_turn_summary||{},sc=r.session_context||{},em=r.external_metadata||{};
   const src=['PC mo',r.cwd?baseName(r.cwd):'Claude Code'];
@@ -1007,6 +1012,7 @@ function applyRecords(records){
     if(!s){
       const desk=isLead?null:freeDesk();if(!isLead&&!desk)continue;
       s=mkLive(r,desk,isLead);sessions.push(s);seedChat(s);
+      if(s.status==='needs'||s.status==='failed'){s.alarmAt=s.at||now();s.prio=/permission/i.test(s.ask||'')||s.status==='failed'?1:2;s.acked=ackSeen(s);}
       if(firstLoad)applyStatus(s,true);
       else{place(s,{x:2.5*T,y:H+12});guardWake();say(guard,`Magandang araw, ${s.short}! Pirma po muna sa logbook.`,6000);log('Guard',`May bagong session na pumasok: ${s.name}.`);applyStatus(s,false);}
       continue;
@@ -1015,6 +1021,7 @@ function applyRecords(records){
     const i=infoOf(r);Object.assign(s,i);
     s.activity=[i.act||'Nagtatrabaho.',sent(i.detail||i.recent||'Nagtatrabaho sa task niya')];
     if(i.status!==prev){s.status=prev;setStatus(s,i.status);}
+    else if(s.status==='needs'&&prevDetail.split('|')[2]!==s.ask){s.acked=ackSeen(s);s.alarmAt=now();s.prio=/permission/i.test(s.ask||'')?1:2;if(!s.acked)toast(s);}
     else if(i.at!==prevAt&&prevDetail!==(s.detail+'|'+s.recent+'|'+s.ask)&&s.status!=='working'){log(s.short,statusLine(s),s);say2(s,'agent',statusLine(s));}
     else if(s.status==='working'&&prevDetail!==(s.detail+'|'+s.recent+'|'+s.ask))log(s.short,statusLine(s),s);
   }
@@ -1117,9 +1124,12 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
-  '0.6.5':{news:['Mas madaling makilala ang mga session: kapag walang pangalan, ang unang utos mo ang nagiging pangalan, at may numero kapag magkapareho. Sa card, kung ano ang ipinagawa mo ang makikita, hindi na ang paulit-ulit na paalala.',
-    'Nagsasara na sa <b>Esc</b> o sa pag-click sa labas ang Piliin ang team, I-connect ang phone at ang card na ito. Lumalabas na rin sa fullscreen ang Esc.'],
-    todo:['Wala kang kailangang gawin.']},
+  '0.6.5':{news:['<b>Buong audit at testing ng app:</b> UI/UX sa PC, tablet at phone; lahat ng daloy (alarms, chat, team, controls); at ang code. Inayos ang lahat ng nakita.',
+    '<b>Phone:</b> hindi na natatakpan ng tab bar ang anumang laman, maikli na ang header, iisang alarm lang ang lumalabas, at mas malalaki ang mga pindutan.',
+    '<b>Chat at alarms:</b> isang salita na lang sa bawat status, may <b>Sagutin</b> ang mga humihingi ng pahintulot, naaalala ang ACK, at may <b>Subukan ulit</b> kapag hindi naipadala.',
+    '<b>Mas ligtas:</b> hindi na makakapag-utos sa Dev Room ang ibang website sa PC, at hindi na mababago ng ibang link ang pairing ng phone app nang hindi ka tinatanong.',
+    'Nagsasara na sa Esc ang mga dialog at ang fullscreen; magkakaiba na ang pangalan ng mga session.'],
+    todo:['Wala sa PC. Sa phone, pindutin ang <b>I-update</b> sa banner para sa mga ayos sa Android app.']},
   '0.6.4':{news:['<b>Ang Chat sa PC ay ang mismong Claude Code na.</b> Buksan ang Panel → Chat (o pindutin ang <b>Claude</b>): nandoon na mismo sa loob ng Dev Room ang Claude Code chat ng mga session mo, hindi na hiwalay na window. Mag-login isang beses; bubukas ang login sa loob ng app.',
     'Wala nang scrollbar sa ibaba at kanan ng window.',
     'Naayos ang malaking pulang bilog sa itaas ng map, ang nagpapatong na pangalan at bubbles, at ang mga button sa phone.'],
@@ -1784,7 +1794,8 @@ async function setAway(m){
   if(m!=='off'&&!confirm('Kapag naka-on ito, hindi muna matatapos ang turn ng session pagkatapos niyang sumagot: maghihintay siya ng utos mo mula sa app nang hanggang 20 minuto. Habang naghihintay, mukha siyang "may ginagawa" sa Claude Code at hindi ka makakapag-utos doon nang normal (pindutin ang Esc para ituloy). Ituloy?')){$('awaySel').value=awayMode;return;}
   awayMode=m;chatKey='';renderPanel();try{await fetch('/api/away',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({mode:m})});}catch(e){}}
 function cleanMsg(t){
-  return String(t||'').replace(/<([a-z][\w]*-[\w-]*)[^>]*>[\s\S]*?<\/\1>/gi,'').replace(/<\/?[a-z][\w]*-[\w-]*[^>]*>/gi,'').replace(/\n{3,}/g,'\n\n').trim();
+  const SYS='system-reminder|command-name|command-message|command-args|command-contents|local-command-stdout|local-command-stderr|local-command-caveat|side-sessions-event|task-notification|user-prompt-submit-hook|bash-input|bash-stdout|bash-stderr';
+  return String(t||'').replace(new RegExp('<('+SYS+')\\b[^>]*>[\\s\\S]*?<\\/\\1>','gi'),'').replace(new RegExp('<\\/?('+SYS+')\\b[^>]*>','gi'),'').replace(/\n{3,}/g,'\n\n').trim();
 }
 // One feed for the whole team: your prompts, the sessions' replies and messages sent from this app.
 function chatFeed(){
@@ -1794,12 +1805,12 @@ function chatFeed(){
   for(const s of list){
     for(const m of (CONVO[s.sid]||[])){const text=cleanMsg(m.text);if(text)items.push({s,t:m.at,you:m.role==='user',text});}
     for(const m of (s.inbox||[]))items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true});
-    for(const m of PENDING)if(m.sid===s.sid)items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true,why:m.why});
+    PENDING.forEach((m,pi)=>{if(m.sid===s.sid)items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true,why:m.why,pi});});
   }
   items.sort((a,b)=>a.t-b.t);
   const out=items.slice(-120).map(it=>{
     const who=it.you?`<b>Boss</b> → ${esc(it.s.short)}`:`<i style="background:${it.s.pal.shirt}"></i><b>${esc(it.s.short)}</b>`;
-    const st=it.app?`<span class="st">${{sending:'Ipinapadala…',queued:'Naghihintay maipasa',sent:'Ipinasa na, hinihintay ang session',delivered:'Naipasa ✓',failed:'Hindi naipadala. Subukan ulit.'}[it.st]||''}${it.why?' ('+esc(it.why)+')':''}${it.app?' · mula sa app':''}</span>`:'';
+    const st=it.app?`<span class="st">${{sending:'Ipinapadala…',queued:'Naghihintay maipasa',sent:'Ipinasa na, hinihintay ang session',delivered:'Naipasa ✓',failed:'Hindi naipadala.'}[it.st]||''}${it.st==='failed'&&it.pi!=null?` <button type="button" class="linkbtn" data-retry="${it.pi}">Subukan ulit</button> <button type="button" class="linkbtn" data-drop="${it.pi}">Alisin</button>`:''}${it.why?' ('+esc(it.why)+')':''}${it.app?' · mula sa app':''}</span>`:'';
     return `<div class="cmsg ${it.you?'you':''}" data-chatto="${esc(it.s.sid)}"><span class="who">${who} · ${simLabel(it.t)}</span><div class="msg ${it.you?'you':'agent'}">${esc(it.text)}</div>${st}</div>`;
   });
   // a queued message to a session that already stopped (and is not waiting) only arrives with its next turn
@@ -1824,7 +1835,7 @@ function renderPanel(){
 
   const body=$('cpBody');
   if(ptab==='alarms'){
-    const al=sessions.filter(x=>x.status==='needs'||x.status==='failed').sort((a,b)=>(a.acked-b.acked)||((a.prio||2)-(b.prio||2))||(b.alarmAt||0)-(a.alarmAt||0));
+    const al=sessions.filter(x=>x.status==='needs'||x.status==='failed').sort((a,b)=>((!!a.acked)-(!!b.acked))||((a.prio||2)-(b.prio||2))||(b.alarmAt||0)-(a.alarmAt||0));
     const key='a'+al.map(x=>x.id+':'+x.status+':'+(x.acked?1:0)).join('|');
     if(key!==chatKey){chatKey=key;body.innerHTML=al.length?`<ul class="alist">${al.map(x=>`<li class="alrow ${x.status==='failed'||x.prio===1?'p1':'p2'} ${x.acked?'':'unack'}" data-pick="${x.id}"><i></i><span class="m"><b>${esc(x.short)} · ${x.status==='failed'?'MAY ERROR':'KAILANGAN KA'} · ${x.status==='failed'||x.prio===1?'MATAAS':'KATAMTAMAN'}</b><span>${esc(x.status==='failed'?(x.detail||'May pumalyang command.'):(x.ask||'May tanong sa iyo.'))}</span></span>${x.acked?'<span class="ackd">✓ Nakita na</span>':`<button type="button" class="btn" data-ack="${x.id}">ACK</button>`}</li>`).join('')}</ul>`:'<p class="sub2">Walang alarm. Normal ang lahat ng operator.</p>';}
   }else if(ptab==='chat'){
@@ -1875,9 +1886,9 @@ async function saveTeam(t){
   version=0;setConn();
 }
 function rebuildTeam(){for(const s of sessions.slice())dropSession(s,'');firstLoad=true;logs.length=0;applyRecords(allRecords);setConn();}
-function collectNames(){const n=Object.assign({},TEAM.names||{});document.querySelectorAll('#teamPanel .tname').forEach(i=>{const r=allRecords.find(x=>x.id===i.dataset.id);const v=i.value.trim();if(v&&(!r||v!==r.title||n[i.dataset.id]))n[i.dataset.id]=v;});return n;}
+function collectNames(){const n=Object.assign({},TEAM.names||{});document.querySelectorAll('#teamPanel .tname').forEach(i=>{const r=allRecords.find(x=>x.id===i.dataset.id);const v=i.value.trim();if(!v||(r&&v===r.title&&!n[i.dataset.id]))delete n[i.dataset.id];else n[i.dataset.id]=v;});return n;}
 function dockCard(s){
-  return `<button type="button" class="dcard ${s.id===selected?'sel':''} ${s.status==='needs'?'needcard':''}" data-id="${s.id}">${av(s)}<span style="min-width:0"><span class="nm" style="display:block">${esc(s.role)}${FX.mood?`<span class="mood" title="Energy ${Math.round(energy(s)*100)}%">${moodOf(s)}</span>`:''}</span><span class="rl" style="display:block">${esc(s.task||actText(s))}</span></span><span class="ft">${pill(s)}<span class="dur">${dur(now()-s.since)}</span></span>${FX.timeline?tlHTML(s):''}</button>`;
+  return `<button type="button" class="dcard ${s.id===selected?'sel':''} ${s.status==='needs'?'needcard':''}" data-id="${s.id}">${av(s)}<span style="min-width:0"><span class="nm" style="display:block">${esc(s.role)}${FX.mood?`<span class="mood" title="Energy ${Math.round(energy(s)*10)*10}%">${moodOf(s)}</span>`:''}</span><span class="rl" style="display:block">${esc(s.task||actText(s))}</span></span><span class="ft">${pill(s)}<span class="dur">${dur(now()-s.since)}</span></span>${FX.timeline?tlHTML(s):''}</button>`;
 }
 function render(){
   pruneToasts();
@@ -1890,7 +1901,7 @@ function render(){
     <span class="count"><i class="dot" style="background:var(--idle)"></i><b>${by('idle')-sleepN}</b> naka-break</span>
     <span class="count"><i class="dot" style="background:var(--sleep)"></i><b>${sleepN}</b> tulog</span>
     <span class="count"><i class="dot" style="background:var(--done)"></i><b>${by('done')+by('failed')}</b> tapos o may error</span>`);
-  {const dh=sessions.map(dockCard).join('')+`<button type="button" class="addcard" data-act="add">+ Magdagdag ng session</button>`;if(dh!==render.dock){render.dock=dh;$('dock').innerHTML=dh;}}
+  {const dh=sessions.map(dockCard).join('')+`<button type="button" class="addcard" data-act="add">+ Magdagdag ng session</button>`;if(dh!==render.dock){render.dock=dh;const f=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#dock [data-id]');const fid=f&&f.dataset.id;$('dock').innerHTML=dh;if(fid)$('dock').querySelector(`[data-id="${fid}"]`)?.focus();}}
   renderPanel();
   const tb=$('tabBadge');tb.hidden=!needN;tb.textContent=needN;
   $('clock').textContent=dayLabel(now())+', '+simLabel(now());$('sbClock').textContent=simLabel(now()).replace(/ (AM|PM)/,'');
@@ -1906,7 +1917,7 @@ function toast(s){
   if(!el){el=document.createElement('div');el.className='toast';el.dataset.sid=s.id;box.appendChild(el);}
   const hi=s.status==='failed'||s.prio===1;el.classList.toggle('p1',hi);el.classList.toggle('p2',!hi);
   el.innerHTML=`${av(s,28)}<div style="min-width:0"><div class="ti">${s.status==='failed'?'MAY ERROR':'KAILANGAN KA'} · ${hi?'MATAAS':'KATAMTAMAN'} · ${simLabel(now())}</div><b>Kailangan ka ng ${esc(s.role)}.</b><div style="font-size:12.5px">${esc(s.status==='failed'?(s.detail||'May pumalyang command.'):(s.ask||'May tanong siya sa iyo.'))}</div><div class="acts"><button type="button" class="btn" data-ack="${s.id}">ACK</button><button type="button" class="btn" data-open-alarm="${s.id}">Tingnan</button><button type="button" class="btn primary" data-act="claude">Sagutin</button></div></div>`;
-  while(box.children.length>4)box.firstChild.remove();
+  while(box.children.length>4){const low=[...box.children].find(x=>x.classList.contains('p2'));(low||box.firstChild).remove();}
 }
 function pruneToasts(){const box=$('toasts');if(!box)return;for(const el of [...box.children]){const s=sessions.find(x=>x.id===+el.dataset.sid);if(!s||s.acked||(s.status!=='needs'&&s.status!=='failed'))el.remove();}}
 function setDrawer(on,tab){const a=$('app');if(tab){ptab=tab;chatKey='';}a.classList.toggle('drawer',on);const b=$('chatToggle');if(b)b.textContent=on?'Isara ang panel':'Panel';render();}
@@ -1919,7 +1930,7 @@ function openChat(id){
 
 /* ---------- interactions ---------- */
 document.addEventListener('click',e=>{
-  const ak=e.target.closest('[data-ack]');if(ak){const s=sessions.find(x=>x.id===+ak.dataset.ack);if(s){s.acked=true;log('Boss',`ACK: alarm ni ${s.short}.`,s);chatKey='';render();}return;}
+  const ak=e.target.closest('[data-ack]');if(ak){const s=sessions.find(x=>x.id===+ak.dataset.ack);if(s){s.acked=true;ackRemember(s);log('Boss',`ACK: alarm ni ${s.short}.`,s);chatKey='';render();}return;}
   const pk=e.target.closest('[data-pick]');if(pk&&!e.target.closest('[data-ack]')){selected=+pk.dataset.pick;const fs=sessions.find(x=>x.id===selected);if(fs){cam.follow=fs;}chatKey='';render();return;}
   const ag=e.target.closest('.dcard');if(ag){openChat(+ag.dataset.id);return;}
   if(e.target.closest('[data-act="add"]')){addSession();return;}
@@ -1931,13 +1942,13 @@ document.addEventListener('click',e=>{
   if(e.target.closest('[data-act="wn-ok"]')){$('whatsNew').hidden=true;try{localStorage.setItem('devroom.seenNotes',NOTES_VER);}catch(e){}return;}
   if(e.target.closest('[data-act="pair"]')){openPair();return;}
   if(e.target.closest('[data-act="team-cancel"]')){$('teamPanel').hidden=true;return;}
-  if(e.target.closest('[data-act="team-reset"]')){saveTeam({lead:null,ids:[],names:TEAM.names||{}});$('teamPanel').hidden=true;return;}
+  if(e.target.closest('[data-act="team-reset"]')){saveTeam({lead:null,ids:[],names:{}});$('teamPanel').hidden=true;return;}
   if(e.target.closest('[data-act="team-save"]')){
     const ids=[...document.querySelectorAll('#teamPanel input[name="tm"]:checked')].map(i=>i.value);
     const l=document.querySelector('#teamPanel input[name="tl"]:checked');let lead=l?l.value:null;
     if(lead&&!ids.includes(lead))ids.unshift(lead);
     saveTeam({lead,ids,names:collectNames()});$('teamPanel').hidden=true;return;}
-  const oa=e.target.closest('[data-open-alarm]');if(oa){const id=+oa.dataset.openAlarm;openChat(id);ptab='alarms';chatKey='';render();return;}
+  const oa=e.target.closest('[data-open-alarm]');if(oa){const id=+oa.dataset.openAlarm;oa.closest('.toast')?.remove();openChat(id);ptab='alarms';chatKey='';render();return;}
   if(e.target.closest('[data-act="drawer-close"]')){setDrawer(false);return;}
   if(e.target.closest('.count.need')){setDrawer(true,'alarms');return;}
   const a=e.target.closest('[data-act="reply"]');
@@ -1954,6 +1965,8 @@ $('composer').addEventListener('focusin',()=>{$('app').classList.add('typing');s
 $('composer').addEventListener('focusout',()=>setTimeout(()=>{if(!$('composer').contains(document.activeElement))$('app').classList.remove('typing');},200));
 $('awaySel').addEventListener('change',e=>setAway(e.target.value));
 $('cpBody').addEventListener('click',e=>{
+  const rt=e.target.closest('[data-retry]');if(rt){const m=PENDING[+rt.dataset.retry];if(m){PENDING.splice(+rt.dataset.retry,1);const s=bySid(m.sid);if(s)answer(s,m.text);else{connMsg='Wala na sa office ang session na iyon.';setConn();}}chatKey='';renderPanel();return;}
+  const dp=e.target.closest('[data-drop]');if(dp){PENDING.splice(+dp.dataset.drop,1);chatKey='';renderPanel();return;}
   const f=e.target.closest('[data-cf]');if(f){chatFilter=f.dataset.cf;if(chatFilter!=='all')chatTo=chatFilter;forceScroll=true;chatKey='';renderPanel();return;}
   const m=e.target.closest('[data-chatto]');if(m){chatTo=m.dataset.chatto;$('chatTo').value=chatTo;$('msgInput').focus();}
 });
@@ -2006,7 +2019,7 @@ document.addEventListener('keydown',e=>{
   if(e.key!=='Escape')return;
   if(!$('whatsNew').hidden){$('whatsNew').querySelector('[data-act="wn-ok"]')?.click();return;}
   if(!$('teamPanel').hidden){$('teamPanel').hidden=true;return;}
-  if($('app').classList.contains('drawer')){setDrawer(false);return;}
+  if($('app').classList.contains('drawer')){if(document.activeElement&&document.activeElement.closest('.pane'))document.activeElement.blur();setDrawer(false);return;}
   if($('app').classList.contains('focus'))$('fsBtn').click();});
 // dialogs take the keyboard focus when they open and give it back when they close; Tab stays inside them
 {let opener=null;
@@ -2026,7 +2039,7 @@ document.addEventListener('keydown',e=>{
 {const dw=document.querySelector('.dockwrap');const upd=()=>{if(dw)$('app').style.setProperty('--dockh',dw.offsetHeight+'px');};if(window.ResizeObserver&&dw)new ResizeObserver(upd).observe(dw);upd();}
 $('pauseBtn').addEventListener('click',()=>{
   if(!paused){paused=true;pauseAt=Date.now();$('pauseBtn').textContent='Ituloy';}
-  else{pausedAcc+=Date.now()-pauseAt;paused=false;$('pauseBtn').textContent='Pause';}
+  else{paused=false;$('pauseBtn').textContent='Pause';}
 });
 function addSession(){
   guardWake();say(guard,'Wala pang bagong dumarating, boss.');

@@ -9,13 +9,63 @@ The version lives in `VERSION`. Each build is published as release `v<VERSION>-b
 
 ## 0.6.5 (2026-11-01)
 
-### Fixed (found by using the app end to end)
-- **Dialogs that would not close:** the team picker and the phone pairing dialog stayed open on Esc and on a click outside them, and they blocked the map controls. Now Esc or a click on the dimmed backdrop closes them, and the What's new card too.
-- **Fullscreen and Esc:** Esc now leaves fullscreen.
-- **Indistinguishable sessions:** sessions without a name all showed the folder name (for example, every one was "LOGIC_SIM_PRO.").
-  - An unnamed session is now called after its first prompt.
-  - Sessions that still share a name get a number.
-- **Cards:** each card shows what the session was asked to do or is doing. Before, every unnamed session's card repeated "Walang role sa pangalan…".
+A full audit: a UI/UX inspection on PC, tablet and phone in light and dark mode, end-to-end tests of every flow against the real server, and a code review. Everything found is fixed here.
+
+### Fixed: windows and the embedded Claude view (PC)
+- The tray icon and a second launch bring the window back after the Claude view was opened.
+- The Claude view only shows claude.ai, anthropic.com and the sign-in pages; other links open in your browser.
+- The Claude view no longer gets stuck over other tabs. Hiding it gives the keyboard back to Dev Room.
+- A minimized window is no longer restarted into the tray.
+
+### Security
+- **Web pages on the PC can no longer use Dev Room.** Any page on the PC, including one served on `localhost`, could read sessions and send them messages. Now:
+  - every change needs Dev Room's own header;
+  - hooks refuse browser requests;
+  - only the Dev Room window can move the Claude view.
+- **Android pairing:**
+  - The Android app asks before a pairing link moves it to another PC.
+  - The Claude screen never opens `devroom:` or other app links.
+
+### Fixed: chat and alarms
+- An acknowledged alarm now moves below the new ones.
+- ACK is remembered after a reload.
+- A new, different question from the same session raises the alarm again.
+- **Toasts:**
+  - With more than four toasts, the less urgent ones go first.
+  - Tingnan closes its toast.
+- **Messages:**
+  - Two messages can no longer get the same id.
+  - Text in angle brackets (`<user-card>`) is no longer removed from the feed; only Claude Code's system blocks are.
+  - A failed message has **Subukan ulit** (try again) and **Alisin** (remove).
+- Pause no longer makes the clock and timestamps run late.
+- Clearing a session's name in the team picker restores the original name, and **Gamitin ang default** resets names too.
+
+### Changed: UI/UX
+- **One status vocabulary everywhere:** Nagtatrabaho, Kailangan ka, Naka-break, Pa-review, May error.
+  - Permission prompts read in Tagalog and have a **Sagutin** button.
+  - Acknowledged alarms look settled.
+- **Phone:**
+  - The tab bar never covers content.
+  - The header is short, the chat list is tall, and one toast shows at a time.
+  - Tapping a card filters the chat to that session.
+- **Touch:** controls are at least 40 px on touch screens.
+- **Chat panel:**
+  - The Claude bar and composer are compact, and the away setting moved under **Opsyon**.
+  - Toasts and the legend hide while the panel is open.
+- **Dock:** it scrolls sideways with the mouse wheel and fades at the edge when more cards follow.
+- **Keyboard:**
+  - Dialogs take focus and keep Tab inside them.
+  - The closed panel is out of the Tab order.
+  - Cards keep focus.
+- **Names:** shortened names end with "…", avatars use initials, and "Hooks" is a status, not a button.
+- **Map:** 60 fps on 90 and 120 Hz screens; the Claude view follows a move to a monitor with other scaling.
+
+### Fixed: server and Android
+- Transcripts are read outside the shared lock.
+- Bodies up to 32 MB are accepted, so a large Write is not dropped.
+- `/api/team` refuses malformed data.
+- An update no longer fails when an older copy is still in use.
+- The background watcher closes its connections and starts fresh on a new pairing.
 
 ## 0.6.4 (2026-11-01)
 

@@ -18,7 +18,7 @@ use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 pub const DEFAULT_PORT: u16 = 4317;
 const INDEX_HTML: &str = include_str!("../../ui/index.html");
 const HOOK_EVENTS: [&str; 8] = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "SubagentStop", "Notification", "Stop", "SessionEnd"];
-const MAX_BODY: usize = 4 * 1024 * 1024;
+const MAX_BODY: usize = 32 * 1024 * 1024;   // a Write tool call can carry a whole file
 
 /// Set by the app: opens the Dev Room window (used when DevRoom.exe is started a second time).
 pub static ON_SHOW: std::sync::OnceLock<Box<dyn Fn() + Send + Sync>> = std::sync::OnceLock::new();
@@ -648,6 +648,10 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
             if !token_ok { return respond_json(req, 401, &json!({"error": "pairing"})); }
             let Some(v) = read_body(&mut req) else { return respond_json(req, 400, &json!({"error": "bad json"})) };
             let mut s = lk(st);
+            let bad = v.get("lead").map(|x| !x.is_string() && !x.is_null()).unwrap_or(false)
+                || v.get("ids").map(|x| !x.is_array()).unwrap_or(false)
+                || v.get("names").map(|x| !x.is_object()).unwrap_or(false);
+            if bad { drop(s); return respond_json(req, 400, &json!({"error": "bad team"})); }
             let lead = v.get("lead").cloned().filter(|x| x.is_string()).unwrap_or(Value::Null);
             let ids: Vec<Value> = v.get("ids").and_then(|x| x.as_array()).cloned().unwrap_or_default().into_iter().filter(|x| x.is_string()).collect();
             let names: Map<String, Value> = v.get("names").and_then(|x| x.as_object()).cloned().unwrap_or_default()
@@ -664,7 +668,9 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
             if text.is_empty() { return respond_json(req, 400, &json!({"error": "empty"})); }
             let mut g = lk(st);
             let Some(s) = g.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()) else { drop(g); return respond_json(req, 404, &json!({"error": "no session"})) };
-            let id = now_ms();
+            // unique even for messages sent in the same millisecond
+            static LAST: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            let id = { let mut cur = LAST.load(std::sync::atomic::Ordering::SeqCst); loop { let next = (cur + 1).max(now_ms()); match LAST.compare_exchange(cur, next, std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst) { Ok(_) => break next, Err(c) => cur = c } } };
             let inbox = s.entry("inbox").or_insert_with(|| json!([]));
             if !inbox.is_array() { *inbox = json!([]); }
             let arr = inbox.as_array_mut().unwrap();
