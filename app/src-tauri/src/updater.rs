@@ -57,6 +57,40 @@ pub fn set_hidden(h: bool) { HIDDEN.store(h, Ordering::Relaxed); }
 pub static MINIMIZED: AtomicBool = AtomicBool::new(false);
 pub fn set_minimized(m: bool) { MINIMIZED.store(m, Ordering::Relaxed); }
 
+/// Where the window was and how big (logical px), and whether it was maximized, so a restart (or reopening it
+/// from the tray) puts it back exactly as you left it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Geom { pub x: f64, pub y: f64, pub w: f64, pub h: f64, pub max: bool }
+static GEOM: Mutex<Option<Geom>> = Mutex::new(None);
+fn geom_path() -> PathBuf { crate::server::data_dir().join("window.json") }
+
+/// The last known window place: from memory, else from the file.
+pub fn geom() -> Option<Geom> {
+    if let Some(g) = GEOM.lock().ok().and_then(|g| *g) { return Some(g); }
+    read_geom()
+}
+fn read_geom() -> Option<Geom> {
+    let v: Value = serde_json::from_slice(&fs::read(geom_path()).ok()?).ok()?;
+    let f = |k: &str| v.get(k).and_then(|x| x.as_f64());
+    let g = Geom { x: f("x")?, y: f("y")?, w: f("w")?, h: f("h")?, max: v.get("max").and_then(|x| x.as_bool()).unwrap_or(false) };
+    (g.w >= 400.0 && g.h >= 300.0 && g.w < 20000.0 && g.h < 20000.0).then_some(g)
+}
+/// Update what is remembered (called on every move and resize; written to disk only by `save_geom`).
+pub fn note_geom(f: impl FnOnce(&mut Geom)) {
+    if let Ok(mut g) = GEOM.lock() {
+        let mut cur = g.or_else(read_geom).unwrap_or(Geom { x: f64::NAN, y: f64::NAN, w: 1440.0, h: 900.0, max: false });
+        f(&mut cur);
+        *g = Some(cur);
+    }
+}
+pub fn save_geom() {
+    let Some(g) = GEOM.lock().ok().and_then(|g| *g) else { return };
+    if !g.x.is_finite() || !g.y.is_finite() { return; }
+    let p = geom_path();
+    let tmp = p.with_extension("tmp");
+    if fs::write(&tmp, json!({"x": g.x, "y": g.y, "w": g.w, "h": g.h, "max": g.max}).to_string()).is_ok() { let _ = fs::rename(&tmp, &p); }
+}
+
 fn set_note(n: &str) { if let Ok(mut s) = STATE.lock() { s.note = n.to_string(); } }
 
 fn get(url: &str, limit: u64) -> Result<Vec<u8>, String> {
@@ -155,6 +189,7 @@ pub fn restart(hidden: bool) {
             let mut cmd = std::process::Command::new(exe);
             cmd.arg("--restarted");
             if hidden { cmd.arg("--tray"); } else if MINIMIZED.load(Ordering::Relaxed) { cmd.arg("--minimized"); }
+            save_geom();
             crate::tunnel::shutdown();
             let _ = cmd.spawn();
         }

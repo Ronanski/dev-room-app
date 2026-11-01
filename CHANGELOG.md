@@ -7,6 +7,18 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.11.0 (2026-11-01)
+
+- **The PC window comes back as you left it.** Dev Room remembers the window's place, size and whether it was maximized (`window.json` in the data folder, saved on move, resize, close and before an update restart).
+  - After an update restart it returns in the same state: in the tray, minimized on the taskbar (shown with `SetWindowPlacement` and `SW_SHOWMINNOACTIVE`, so it does not flash or take focus, and it opens maximized again if it was), maximized, or at its old place and size.
+  - Reopening it from the tray uses the same place and size. A place on a screen that is no longer connected is ignored (the window is centered).
+- **Artifacts and pictures open in a pop-out, not full screen.** One layout per device:
+  - **PC and tablet landscape:** a floating window beside the chat. Drag it by its bar, resize it from the corner; it remembers where you put it. The chat stays usable while it is open.
+  - **Tablet portrait:** a centered card.
+  - **Phone (and phone landscape):** a sheet from the bottom; swipe it down to close.
+  - **⤢** (or a double click on the bar) makes it full screen and back. Pictures: tap to see them at full size, tap again to fit. Esc, ✕ or a tap outside closes it.
+- Tested here with Playwright at 1366×768, 1920×1080, 1280×800 and 800×1280 touch, and 412×900 and 900×412 phone (light and dark): drag, resize, remembered place, full screen, image zoom, swipe to close, no page errors, no overflow. The window restore needs the real Windows build to check.
+
 ## 0.10.0 (2026-11-01)
 
 - **Playrooms you make.** "Piliin ang team" is now **Mga Playroom**:
