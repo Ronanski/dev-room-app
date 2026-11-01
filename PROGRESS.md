@@ -11,7 +11,31 @@ Dev Room shows them all in one place instead. Each session is a character in a s
 - who needs the user's input,
 - what each session is doing right now, and how far along it is.
 
-## Status
+## Current state (v0.6.5, 2026-11-01)
+
+Shipped and auto-updating:
+- **Windows tray app:** hooks give live status, the map is an isometric power plant, there is a chat feed, and the real claude.ai chat is embedded in the panel.
+- **Android app:** shows the office, sends alerts, and has an in-app Claude screen.
+
+A full UI/UX, functional and code audit was done, and its fixes went into 0.6.5.
+
+### Not yet verified on real devices
+- The embedded Claude view and its sign-in inside the Windows window (Tauri multiwebview).
+- The Android app's Claude screen, its sign-in, and the pairing confirmation.
+- The auto-restart from the tray on Windows.
+
+### Backlog (ask the user before starting; they pick the order)
+1. Sound or vibration when a session needs you, with an on/off switch.
+2. Tapping a character opens that session's Claude chat directly.
+3. A status count in the window title or tray icon, for example "2 naghihintay".
+4. A daily report of what each session did today.
+5. Search and filter in the chat feed and the activity log.
+6. A Settings panel: bubble size, animation speed, NPCs on or off, away mode.
+7. Signed updates. This needs a signing key in the repo secrets, so ask the user first.
+8. Approve or deny permission prompts from the app. This needs Claude Code's PermissionRequest hook; check the docs first.
+9. Phone: show at most one toast plus a "+N" count, and a compact header everywhere.
+
+## Status (history)
 
 Mockup only. There is no real app yet.
 
