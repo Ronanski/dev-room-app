@@ -49,6 +49,10 @@ Phone on the same Wi-Fi  (http://<PC IP>:4317/?t=<pairing token>, from the QR co
 - **The guard** plays ML on her phone, dozes off sometimes, and wakes up to greet new sessions.
 - **Bubbles** stay up for at least 6 seconds, longer for long text. Lines come from large pools per state and role, plus the session's real task, with no immediate repeats. The A− and A+ buttons set the text size per device.
 
+## Away from home (Tailscale)
+
+Install Tailscale on the PC and the phone and sign in to the same account. Dev Room then puts the PC's Tailscale address in the pairing QR next to the Wi-Fi address. The Android app and its background watcher try home Wi-Fi first and use Tailscale when away.
+
 ## Limits of this version
 
 - Replying from Dev Room is not possible yet. Hooks cannot inject messages into a running session, so answer in the Claude desktop app.

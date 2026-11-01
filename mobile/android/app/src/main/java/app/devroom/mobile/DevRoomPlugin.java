@@ -28,7 +28,7 @@ public class DevRoomPlugin extends Plugin {
         String url = call.getString("url");
         if (url == null || url.isEmpty()) { call.reject("url is required"); return; }
         getContext().getSharedPreferences(WatchService.PREFS, Context.MODE_PRIVATE).edit()
-            .putString("url", url).putString("token", call.getString("token", "")).apply();
+            .putString("url", url).putString("token", call.getString("token", "")).putString("alt", call.getString("alt", "")).apply();
         if (Build.VERSION.SDK_INT >= 33 && getPermissionState("notifications") != PermissionState.GRANTED) {
             requestPermissionForAlias("notifications", call, "afterPermission");
             return;
