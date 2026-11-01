@@ -68,6 +68,10 @@ html,body{overflow-x:hidden}
   linear-gradient(var(--ink),var(--ink)) 3px 24px/20px 2px no-repeat}
 h1{font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1;margin:0;letter-spacing:.5px}
 .sub{margin:3px 0 0;color:var(--muted);font-size:12px}
+.remotebox{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:10px 0}
+.remotebox .hint{grid-column:1/-1;margin:0}
+.remotebox .rs{font-size:12.5px;color:var(--muted)}
+.remotebox .rs.ok{color:var(--work);font-weight:700}
 .updpill{font:inherit;font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 9px;margin:0 2px;border:1px solid var(--line);background:var(--panel);color:var(--muted);cursor:pointer;min-height:0;line-height:1.6;vertical-align:baseline}
 .updpill[data-st="ok"]{color:var(--work);border-color:color-mix(in srgb,var(--work) 45%,var(--line))}
 .updpill[data-st="busy"]{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
@@ -390,7 +394,7 @@ body{margin:0}
     <header class="top">
       <div class="brand">
         <span class="logo" aria-hidden="true"></span>
-        <div><h1>Dev Room · Unit 1</h1><p class="sub">Unit 1 · live mula sa PC mo · <button type="button" class="updpill" id="ver" data-act="updinfo" data-st="wait">Tinitingnan ang update…</button> · <span class="clock" id="clock"></span></p></div>
+        <div><h1>Dev Room · Unit 1</h1><p class="sub">Unit 1 · live mula sa PC mo<span id="via"></span> · <button type="button" class="updpill" id="ver" data-act="updinfo" data-st="wait">Tinitingnan ang update…</button> · <span class="clock" id="clock"></span></p></div>
       </div>
       <div class="counts" id="counts"></div>
       <div class="controls">
@@ -990,7 +994,7 @@ function statusLine(s){
 }
 const freeDesk=()=>DESKS.find(d=>!d.owner);
 let TEAM={lead:null,ids:[],names:{}};
-let tsUrl='';let allRecords=[],mode='connecting',connMsg='',lastSync=0,firstLoad=true,version=0,isLocal=false,hooksOk=null,settingsPath='',lanUrl='';
+let tsUrl='',REMOTE=null;let allRecords=[],mode='connecting',connMsg='',lastSync=0,firstLoad=true,version=0,isLocal=false,hooksOk=null,settingsPath='',lanUrl='';
 const MAXN=DESKS.length;
 // The main session is the one without "ROLE:" in its name (or whose name says lead, main or project).
 function autoLead(rs){
@@ -1112,14 +1116,14 @@ function setConn(){
 }
 async function poll(){
   try{
-    const r=await fetch('/api/state?v='+version+(document.hidden?'&bg=1':''),{headers:hdr(),cache:'no-store'});
+    const r=await fetch('/api/state?v='+(($('remoteBox')&&!$('teamPanel').hidden)?-1:version)+(document.hidden?'&bg=1':''),{headers:hdr(),cache:'no-store'});
     if(r.status===204){if(mode!=='live'){mode='live';}lastSync=Date.now();}
     else if(r.status===401){mode='auth';}
     else if(r.ok){
       const j=await r.json();
       const teamChanged=JSON.stringify(j.team)!==JSON.stringify(TEAM);
       updates(j);
-      version=j.version;TEAM=j.team||TEAM;isLocal=!!j.local;hooksOk=j.hooks_installed;embedClaude=!!j.embed_claude||shellEmbed;$('app').classList.toggle('hasclaude',embedClaude);settingsPath=j.settings_path||'';lanUrl=j.lan_url||'';tsUrl=j.ts_url||'';
+      version=j.version;TEAM=j.team||TEAM;isLocal=!!j.local;hooksOk=j.hooks_installed;embedClaude=!!j.embed_claude||shellEmbed;$('app').classList.toggle('hasclaude',embedClaude);REMOTE=j.remote||null;if(!$('teamPanel').hidden&&$('remoteBox'))remoteBox();settingsPath=j.settings_path||'';lanUrl=j.lan_url||'';tsUrl=j.ts_url||'';
       mode='live';lastSync=Date.now();
       if(teamChanged&&!firstLoad){allRecords=j.sessions;rebuildTeam();}else applyRecords(j.sessions);
       awayMode=j.away||awayMode;
@@ -1131,6 +1135,10 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.7.0':{news:['<b>Malayo mode: kita at makakausap mo ang office kahit naka-mobile data ka.</b> Walang ibang app at walang account. Ang Dev Room sa PC mismo ang gumagawa ng ligtas na daan sa internet, at kusang hinahanap ito ng phone kapag wala ka sa Wi-Fi.',
+    'Sa itaas ng phone, nakasulat kung paano ka nakakonekta: <b>(Wi-Fi)</b> o <b>(malayo, internet)</b>.',
+    'Naka-on ito agad. Para i-off: <b>I-connect ang phone</b> → <b>Malayo mode</b> → <b>I-off</b>.'],
+    todo:['Sa phone, pindutin ang <b>I-update</b> at i-install (kailangan ito para sa Malayo mode).','Sa PC, wala kang gagawin. Sa unang bukas, ilang minutong maghahanda ang Malayo mode; makikita mo ang status sa <b>I-connect ang phone</b>.','Hindi kailangang i-scan ulit ang QR code.']},
   '0.6.6':{news:['<b>Ang Chat tab ay ang mismong Claude Code na, sa PC at sa phone.</b> Pagbukas mo ng Chat, nandoon na agad ang totoong Claude chat: kita mo agad ang huling sagot ng bawat session at nakakausap mo sila nang real time.',
     'Wala na ang hiwalay na <b>Claude</b> at <b>Kausapin sa Claude</b> button. Ang <b>Sagutin</b> sa alarm ay diretso nang nagbubukas ng Chat.',
     '<b>Phone:</b> hindi na lumilipat sa ibang screen; nasa loob na mismo ng Chat tab ang Claude. Back button: babalik muna sa loob ng Claude chat.',
@@ -1217,6 +1225,7 @@ function showUpd(){
   el.title=[pc&&('PC: '+pc.d),ap&&('Phone: '+ap.d)].filter(Boolean).join('\n');
 }
 if(window.parent!==window)addEventListener('message',e=>{if(e.source!==window.parent)return;const d=e.data||{};
+  if(d.type==='devroom:via'){const v={wifi:' (Wi-Fi)',tailscale:' (Tailscale)',remote:' (malayo, internet)'}[d.via]||'';const el=$('via');if(el&&el.textContent!==v)el.textContent=v;return;}
   if(d.type==='devroom:apk'){UPD.apk={build:Number(d.build)||0,latest:Number(d.latest)||0,ver:String(d.ver||'').replace(/[^0-9A-Za-z.\-]/g,'')};showUpd();}});
 // A downloaded update installs itself: right away when the window is not on screen, otherwise after a
 // minute without input, with a 10 s countdown and a button to wait.
@@ -1246,13 +1255,23 @@ async function installHooks(){
 function openPair(){
   const el=$('teamPanel');
   el.innerHTML=`<div class="tp-card" role="dialog" aria-label="I-connect ang phone"><h2>I-connect ang phone</h2>
-  <p class="hint">Dapat nasa parehong Wi-Fi ang phone at ang PC na ito. I-scan ang QR code gamit ang camera ng phone, at bubukas ang Dev Room sa browser. Kung naka-install ang Dev Room app (APK), pindutin doon ang Buksan sa Dev Room app para makatanggap ka ng notification kapag may naghihintay sa iyo.</p>
+  <p class="hint">Gawin ito isang beses habang nasa parehong Wi-Fi ang phone at ang PC. I-scan ang QR code gamit ang camera ng phone, at bubukas ang Dev Room sa browser. Kung naka-install ang Dev Room app (APK), pindutin doon ang Buksan sa Dev Room app para makatanggap ka ng notification kapag may naghihintay sa iyo.</p>
   <div class="qr"><img src="/pair.svg?ts=${Date.now()}" alt="QR code para sa phone"></div>
-  <p class="hint">${tsUrl?'Naka-on ang Tailscale sa PC na ito, kaya gagana rin ang phone kahit wala ka sa bahay, basta naka-on din ang Tailscale sa phone.':'Para magamit ang phone kahit wala ka sa bahay, i-install ang Tailscale (libre) sa PC at sa phone, mag-login sa parehong account, at i-scan ulit ang QR code.'}</p>
+  <div class="remotebox" id="remoteBox"></div>
   <p class="hint">Kung magtanong ang Windows Firewall, payagan ang Dev Room sa Private networks. Huwag i-share ang QR code na ito, dahil sinumang may hawak nito ay makakakita ng sessions mo.</p>
   <div class="row"><span style="flex:1"></span><button type="button" class="btn primary" data-act="team-cancel">Isara</button></div></div>`;
-  el.hidden=false;
+  el.hidden=false;remoteBox();
 }
+// Malayo mode: the phone works away from home Wi-Fi (mobile data), with no extra app.
+function remoteBox(){
+  const el=$('remoteBox');if(!el)return;const r=REMOTE||{};
+  const st=!r.on?'Naka-off. Sa parehong Wi-Fi lang gagana ang phone.':r.ready?'✓ Handa na: gagana ang phone kahit malayo ka (mobile data).':(r.status||'Inihahanda…');
+  const h=`<b>Malayo mode</b><span class="rs ${r.on&&r.ready?'ok':''}">${esc(st)}</span><button type="button" class="btn" data-act="remote-toggle">${r.on?'I-off':'I-on'}</button>
+  <p class="hint">Walang ibang app na kailangan. Dumadaan ang koneksyon sa ligtas na tunnel ng Cloudflare (libre), at kailangan pa rin ang pairing mo para makapasok. Naka-on dapat ang PC at ang Dev Room.</p>`;
+  if(el.dataset.h!==h){el.dataset.h=h;el.innerHTML=h;}
+}
+async function toggleRemote(){const on=!(REMOTE&&REMOTE.on);REMOTE=Object.assign({},REMOTE,{on,ready:false,status:on?'Inihahanda…':''});remoteBox();
+  try{await fetch('/api/remote',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({on})});}catch(e){}}
 function loadDetail(){}
 
 /* ---------- isometric renderer ---------- */
@@ -1985,6 +2004,7 @@ document.addEventListener('click',e=>{
   if(e.target.closest('[data-act="team"]')){openTeam();return;}
   if(e.target.closest('[data-act="hooks"]')){installHooks();return;}
   if(e.target.closest('[data-act="restart"]')){restartApp(false);return;}
+  if(e.target.closest('[data-act="remote-toggle"]')){toggleRemote();return;}
   if(e.target.closest('[data-act="updinfo"]')){const ap=apkUpd(),pc=pcUpd();
     if(ap&&ap.act){try{window.parent.postMessage({type:'devroom:update'},'*');}catch(x){}}
     connMsg=[pc&&('PC: '+pc.d),ap&&('Phone: '+ap.d)].filter(Boolean).join(' ');setConn();clearTimeout(showUpd.t);showUpd.t=setTimeout(()=>{connMsg='';setConn();},12000);return;}

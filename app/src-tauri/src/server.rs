@@ -58,6 +58,8 @@ struct State {
     away: String,
     /// Last time a phone or tablet had the office on screen (background watchers do not count).
     remote_seen: u64,
+    /// "Malayo mode": the paired phone can reach Dev Room from anywhere through a tunnel (on by default).
+    remote_off: bool,
 }
 
 impl State {
@@ -65,7 +67,7 @@ impl State {
 
     fn save(&self) {
         let _ = fs::create_dir_all(&self.dir);
-        let data = json!({"sessions": self.sessions, "team": self.team, "token": self.token, "away": self.away, "away_v": 2});
+        let data = json!({"sessions": self.sessions, "team": self.team, "token": self.token, "away": self.away, "away_v": 2, "remote_off": self.remote_off});
         // write then rename, so a crash never leaves a half-written file (which would unpair every phone)
         let tmp = self.dir.join("state.json.tmp");
         if fs::write(&tmp, serde_json::to_vec(&data).unwrap_or_default()).is_ok() { let _ = fs::rename(&tmp, self.dir.join("state.json")); }
@@ -85,6 +87,7 @@ impl State {
                 }
                 if let Some(t) = v.get("team") { if t.is_object() { st.team = t.clone(); } }
                 if let Some(t) = v.get("token").and_then(|t| t.as_str()) { st.token = t.to_string(); }
+                st.remote_off = v.get("remote_off").and_then(|x| x.as_bool()).unwrap_or(false);
                 // 0.6.0-0.6.2 defaulted to "auto"; a held Stop hook looks like a session that never answers, so start from "off"
                 if v.get("away_v").and_then(|x| x.as_u64()).unwrap_or(0) >= 2 {
                     if let Some(a) = v.get("away").and_then(|t| t.as_str()) { st.away = a.to_string(); }
@@ -570,9 +573,19 @@ fn read_body(req: &mut Request) -> Option<Value> {
 
 /// Requests must name this PC (DNS rebinding) and, when a browser sends an Origin, come from Dev Room
 /// itself or the Android app shell. A web page open on the PC therefore cannot drive Dev Room.
-fn request_allowed(req: &Request, port: u16, local: bool) -> bool {
+fn request_allowed(req: &Request, port: u16, local: bool, tun: bool) -> bool {
     let hv = |k: &'static str| req.headers().iter().find(|h| h.field.equiv(k)).map(|h| h.value.as_str().to_ascii_lowercase());
     let Some(host) = hv("Host") else { return false };
+    if tun {
+        // through the tunnel: the tunnel's own name (or the loopback address cloudflared may use); the token guards everything
+        let th = crate::tunnel::host().map(|h| h.to_ascii_lowercase());
+        let ok = th.as_deref() == Some(host.as_str()) || host == format!("127.0.0.1:{port}") || host == format!("localhost:{port}");
+        if !ok { return false; }
+        return match hv("Origin") {
+            None => true,
+            Some(o) => th.map(|h| o == format!("https://{h}")).unwrap_or(false) || o == "http://localhost" || o == "https://localhost" || o == "capacitor://localhost",
+        };
+    }
     // An IP address (any of this PC's adapters) or localhost: a rebinding attack always uses a host name.
     let ok_host = host == format!("localhost:{port}")
         || host.parse::<SocketAddr>().map(|a| a.port() == port).unwrap_or(false);
@@ -584,9 +597,10 @@ fn request_allowed(req: &Request, port: u16, local: bool) -> bool {
     }
 }
 
-fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
-    let local = is_loopback(req.remote_addr());
-    if !request_allowed(&req, port, local) { return respond_json(req, 403, &json!({"error": "origin"})); }
+fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16, tun: bool) {
+    // everything that comes through the tunnel is a phone, even though cloudflared connects from this PC
+    let local = !tun && is_loopback(req.remote_addr());
+    if !request_allowed(&req, port, local, tun) { return respond_json(req, 403, &json!({"error": "origin"})); }
     let has = |k: &'static str| req.headers().iter().find(|h| h.field.equiv(k)).map(|h| h.value.as_str().to_string());
     // Hooks come from curl, never from a browser (browsers always send Origin on POST).
     if req.url().starts_with("/hook") && has("Origin").is_some() { return respond_json(req, 403, &json!({"error": "origin"})); }
@@ -603,7 +617,8 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
         let token = lk(st).token.clone();
         let given = req.headers().iter().find(|h| h.field.equiv("X-DevRoom-Token")).map(|h| h.value.as_str().to_string())
             .or_else(|| q.get("t").cloned()).unwrap_or_default();
-        given == token
+        // constant time: the tunnel puts this check on the internet
+        given.len() == token.len() && given.bytes().zip(token.bytes()).fold(0u8, |a, (x, y)| a | (x ^ y)) == 0
     };
     match (req.method().clone(), path.as_str()) {
         (Method::Get, "/") | (Method::Get, "/index.html") => {
@@ -639,6 +654,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
                 "settings_path": if local { json!(claude_settings_path().display().to_string()) } else { Value::Null },
                 "lan_url": lan, "ts_url": tailscale_ip().map(|ip| format!("http://{ip}:{port}/")),
                 "app_build": crate::updater::BUILD, "app_version": crate::updater::VERSION, "ui_build": crate::updater::ui_build(),
+                "remote": if local { crate::tunnel::info() } else { Value::Null },
                 "update_ready": crate::updater::exe_ready(), "update_note": crate::updater::note(),
                 "latest": crate::updater::latest()});
             drop(s);
@@ -694,6 +710,15 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
             let rect = if v.get("show").and_then(|x| x.as_bool()).unwrap_or(false) && n("w") > 50.0 && n("h") > 50.0 { Some((n("x"), n("y"), n("w"), n("h"))) } else { None };
             let ok = ON_CLAUDE.get().map(|f| f(rect)).is_some();
             respond_json(req, if ok { 200 } else { 503 }, &json!({"ok": ok}));
+        }
+        (Method::Post, "/api/remote") => {
+            if !local { return respond_json(req, 403, &json!({"error": "loopback only"})); }
+            let Some(v) = read_body(&mut req) else { return respond_json(req, 400, &json!({"error": "bad json"})) };
+            let on = v.get("on").and_then(|x| x.as_bool()).unwrap_or(true);
+            let mut g = lk(st);
+            g.remote_off = !on; g.bump(); g.save(); let token = g.token.clone(); drop(g);
+            crate::tunnel::set_enabled(on, token);
+            respond_json(req, 200, &json!({"ok": true}));
         }
         (Method::Post, "/api/show") => {
             if !local { return respond_json(req, 403, &json!({"error": "loopback only"})); }
@@ -835,10 +860,22 @@ pub fn start(port: u16) -> Option<u16> {
     if !hooks_installed(port) && has_any_ours() { let _ = install_hooks(port); }
     let live = st.clone();
     std::thread::spawn(move || loop { std::thread::sleep(std::time::Duration::from_secs(3)); liveness(&live); });
+    // Malayo mode: a loopback-only port for the tunnel, where every request counts as a phone
+    if let Ok(ts) = Server::http(("127.0.0.1", crate::tunnel::PORT)) {
+        let st2 = st.clone();
+        std::thread::spawn(move || {
+            for req in ts.incoming_requests() {
+                let st = st2.clone();
+                std::thread::spawn(move || handle(req, &st, crate::tunnel::PORT, true));
+            }
+        });
+        let g = lk(&st);
+        if !g.remote_off { crate::tunnel::set_enabled(true, g.token.clone()); }
+    }
     std::thread::spawn(move || {
         for req in server.incoming_requests() {
             let st = st.clone();
-            std::thread::spawn(move || handle(req, &st, port));
+            std::thread::spawn(move || handle(req, &st, port, false));
         }
     });
     Some(port)

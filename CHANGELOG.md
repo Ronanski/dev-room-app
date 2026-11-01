@@ -7,6 +7,21 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.7.0 (2026-11-01)
+
+**Malayo mode:** the phone reaches the office from anywhere (mobile data), with no extra app and no account.
+- The PC app runs Cloudflare's free quick tunnel (`cloudflared`, downloaded once to `%APPDATA%\DevRoom\bin`). The tunnel points to a second, loopback-only port (4318).
+  - Every request on that port counts as a phone, so the pairing token is always required (compared in constant time).
+  - Hooks and the PC-only routes are refused on that port.
+  - Host and Origin are checked against the tunnel's name.
+- The tunnel's address changes on every start. The PC posts it to a private ntfy.sh topic named after a SHA-256 of the pairing token.
+  - The phone app and its background alerts read it there when home Wi-Fi and Tailscale do not answer.
+  - Only `*.trycloudflare.com` addresses are accepted.
+- On by default, with an on/off switch and a live status in **I-connect ang phone**.
+- The tunnel stops when Dev Room quits or restarts for an update.
+- The phone header shows how it is connected: Wi-Fi, Tailscale, or "malayo, internet".
+- No need to scan the QR code again.
+
 ## 0.6.6 (2026-11-01)
 
 The Chat tab is the real Claude Code chat itself, on the PC and on the phone, so you read the sessions' latest replies and talk to them in real time without extra buttons.

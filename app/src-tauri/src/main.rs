@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod server;
+mod tunnel;
 mod updater;
 
 use tauri::menu::{CheckMenuItem, Menu, MenuItem};
@@ -200,5 +201,7 @@ fn main() {
         if let RunEvent::ExitRequested { api, code, .. } = event {
             if code.is_none() { api.prevent_exit(); }
         }
+        // never leave the tunnel helper running after Dev Room quits
+        if let RunEvent::Exit = event { tunnel::shutdown(); }
     });
 }
