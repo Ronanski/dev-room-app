@@ -198,6 +198,29 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .chatpanel.embed .cp-body,.chatpanel.embed .claudebar,.chatpanel.embed .composer{display:none!important}
 /* with the real Claude chat inside the app, the Chat tab is Claude itself: no extra Claude buttons */
 .app.hasclaude .claudebtn,.app.hasclaude .claudebar{display:none!important}
+.composer .rcpt{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;align-items:center;font-size:12px;color:var(--muted)}
+.composer .rcpt::-webkit-scrollbar{display:none}
+.composer .rcpt>span{white-space:nowrap;flex:none}
+.composer .rcpt button{flex:none;font:inherit;font-size:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:4px 10px;display:inline-flex;gap:5px;align-items:center;cursor:pointer;min-height:30px}
+.composer .rcpt button i{width:8px;height:8px;border-radius:50%}
+.composer .rcpt button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--panel);font-weight:700}
+.composer .cbox{display:flex;align-items:flex-end;gap:8px;border:1px solid var(--line);border-radius:22px;background:var(--bg);padding:5px 5px 5px 14px}
+.composer .cbox:focus-within{border-color:var(--accent)}
+.composer .cbox textarea{flex:1;border:0;outline:0!important;background:none;min-height:24px;max-height:160px;padding:6px 0;line-height:1.4;font-size:14px}
+.composer .send{flex:none;width:38px;height:38px;border-radius:50%;border:0;background:var(--accent);color:var(--panel);display:grid;place-items:center;cursor:pointer}
+.composer .send:disabled{opacity:.4;cursor:default}
+.attimg{display:block;max-width:100%;max-height:260px;border-radius:10px;border:1px solid var(--line);cursor:zoom-in;background:var(--chip)}
+.attcard{display:flex;gap:10px;align-items:center;text-align:left;font:inherit;border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:12px;padding:10px 12px;cursor:pointer;max-width:100%}
+.attcard .ic{width:34px;height:34px;flex:none;border-radius:8px;display:grid;place-items:center;background:var(--accent);color:var(--panel);font-weight:800}
+.attcard small{display:block;color:var(--muted);font-size:11.5px}
+.cmsg.you .attimg,.cmsg.you .attcard{margin-left:auto}
+.viewer{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column}
+.viewer[hidden]{display:none}
+.viewer .vbar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+.viewer .vbar b{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.viewer .vbody{flex:1;min-height:0;display:grid;place-items:center;overflow:auto}
+.viewer .vbody img{max-width:100%;max-height:100%;object-fit:contain}
+.viewer .vbody iframe{width:100%;height:100%;border:0;background:#fff}
 .typing{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:4px 2px}
 .typing i{width:8px;height:8px;border-radius:50%;flex:none}
 .typing .dots{display:inline-flex;gap:3px;margin-left:2px}
@@ -326,7 +349,7 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
   .app[data-tab="chat"] .top,.app[data-tab="chat"] .conn{display:none}
   .app[data-tab="chat"] .chatpanel{height:calc(100dvh - 90px - env(safe-area-inset-bottom,0px))}
   .toasts .toast:not(:last-child){display:none}
-  .app.typing .tabs,.app.typing .cp-head,.app.typing .cp-tabs,.app.typing .composer .away,.app.typing .cfilter{display:none}
+  .app.typing .tabs,.app.typing .cp-head,.app.typing .cp-tabs,.app.typing .cfilter{display:none}
   .app.typing .chatpanel{height:calc(100dvh - 16px)}
   .app[data-tab="chat"] .pane[data-pane="office"],.app[data-tab="chat"] .dockwrap,.app[data-tab="office"] .pane[data-pane="chat"]{display:none!important}
   .pane[data-pane="chat"]{min-height:0}
@@ -450,9 +473,9 @@ body{margin:0}
           <div class="claudehost" id="claudeHost" hidden><span>Binubuksan ang Claude…</span></div>
           <div class="claudebar"><button type="button" class="btn primary" data-act="claude">Kausapin sa Claude</button><span class="hint">Instant na sagot mula sa mismong Claude Code.</span></div>
           <form class="composer" id="composer">
-            <div class="to"><label for="chatTo" id="msgLabel">Para kay</label><select id="chatTo"></select></div>
-            <textarea id="msgInput" rows="2" placeholder="Ano ang gusto mong ipagawa?"></textarea>
-            <div class="row"><details class="away"><summary>Opsyon</summary><label for="awaySel">Kapag tapos na ang session, abangan ang utos mula sa app:</label><select id="awaySel"><option value="off">Hindi (normal na tatapusin ang turn)</option><option value="auto">Kapag may phone na nakabukas</option><option value="on">Palagi</option></select></details><button type="submit" class="btn primary">Ipadala</button></div>
+            <div class="rcpt" id="rcpt" role="group" aria-label="Para kay"></div>
+            <div class="cbox"><textarea id="msgInput" rows="1" placeholder="Mensahe…" aria-label="Mensahe"></textarea><button type="submit" class="send" aria-label="Ipadala"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+            <select id="chatTo" hidden></select><select id="awaySel" hidden><option value="off">off</option><option value="auto">auto</option><option value="on">on</option></select>
           </form>
         </div>
       </section>
@@ -468,6 +491,7 @@ body{margin:0}
 <div id="toast" hidden></div>
     <div class="teampanel" id="teamPanel" hidden></div>
     <div class="teampanel" id="whatsNew" hidden></div>
+    <div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-label="Tingnan"><div class="vbar"><b id="vTitle"></b><button type="button" class="btn" data-act="vclose">Isara</button></div><div class="vbody" id="vBody"></div></div>
   </div>
 </div>
 <p class="devnote">Galing ang data sa Claude Code hooks sa PC mo.</p>
@@ -1143,6 +1167,8 @@ async function poll(){
       mode='live';lastSync=Date.now();
       if(teamChanged&&!firstLoad){allRecords=j.sessions;rebuildTeam();}else applyRecords(j.sessions);
       awayMode=j.away||awayMode;
+      // the old "wait for the app" option is gone: messages are real time now, so a held turn is never wanted
+      if(awayMode!=='off'&&!setAway.fixed){setAway.fixed=true;setAway('off');}
       {const cn=(j.sessions||[]).map(r=>r.id+':'+(r.convo_n||0)).join(',');if(cn!==convoKey){convoKey=cn;loadConvo();}}
     }else mode='offline';
   }catch(e){mode='offline';}
@@ -1151,7 +1177,10 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
-  '0.8.1':{news:['<b>Naka-format na ang mga sagot sa chat, tulad sa Claude app:</b> bold, listahan, numbered list, heading at code. Wala nang <code>**</code> at <code>-</code> na nakakalat.','Hindi na nababali sa dalawang linya ang pangalan ng project sa itaas ng chat.','<b>Hindi na naiipit ang mensahe mo:</b> kapag nagtatrabaho ang session, nakapila ito at matatanggap niya sa susunod niyang hakbang, tulad sa Claude app. Pagkatapos ng trabaho niya, agad itong naipapadala, kahit pinahinto mo siya gamit ang Esc.'],
+  '0.9.0':{news:['<b>Bagong chatbox, tulad ng sa Claude app:</b> isang kahon na lumalaki habang nagta-type ka, may bilog na send button, at mga pindutan sa <b>Para kay</b> imbes na dropdown.',
+    '<b>Kita na ang mga larawan at artifact na ipinapadala nila:</b> screenshots at pages, mismo sa chat. Pindutin para buksan nang buo sa loob ng app.',
+    '<b>Naka-format na ang mga sagot</b> (bold, listahan, code), at wala nang <b>Opsyon</b>: real time na ang lahat.',
+    '<b>Hindi na naiipit ang mensahe mo:</b> kapag nagtatrabaho ang session, matatanggap niya ito sa susunod niyang hakbang, tulad sa Claude app. Pagkatapos, agad itong naipapadala, kahit pinahinto mo siya gamit ang Esc.'],
     todo:['Wala kang gagawin: kusa itong nag-a-update sa PC, at sabay na nag-a-update ang tablet at phone.']},
   '0.8.0':{news:['<b>Real-time na ang chat ng Dev Room.</b> Bumalik ang dating chatbox, pero wala nang hintayan:',
     '<b>Sagot nila:</b> lumalabas agad habang isinusulat nila, hindi na sa dulo ng turn lang. Kita ang lahat ng session sa <b>Lahat</b>, o pumili ng isa.',
@@ -1915,6 +1944,20 @@ function cleanMsg(t){
   const SYS='system-reminder|command-name|command-message|command-args|command-contents|local-command-stdout|local-command-stderr|local-command-caveat|side-sessions-event|task-notification|user-prompt-submit-hook|bash-input|bash-stdout|bash-stderr';
   return String(t||'').replace(new RegExp('<('+SYS+')\\b[^>]*>[\\s\\S]*?<\\/\\1>','gi'),'').replace(new RegExp('<\\/?('+SYS+')\\b[^>]*>','gi'),'').replace(/\n{3,}/g,'\n\n').trim();
 }
+// Pictures and pages the sessions show or send: in the chat, opened inside the app (pages run sandboxed).
+const attUrl=id=>'/api/att/'+encodeURIComponent(id)+(TOKEN?'?t='+encodeURIComponent(TOKEN):'');
+const attKind=id=>/\.(png|jpg|gif|webp|svg)$/.test(id)?'image':/\.html$/.test(id)?'page':'file';
+function attHTML(it){
+  const k=attKind(it.att);
+  if(k==='image')return `<img class="attimg" src="${attUrl(it.att)}" alt="${esc(it.title||it.name)}" loading="lazy" data-view="${esc(it.att)}" data-vt="${esc(it.title||it.name)}">`;
+  return `<button type="button" class="attcard" data-view="${esc(it.att)}" data-vt="${esc(it.title||it.name)}"><span class="ic">${k==='page'?'▣':'PDF'}</span><span><b>${esc(it.title||it.name)}</b><small>${k==='page'?'Artifact':'File'} · ${esc(it.name)} · pindutin para buksan</small></span></button>`;
+}
+function openViewer(id,title){
+  const v=$('viewer'),b=$('vBody');$('vTitle').textContent=title||id;
+  b.innerHTML=attKind(id)==='image'?`<img src="${attUrl(id)}" alt="${esc(title||'')}">`:`<iframe src="${attUrl(id)}" ${attKind(id)==='page'?'sandbox="allow-scripts allow-popups allow-forms"':''} title="${esc(title||'')}"></iframe>`;
+  v.hidden=false;v.querySelector('[data-act="vclose"]').focus();
+}
+function closeViewer(){const v=$('viewer');if(v.hidden)return;v.hidden=true;$('vBody').innerHTML='';}
 // One feed for the whole team: your prompts, the sessions' replies and messages sent from this app.
 function chatFeed(){
   const list=chatFilter==='all'?sessions:sessions.filter(s=>s.sid===chatFilter);
@@ -1923,7 +1966,9 @@ function chatFeed(){
   for(const s of list){
     // a message you sent from the app also comes back as the session's prompt: show it once (with its status)
     const sent=new Set((s.inbox||[]).map(m=>String(m.text||'').trim()));
-    for(const m of (CONVO[s.sid]||[])){const text=cleanMsg(m.text);if(!text||(m.role==='user'&&sent.has(text)))continue;items.push({s,t:m.at,you:m.role==='user',sys:m.role==='sys',text});}
+    for(const m of (CONVO[s.sid]||[])){
+      if(m.att){items.push({s,t:m.at,you:m.role==='user',att:m.att,name:m.name||'',title:m.title||''});continue;}
+      const text=cleanMsg(m.text);if(!text||(m.role==='user'&&sent.has(text)))continue;items.push({s,t:m.at,you:m.role==='user',sys:m.role==='sys',text});}
     for(const m of (s.inbox||[]))items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true});
     PENDING.forEach((m,pi)=>{if(m.sid===s.sid)items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true,why:m.why,pi});});
   }
@@ -1931,6 +1976,7 @@ function chatFeed(){
   const out=items.slice(-120).map(it=>{
     const who=it.you?`<b>Boss</b> → ${esc(it.s.short)}`:`<i style="background:${it.s.pal.shirt}"></i><b>${esc(it.s.short)}</b>`;
     const st=it.app?`<span class="st">${(it.st==='queued'&&it.s.status==='working'?'Nakapila: matatanggap niya sa susunod niyang hakbang, tulad ng pag-type habang nagtatrabaho siya sa Claude app':{sending:'Ipinapadala…',queued:'Ipinapasa…',sent:'Natanggap na niya ✓',delivered:'Natanggap na niya ✓',failed:'Hindi naipadala.'}[it.st]||'')}${it.st==='failed'&&it.pi!=null?` <button type="button" class="linkbtn" data-retry="${it.pi}">Subukan ulit</button> <button type="button" class="linkbtn" data-drop="${it.pi}">Alisin</button>`:''}${it.why?' ('+esc(it.why)+')':''}${it.app?' · mula sa app':''}</span>`:'';
+    if(it.att)return `<div class="cmsg ${it.you?'you':''}"><span class="who">${who} · ${simLabel(it.t)}</span>${attHTML(it)}</div>`;
     if(it.sys)return `<div class="msg sys" data-chatto="${esc(it.s.sid)}">${esc(it.s.short)}: ${esc(it.text)} · ${simLabel(it.t)}</div>`;
     return `<div class="cmsg ${it.you?'you':''}" data-chatto="${esc(it.s.sid)}"><span class="who">${who} · ${simLabel(it.t)}</span><div class="msg md ${it.you?'you':'agent'}">${md(it.text)}</div>${st}</div>`;
   });
@@ -1969,6 +2015,10 @@ function renderPanel(){
       const near=body.scrollHeight-body.scrollTop-body.clientHeight<80,top=body.scrollTop;
       body.innerHTML=`<div class="cfilter"><button type="button" data-cf="all" aria-pressed="${chatFilter==='all'}">Lahat</button>${sessions.map(x=>`<button type="button" data-cf="${esc(x.sid)}" aria-pressed="${chatFilter===x.sid}"><i style="background:${x.pal.shirt}"></i>${esc(x.short)}</button>`).join('')}</div><div class="msgs">${chatFeed()}</div>`;
       if(near||forceScroll){forceScroll=false;body.scrollTop=body.scrollHeight;}else body.scrollTop=top;}
+    {const one=chatFilter!=='all'&&bySid(chatFilter);if(one)chatTo=one.sid;
+     const rk=(one?'1':'*')+chatTo+'|'+sessions.map(x=>x.sid+x.short).join(',');const rc=$('rcpt');
+     if(rc.dataset.k!==rk){rc.dataset.k=rk;rc.innerHTML=one?`<span>Para kay <b>${esc(one.role)}</b></span>`:`<span>Para kay</span>`+sessions.map(x=>`<button type="button" data-rcpt="${esc(x.sid)}" aria-pressed="${x.sid===chatTo}"><i style="background:${x.pal.shirt}"></i>${esc(x.short)}</button>`).join('');}
+     const tgt=bySid(chatTo);$('msgInput').placeholder=tgt?`Mensahe kay ${tgt.short}…`:'Mensahe…';}
     const sel2=$('chatTo');const opts=sessions.map(x=>`<option value="${esc(x.sid)}">${esc(x.role)}${x.listening?' · naka-abang':x.status==='working'?' · nagtatrabaho':''}</option>`).join('');
     if(sel2.dataset.k!==opts){sel2.dataset.k=opts;sel2.innerHTML=opts;}if(sel2.value!==chatTo)sel2.value=chatTo;
     const aw=$('awaySel');if(aw.value!==awayMode)aw.value=awayMode;
@@ -2085,8 +2135,12 @@ document.addEventListener('click',e=>{
 });
 $('composer').addEventListener('submit',async e=>{e.preventDefault();const s=bySid(chatTo);const v=$('msgInput').value;if(!v.trim())return;
   if(!s){connMsg='Wala na sa office ang napiling session. Pumili ulit sa Para kay.';setConn();return;}
-  $('msgInput').value='';if(!await answer(s,v)&&!$('msgInput').value)$('msgInput').value=v;});
+  $('msgInput').value='';$('msgInput').style.height='auto';if(!await answer(s,v)&&!$('msgInput').value)$('msgInput').value=v;});
 $('chatTo').addEventListener('change',e=>{chatTo=e.target.value;});
+$('rcpt').addEventListener('click',e=>{const b=e.target.closest('[data-rcpt]');if(!b)return;chatTo=b.dataset.rcpt;$('rcpt').dataset.k='';renderPanel();$('msgInput').focus();});
+// the message box grows with the text, like in the Claude app
+$('msgInput').addEventListener('input',e=>{const t=e.target;t.style.height='auto';t.style.height=Math.min(160,t.scrollHeight)+'px';});
+$('viewer').addEventListener('click',e=>{if(e.target.closest('[data-act="vclose"]'))closeViewer();});
 $('composer').addEventListener('focusin',()=>{$('app').classList.add('typing');setTimeout(()=>{document.querySelector('.chatpanel').scrollIntoView({block:'start'});const b=$('cpBody');b.scrollTop=b.scrollHeight;},350);});
 $('composer').addEventListener('focusout',()=>setTimeout(()=>{if(!$('composer').contains(document.activeElement))$('app').classList.remove('typing');},200));
 $('awaySel').addEventListener('change',e=>setAway(e.target.value));
@@ -2094,7 +2148,8 @@ $('cpBody').addEventListener('click',e=>{
   const rt=e.target.closest('[data-retry]');if(rt){const m=PENDING[+rt.dataset.retry];if(m){PENDING.splice(+rt.dataset.retry,1);const s=bySid(m.sid);if(s)answer(s,m.text);else{connMsg='Wala na sa office ang session na iyon.';setConn();}}chatKey='';renderPanel();return;}
   const dp=e.target.closest('[data-drop]');if(dp){PENDING.splice(+dp.dataset.drop,1);chatKey='';renderPanel();return;}
   const f=e.target.closest('[data-cf]');if(f){chatFilter=f.dataset.cf;if(chatFilter!=='all')chatTo=chatFilter;forceScroll=true;chatKey='';renderPanel();return;}
-  const m=e.target.closest('[data-chatto]');if(m){chatTo=m.dataset.chatto;$('chatTo').value=chatTo;$('msgInput').focus();}
+  const vw=e.target.closest('[data-view]');if(vw){openViewer(vw.dataset.view,vw.dataset.vt);return;}
+  const m=e.target.closest('[data-chatto]');if(m){chatTo=m.dataset.chatto;$('rcpt').dataset.k='';$('chatTo').value=chatTo;$('msgInput').focus();}
 });
 $('msgInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('composer').requestSubmit();}});
 let drag=null;
@@ -2143,6 +2198,7 @@ applyBS();
 $('chatToggle').addEventListener('click',()=>setDrawer(!$('app').classList.contains('drawer')));
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape')return;
+  if(!$('viewer').hidden){closeViewer();return;}
   if(!$('whatsNew').hidden){$('whatsNew').querySelector('[data-act="wn-ok"]')?.click();return;}
   if(!$('teamPanel').hidden){$('teamPanel').hidden=true;return;}
   if($('app').classList.contains('drawer')){if(document.activeElement&&document.activeElement.closest('.pane'))document.activeElement.blur();setDrawer(false);return;}

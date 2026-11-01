@@ -701,6 +701,18 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16, tun: bool) {
             respond_json(req, 200, &json!({"ok": true, "id": id}));
             deliver_now(&sid);
         }
+        (Method::Get, p) if p.starts_with("/api/att/") => {
+            if !token_ok { return respond_json(req, 401, &json!({"error": "pairing"})); }
+            let id = &p["/api/att/".len()..];
+            let ok = id.len() < 40 && id.split_once('.').map(|(h, e)| h.len() == 24 && h.chars().all(|c| c.is_ascii_hexdigit()) && att_ext(e) == Some(e)).unwrap_or(false);
+            let Some(bytes) = ok.then(|| fs::read(att_dir().join(id)).ok()).flatten() else { return respond_json(req, 404, &json!({"error": "not found"})) };
+            let ext = id.rsplit('.').next().unwrap_or("");
+            let mut r = Response::from_data(bytes).with_header(header("Content-Type", att_mime(ext))).with_header(header("Cache-Control", "private, max-age=86400"))
+                .with_header(header("X-Content-Type-Options", "nosniff"));
+            // pages and drawings run in a sandbox: no access to Dev Room, its token or its storage
+            if ext == "html" || ext == "svg" { r = r.with_header(header("Content-Security-Policy", "sandbox allow-scripts allow-popups allow-forms")); }
+            let _ = req.respond(r);
+        }
         (Method::Get, "/api/convo") => {
             // Conversations are fetched apart from /api/state, only when a session's convo_n changes.
             if !token_ok { return respond_json(req, 401, &json!({"error": "pairing"})); }
@@ -921,6 +933,96 @@ static SHARED: std::sync::OnceLock<Arc<Mutex<State>>> = std::sync::OnceLock::new
 static TAIL: Mutex<Option<HashMap<String, (String, u64, bool)>>> = Mutex::new(None);
 static RUNS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
+/// What a transcript line adds to the chat: text, or a picture / artifact / file the session showed or sent.
+enum Item { Text(&'static str, String), Image(&'static str, String, String), File(&'static str, String, String) }
+
+fn transcript_items(v: &Value) -> Vec<Item> {
+    let mut out = Vec::new();
+    if v.get("isSidechain").and_then(|x| x.as_bool()).unwrap_or(false) { return out; }
+    if let Some((r, t)) = transcript_line(v) { out.push(Item::Text(r, t)); }
+    let kind = v.get("type").and_then(|x| x.as_str()).unwrap_or("");
+    let Some(arr) = v.get("message").and_then(|m| m.get("content")).and_then(|c| c.as_array()) else { return out };
+    let img = |b: &Value, role: &'static str, out: &mut Vec<Item>| {
+        if b.get("type").and_then(|x| x.as_str()) != Some("image") { return; }
+        let src = b.get("source");
+        if src.and_then(|s| s.get("type")).and_then(|x| x.as_str()) != Some("base64") { return; }
+        let mime = src.and_then(|s| s.get("media_type")).and_then(|x| x.as_str()).unwrap_or("image/png").to_string();
+        if let Some(d) = src.and_then(|s| s.get("data")).and_then(|x| x.as_str()) { out.push(Item::Image(role, mime, d.to_string())); }
+    };
+    for b in arr {
+        match (kind, b.get("type").and_then(|x| x.as_str()).unwrap_or("")) {
+            // a picture you pasted
+            ("user", "image") => img(b, "user", &mut out),
+            // a picture the session looked at (a screenshot, an image file it opened)
+            ("user", "tool_result") => if let Some(c) = b.get("content").and_then(|c| c.as_array()) { for x in c { img(x, "assistant", &mut out); } },
+            // a page or file the session published or sent to you
+            ("assistant", "tool_use") => {
+                let name = b.get("name").and_then(|x| x.as_str()).unwrap_or("");
+                let input = b.get("input").cloned().unwrap_or(Value::Null);
+                if name.ends_with("Artifact") {
+                    if let Some(p) = input.get("file_path").and_then(|x| x.as_str()) {
+                        let title = input.get("title").or_else(|| input.get("description")).and_then(|x| x.as_str()).unwrap_or("").to_string();
+                        out.push(Item::File("assistant", p.to_string(), title));
+                    }
+                } else if name == "SendUserFile" {
+                    for f in input.get("files").and_then(|x| x.as_array()).into_iter().flatten() {
+                        if let Some(p) = f.as_str() { out.push(Item::File("assistant", p.to_string(), input.get("caption").and_then(|x| x.as_str()).unwrap_or("").to_string())); }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+/* ---------- attachments: pictures and pages shown in the chat ----------
+   Stored once under %APPDATA%\DevRoom\att\<hash>.<ext>, served only to the paired app. Pages are served
+   sandboxed (no access to Dev Room or its token). */
+fn att_dir() -> PathBuf { data_dir().join("att") }
+
+fn att_ext(mime_or_path: &str) -> Option<&'static str> {
+    let l = mime_or_path.to_ascii_lowercase();
+    let l = l.rsplit(['/', '.', '\\']).next().unwrap_or("");
+    Some(match l { "png" => "png", "jpeg" | "jpg" => "jpg", "gif" => "gif", "webp" => "webp", "svg" | "svg+xml" => "svg", "html" | "htm" => "html", "pdf" => "pdf", _ => return None })
+}
+
+fn att_mime(ext: &str) -> &'static str {
+    match ext { "png" => "image/png", "jpg" => "image/jpeg", "gif" => "image/gif", "webp" => "image/webp", "svg" => "image/svg+xml", "html" => "text/html; charset=utf-8", "pdf" => "application/pdf", _ => "application/octet-stream" }
+}
+
+/// Keep an attachment; returns its id (content hash, so the same picture is stored once).
+fn att_store(bytes: &[u8], ext: &str) -> Option<String> {
+    if bytes.is_empty() || bytes.len() > 20 * 1024 * 1024 { return None; }
+    use sha2::{Digest, Sha256};
+    let id: String = Sha256::digest(bytes).iter().take(12).map(|b| format!("{b:02x}")).collect();
+    let dir = att_dir();
+    let p = dir.join(format!("{id}.{ext}"));
+    if !p.exists() {
+        let _ = fs::create_dir_all(&dir);
+        let tmp = dir.join(format!("{id}.tmp"));
+        fs::write(&tmp, bytes).ok()?;
+        fs::rename(&tmp, &p).ok()?;
+        // keep the folder small: the oldest beyond 300 files go
+        if let Ok(rd) = fs::read_dir(&dir) {
+            let mut all: Vec<(std::time::SystemTime, PathBuf)> = rd.flatten().filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.path()))).collect();
+            if all.len() > 300 { all.sort(); for (_, f) in all.iter().take(all.len() - 300) { let _ = fs::remove_file(f); } }
+        }
+    }
+    Some(format!("{id}.{ext}"))
+}
+
+fn push_att(s: &mut Map<String, Value>, role: &str, att: &str, name: &str, title: &str) {
+    let c = s.entry("convo").or_insert_with(|| json!([]));
+    if !c.is_array() { *c = json!([]); }
+    let arr = c.as_array_mut().unwrap();
+    if arr.iter().rev().take(30).any(|m| m.get("att").and_then(|x| x.as_str()) == Some(att)) { return; }
+    arr.push(json!({"role": role, "text": "", "att": att, "name": name, "title": clip(title, 120), "at": now_ms()}));
+    if arr.len() > 40 { let n = arr.len() - 40; arr.drain(..n); }
+    let n = s.get("convo_n").and_then(|x| x.as_u64()).unwrap_or(0) + 1;
+    s.insert("convo_n".into(), json!(n));
+}
+
 /// The text a transcript line shows in the chat: your prompts and Claude's replies (not tool calls or results).
 fn transcript_line(v: &Value) -> Option<(&'static str, String)> {
     if v.get("isSidechain").and_then(|x| x.as_bool()).unwrap_or(false) || v.get("isMeta").and_then(|x| x.as_bool()).unwrap_or(false) { return None; }
@@ -948,7 +1050,7 @@ fn tail_transcripts(st: &Mutex<State>) {
     let list: Vec<(String, String, bool)> = lk(st).sessions.iter()
         .filter_map(|(k, v)| v.get("transcript").and_then(|x| x.as_str()).map(|t| (k.clone(), t.to_string(),
             now.saturating_sub(v.get("hook_at").and_then(|x| x.as_u64()).unwrap_or(0)) < 120_000))).collect();
-    let mut found: Vec<(String, &'static str, String)> = Vec::new();
+    let mut found: Vec<(String, Item)> = Vec::new();
     {
         let mut guard = TAIL.lock().unwrap_or_else(|e| e.into_inner());
         let tails = guard.get_or_insert_with(HashMap::new);
@@ -957,7 +1059,7 @@ fn tail_transcripts(st: &Mutex<State>) {
             let len = fs::metadata(path).map(|m| m.len()).unwrap_or(0);
             // The first look starts at the end (earlier lines are in the saved conversation), except for a session
             // active right now: its newest lines may have been written just before we looked (repeats are skipped).
-            let e = tails.entry(sid.clone()).or_insert_with(|| (path.clone(), if *active { len.saturating_sub(64 * 1024) } else { len }, *active));
+            let e = tails.entry(sid.clone()).or_insert_with(|| (path.clone(), if *active { len.saturating_sub(64 * 1024) } else { len }, *active && len > 0));
             if &e.0 != path || len < e.1 { *e = (path.clone(), len, false); continue; }
             if len == e.1 { continue; }
             let catch_up = std::mem::replace(&mut e.2, false);
@@ -972,21 +1074,43 @@ fn tail_transcripts(st: &Mutex<State>) {
             e.1 = start + end as u64 + 1;
             // reading from the middle of a file: drop the partial first line
             let body = if fresh { buf[..end].splitn(2, |&b| b == b'\n').nth(1).unwrap_or(&[]) } else { &buf[..end] };
-            let mut got: Vec<(&'static str, String)> = body.split(|&b| b == b'\n')
-                .filter_map(|line| serde_json::from_slice::<Value>(line).ok()).filter_map(|v| transcript_line(&v)).collect();
+            let mut got: Vec<Item> = body.split(|&b| b == b'\n')
+                .filter_map(|line| serde_json::from_slice::<Value>(line).ok()).flat_map(|v| transcript_items(&v)).collect();
             // catching up on a session that is already running: only its current turn (from your last prompt)
             if catch_up {
-                if let Some(i) = got.iter().rposition(|(r, _)| *r == "user") { got.drain(..i); } else { got.clear(); }
+                if let Some(i) = got.iter().rposition(|it| matches!(it, Item::Text("user", _))) { got.drain(..i); } else { got.clear(); }
             }
-            found.extend(got.into_iter().map(|(r, t)| (sid.clone(), r, t)));
+            found.extend(got.into_iter().map(|it| (sid.clone(), it)));
         }
     }
     if found.is_empty() { return; }
+    // pictures and files are saved before taking the lock (decoding and copying can take a moment)
+    enum Ready { Text(&'static str, String), Att(&'static str, String, String, String) }
+    let ready: Vec<(String, Ready)> = found.into_iter().filter_map(|(sid, it)| Some((sid, match it {
+        Item::Text(r, t) => Ready::Text(r, t),
+        Item::Image(r, mime, b64) => {
+            use base64::Engine;
+            let bytes = base64::engine::general_purpose::STANDARD.decode(b64.as_bytes()).ok()?;
+            let ext = att_ext(&mime)?;
+            Ready::Att(r, att_store(&bytes, ext)?, format!("larawan.{ext}"), String::new())
+        }
+        Item::File(r, path, title) => {
+            let ext = att_ext(&path)?;
+            let bytes = fs::read(&path).ok()?;
+            let name = base_name(&path);
+            Ready::Att(r, att_store(&bytes, ext)?, name, title)
+        }
+    }))).collect();
     let mut g = lk(st);
-    for (sid, role, text) in found {
+    for (sid, it) in ready {
         if let Some(s) = g.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()) {
-            push_convo(s, role, &text, if role == "user" { 2000 } else { 4000 });
-            if role == "assistant" { s.insert("recent".into(), json!(clip(&text, 300))); s.insert("updated_at".into(), json!(now_ms())); }
+            match it {
+                Ready::Text(role, text) => {
+                    push_convo(s, role, &text, if role == "user" { 2000 } else { 4000 });
+                    if role == "assistant" { s.insert("recent".into(), json!(clip(&text, 300))); s.insert("updated_at".into(), json!(now_ms())); }
+                }
+                Ready::Att(role, att, name, title) => push_att(s, role, &att, &name, &title),
+            }
         }
     }
     g.bump();

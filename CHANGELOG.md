@@ -7,7 +7,18 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
-## 0.8.1 (2026-11-01)
+## 0.9.0 (2026-11-01)
+
+- **Pictures and artifacts in the chat:**
+  - Screenshots and images a session looks at (tool results), and pictures you paste, show inline.
+  - Pages a session publishes (the Artifact tool) and files it sends (SendUserFile) show as cards, opened full screen inside the app.
+  - Files are stored once by content hash under `%APPDATA%\DevRoom\att` (newest 300) and served at `/api/att/<id>`, with the pairing token required.
+  - Pages and SVGs are served with a CSP sandbox and opened in a sandboxed iframe, so they cannot reach Dev Room or its token.
+- **New composer, like the Claude app:**
+  - One rounded box that grows with the text, with a round send button.
+  - Recipient chips under **Para kay** replace the native dropdown.
+  - The **Opsyon** (away mode) is gone, and a saved "on" or "auto" is switched off.
+- The live transcript reader no longer drops the first reply of a session whose transcript was empty when first seen.
 
 - **Chat replies are formatted like in the Claude app:** bold, italics, inline code, code blocks, headings, bullet and numbered lists, and rules.
   - The text is escaped before formatting, so a reply can never inject HTML.
