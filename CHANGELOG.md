@@ -7,6 +7,13 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.8.1 (2026-11-01)
+
+- **Chat replies are formatted like in the Claude app:** bold, italics, inline code, code blocks, headings, bullet and numbered lists, and rules.
+  - The text is escaped before formatting, so a reply can never inject HTML.
+  - Links show as text.
+- The project name in the chat header stays on one line, with an ellipsis.
+
 ## 0.8.0 (2026-11-01)
 
 **Real-time chat in Dev Room's own chatbox.** The Chat tab is Dev Room's chat again, not claude.ai.

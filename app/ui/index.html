@@ -218,6 +218,15 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .cmsg .who b{color:var(--ink)}
 .cmsg .who i{width:8px;height:8px;border-radius:2px;display:inline-block}
 .cmsg .msg{max-width:100%;white-space:pre-wrap}
+.cmsg .msg.md{white-space:normal}
+.msg.md p{margin:0 0 6px}.msg.md p:last-child{margin-bottom:0}
+.msg.md p.h{font-weight:700;margin-top:4px}
+.msg.md ul,.msg.md ol{margin:0 0 6px;padding-left:20px}.msg.md li{margin:2px 0}
+.msg.md code{font-family:var(--f-mono);font-size:.92em;background:color-mix(in srgb,var(--ink) 9%,transparent);padding:0 4px;border-radius:4px}
+.msg.md pre{margin:4px 0 6px;padding:8px;border-radius:8px;background:color-mix(in srgb,var(--ink) 9%,transparent);overflow-x:auto;white-space:pre}
+.msg.md pre code{background:none;padding:0}
+.msg.md hr{border:0;border-top:1px solid var(--line);margin:6px 0}
+.cp-head .raw{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cmsg .st{font-size:10.5px;color:var(--muted)}
 .listen{align-self:stretch;font-size:12px;border:1px dashed var(--work);border-radius:8px;padding:6px 9px;color:var(--ink);background:color-mix(in srgb,var(--work) 10%,var(--panel))}
 .composer .to{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
@@ -1142,6 +1151,8 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.8.1':{news:['<b>Naka-format na ang mga sagot sa chat, tulad sa Claude app:</b> bold, listahan, numbered list, heading at code. Wala nang <code>**</code> at <code>-</code> na nakakalat.','Hindi na nababali sa dalawang linya ang pangalan ng project sa itaas ng chat.'],
+    todo:['Wala kang gagawin: kusa itong nag-a-update sa PC, at sabay na nag-a-update ang tablet at phone.']},
   '0.8.0':{news:['<b>Real-time na ang chat ng Dev Room.</b> Bumalik ang dating chatbox, pero wala nang hintayan:',
     '<b>Sagot nila:</b> lumalabas agad habang isinusulat nila, hindi na sa dulo ng turn lang. Kita ang lahat ng session sa <b>Lahat</b>, o pumili ng isa.',
     '<b>Mensahe mo:</b> kung tapos na ang session, agad siyang sasagot (ang Dev Room mismo ang nagpapatuloy sa session). Kung nagtatrabaho pa, matatanggap niya sa loob ng ilang segundo.',
@@ -1874,6 +1885,32 @@ function openClaude(id){
 async function setAway(m){
   if(m!=='off'&&!confirm('Kapag naka-on ito, hindi muna matatapos ang turn ng session pagkatapos niyang sumagot: maghihintay siya ng utos mo mula sa app nang hanggang 20 minuto. Habang naghihintay, mukha siyang "may ginagawa" sa Claude Code at hindi ka makakapag-utos doon nang normal (pindutin ang Esc para ituloy). Ituloy?')){$('awaySel').value=awayMode;return;}
   awayMode=m;chatKey='';renderPanel();try{await fetch('/api/away',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({mode:m})});}catch(e){}}
+// Claude's replies are Markdown: show them formatted like in the Claude app (bold, lists, code, headings),
+// built from escaped text only, so nothing in a reply can inject HTML.
+function md(src){
+  const inline=t=>esc(t)
+    .replace(/`([^`\n]+)`/g,'<code>$1</code>')
+    .replace(/\*\*([^*\n]+?)\*\*/g,'<b>$1</b>').replace(/__([^_\n]+?)__/g,'<b>$1</b>')
+    .replace(/(^|[^*\w])\*([^*\n]+?)\*(?!\w)/g,'$1<i>$2</i>').replace(/(^|[^_\w])_([^_\n]+?)_(?!\w)/g,'$1<i>$2</i>')
+    .replace(/\[([^\]\n]+)\]\((https?:[^)\s]+)\)/g,'$1');
+  const lines=String(src||'').replace(/\r/g,'').split('\n');const out=[];let list=null,para=[],code=null;
+  const flushP=()=>{if(para.length){out.push('<p>'+para.map(inline).join('<br>')+'</p>');para=[];}};
+  const flushL=()=>{if(list){out.push(`<${list.t}>`+list.items.map(x=>'<li>'+inline(x)+'</li>').join('')+`</${list.t}>`);list=null;}};
+  for(const ln of lines){
+    if(code!==null){if(/^\s*```/.test(ln)){out.push('<pre><code>'+esc(code.join('\n'))+'</code></pre>');code=null;}else code.push(ln);continue;}
+    if(/^\s*```/.test(ln)){flushP();flushL();code=[];continue;}
+    let m;
+    if(!ln.trim()){flushP();flushL();continue;}
+    if((m=ln.match(/^\s{0,3}#{1,6}\s+(.*)$/))){flushP();flushL();out.push('<p class="h">'+inline(m[1])+'</p>');continue;}
+    if(/^\s*([-*_])\s*\1\s*\1[\s\-*_]*$/.test(ln)){flushP();flushL();out.push('<hr>');continue;}
+    if((m=ln.match(/^\s*[-*+]\s+(.*)$/))){flushP();if(!list||list.t!=='ul'){flushL();list={t:'ul',items:[]};}list.items.push(m[1]);continue;}
+    if((m=ln.match(/^\s*\d+[.)]\s+(.*)$/))){flushP();if(!list||list.t!=='ol'){flushL();list={t:'ol',items:[]};}list.items.push(m[1]);continue;}
+    if(list&&/^\s{2,}\S/.test(ln)){list.items[list.items.length-1]+=' '+ln.trim();continue;}
+    flushL();para.push(ln);
+  }
+  if(code!==null)out.push('<pre><code>'+esc(code.join('\n'))+'</code></pre>');
+  flushP();flushL();return out.join('');
+}
 function cleanMsg(t){
   const SYS='system-reminder|command-name|command-message|command-args|command-contents|local-command-stdout|local-command-stderr|local-command-caveat|side-sessions-event|task-notification|user-prompt-submit-hook|bash-input|bash-stdout|bash-stderr';
   return String(t||'').replace(new RegExp('<('+SYS+')\\b[^>]*>[\\s\\S]*?<\\/\\1>','gi'),'').replace(new RegExp('<\\/?('+SYS+')\\b[^>]*>','gi'),'').replace(/\n{3,}/g,'\n\n').trim();
@@ -1895,7 +1932,7 @@ function chatFeed(){
     const who=it.you?`<b>Boss</b> → ${esc(it.s.short)}`:`<i style="background:${it.s.pal.shirt}"></i><b>${esc(it.s.short)}</b>`;
     const st=it.app?`<span class="st">${{sending:'Ipinapadala…',queued:'Ipinapasa…',sent:'Natanggap na niya ✓',delivered:'Natanggap na niya ✓',failed:'Hindi naipadala.'}[it.st]||''}${it.st==='failed'&&it.pi!=null?` <button type="button" class="linkbtn" data-retry="${it.pi}">Subukan ulit</button> <button type="button" class="linkbtn" data-drop="${it.pi}">Alisin</button>`:''}${it.why?' ('+esc(it.why)+')':''}${it.app?' · mula sa app':''}</span>`:'';
     if(it.sys)return `<div class="msg sys" data-chatto="${esc(it.s.sid)}">${esc(it.s.short)}: ${esc(it.text)} · ${simLabel(it.t)}</div>`;
-    return `<div class="cmsg ${it.you?'you':''}" data-chatto="${esc(it.s.sid)}"><span class="who">${who} · ${simLabel(it.t)}</span><div class="msg ${it.you?'you':'agent'}">${esc(it.text)}</div>${st}</div>`;
+    return `<div class="cmsg ${it.you?'you':''}" data-chatto="${esc(it.s.sid)}"><span class="who">${who} · ${simLabel(it.t)}</span><div class="msg md ${it.you?'you':'agent'}">${md(it.text)}</div>${st}</div>`;
   });
   // a queued message to a session that already stopped (and is not waiting) only arrives with its next turn
   const typing=list.filter(s=>s.status==='working').map(s=>`<div class="typing" data-chatto="${esc(s.sid)}"><i style="background:${s.pal.shirt}"></i><b>${esc(s.short)}</b> ${esc(s.detail&&s.detail.length<90?s.detail:'nagtatrabaho')}<span class="dots"><span></span><span></span><span></span></span></div>`);
