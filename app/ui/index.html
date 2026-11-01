@@ -36,6 +36,11 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline
 .stage{max-width:none;margin:0}
 .stage[data-device="desktop"] .app{height:calc(100dvh - 16px);display:flex;flex-direction:column}
 .app:fullscreen{height:100vh!important;padding:10px;box-sizing:border-box}
+.app.focus .top,.app.focus .conn,.app.focus .updbar,.app.focus .dockwrap,.app.focus .legend,.app.focus .rule,.app.focus .tabs,.app.focus .statusbar{display:none!important}
+.app.focus{position:fixed;inset:0;z-index:50;height:100%!important;padding:6px;box-sizing:border-box;background:var(--bg)}
+.app.focus .body{grid-template-rows:minmax(0,1fr);grid-template-areas:"office chat";height:100%}
+.app.focus .pane[data-pane="office"]{display:flex!important;height:100%}
+.app.focus .mapwrap{height:100%;flex:1}
 .app{container-type:inline-size;container-name:app;position:relative;background:var(--bg)}
 .statusbar{display:none}
 
@@ -188,7 +193,7 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
   .mapwrap{flex:none;height:52vh;min-height:260px}
   .mlegend{display:none}
   .app[data-tab] .pane,.app[data-tab] .dockwrap{flex:none}
-  #fsBtn,#chatToggle{display:none}
+  #chatToggle{display:none}
   .top{gap:10px;padding-bottom:10px;margin-bottom:10px}
   .counts{margin-left:0;width:100%}
   .controls{width:100%}
@@ -982,9 +987,9 @@ const BGRES=2;const bg=document.createElement('canvas');bg.width=SW*BGRES;bg.hei
   wallFace(iso(1.5,0,10),iso(15.5,0,10),iso(15.5,0,58),iso(1.5,0,58),'#15191d');   // video wall frame
   const winV=(u1,u2,z1,z2,col)=>poly(g,[iso(u1,0,z1),iso(u2,0,z1),iso(u2,0,z2),iso(u1,0,z2)],col,OUT);
   winV(18,21,18,48,'#9fb6c4');winV(23,24.6,24,44,'#c9a27e');winV(25.4,27,24,44,'#7d8a6a');winV(36.5,40.5,18,48,'#9fb6c4');
-  g.font='bold 9px monospace';g.fillStyle='rgba(15,18,22,.55)';g.textAlign='center';
+  g.font='bold 14px monospace';g.fillStyle='rgba(15,18,22,.5)';g.textAlign='center';g.textBaseline='middle';
   [['CONTROL ROOM',4,10.5],['TEAM SUPERVISOR',19.5,10.5],['OPISINA MO',25,10.5],['LIBRARY',31.5,10.5],['TULUGAN',38.5,10.5],
-   ['GATE',2.5,22.4],['CR',7,22.4],['PANTRY',12.5,22.4],['LOUNGE',19,22.4],['REC ROOM',25,22.4],['GYM',31,22.4],['HALF COURT',38,22.6]].forEach(([t,u,v])=>{const p=iso(u,v);g.fillText(t,p.x,p.y);});
+   ['GATE',2.5,22.4],['CR',7,22.4],['PANTRY',12.5,22.4],['LOUNGE',19,22.4],['REC ROOM',25,22.4],['GYM',31,22.4],['HALF COURT',38,22.6]].forEach(([t,u,v])=>{const p=iso(u,v-.55);g.save();g.translate(p.x,p.y);g.transform(1,TH/TW,-1,TH/TW,0,0);g.fillText(t,0,0);g.restore();});
 })();
 
 /* furniture as depth-sorted objects */
@@ -1512,9 +1517,14 @@ $('bsUp').addEventListener('click',()=>{bsI=Math.min(BS.length-1,bsI+1);applyBS(
 $('bsDown').addEventListener('click',()=>{bsI=Math.max(0,bsI-1);applyBS();});
 applyBS();
 {const fb=$('fsBtn');const app=$('app');
- if(!(document.fullscreenEnabled&&app.requestFullscreen))fb.hidden=true;
- fb.addEventListener('click',()=>{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});else app.requestFullscreen().catch(()=>{fb.hidden=true;});});
- document.addEventListener('fullscreenchange',()=>{fb.textContent=document.fullscreenElement?'Lumabas sa fullscreen':'Fullscreen';});}
+ // Map-only mode. Uses the Fullscreen API when allowed, and fills the window anyway when it is not (phones, the Android app).
+ const fit=()=>setTimeout(()=>{resizeMap();cam.follow=null;setZoom(1);},60);
+ const setFocus=on=>{app.classList.toggle('focus',on);fb.textContent=on?'Lumabas sa fullscreen':'Fullscreen';fit();};
+ fb.addEventListener('click',()=>{
+   const on=!app.classList.contains('focus');setFocus(on);
+   try{if(on&&document.fullscreenEnabled&&app.requestFullscreen)app.requestFullscreen().catch(()=>{});else if(!on&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});}catch(e){}
+ });
+ document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&app.classList.contains('focus'))setFocus(false);else fit();});}
 $('chatToggle').addEventListener('click',()=>{const a=$('app');a.classList.toggle('nochat');$('chatToggle').textContent=a.classList.contains('nochat')?'Ipakita ang chat':'Itago ang chat';});
 $('pauseBtn').addEventListener('click',()=>{
   if(!paused){paused=true;pauseAt=Date.now();$('pauseBtn').textContent='Ituloy';}

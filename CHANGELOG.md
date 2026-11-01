@@ -37,7 +37,11 @@ The version lives in `VERSION`. Each build is published as release `v<VERSION>-b
 - **Pinch to zoom** on phones and touch screens.
 - **Away from home:** when Tailscale runs on the PC, the pairing QR also carries the Tailscale address. The Android app and its background watcher use home Wi-Fi first and Tailscale when away.
 
+- **Tray app:** closing the Dev Room window keeps it running in the system tray, so phones and tablets stay connected. The tray menu has Buksan ang Dev Room, Simulan kasabay ng Windows (start with Windows, hidden in the tray), and Isara nang tuluyan.
+- **Fullscreen is map only:** the header, status bar and dock hide, and the whole plant fits the screen. It also works where the browser blocks real fullscreen, such as the Android app.
+
 ### Fixed
+- **Room names are painted flat on the floor**, following the isometric angle, instead of floating horizontally.
 - **Bubbles never overlap each other or other people's name tags.** Colliding bubbles lift up with a leader line, and fewer people talk at once when zoomed out. Alarms and the selected character always get through.
 - **Brighter floors.**
 - **The leader is detected automatically** when no team is saved.
