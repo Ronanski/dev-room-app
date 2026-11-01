@@ -10,6 +10,7 @@ use std::fs;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
@@ -21,6 +22,9 @@ const MAX_BODY: usize = 4 * 1024 * 1024;
 
 /// Set by the app: opens the Dev Room window (used when DevRoom.exe is started a second time).
 pub static ON_SHOW: std::sync::OnceLock<Box<dyn Fn() + Send + Sync>> = std::sync::OnceLock::new();
+
+/// Lock the shared state; a panic in another request must not take the whole server down.
+fn lk(m: &Mutex<State>) -> std::sync::MutexGuard<'_, State> { m.lock().unwrap_or_else(|e| e.into_inner()) }
 
 fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
@@ -54,7 +58,9 @@ impl State {
     fn save(&self) {
         let _ = fs::create_dir_all(&self.dir);
         let data = json!({"sessions": self.sessions, "team": self.team, "token": self.token, "away": self.away});
-        let _ = fs::write(self.dir.join("state.json"), serde_json::to_vec_pretty(&data).unwrap_or_default());
+        // write then rename, so a crash never leaves a half-written file (which would unpair every phone)
+        let tmp = self.dir.join("state.json.tmp");
+        if fs::write(&tmp, serde_json::to_vec(&data).unwrap_or_default()).is_ok() { let _ = fs::rename(&tmp, self.dir.join("state.json")); }
     }
 
     fn load(dir: PathBuf) -> State {
@@ -76,6 +82,7 @@ impl State {
         }
         if st.token.len() < 16 { st.token = format!("{:016x}{:016x}", rand::random::<u64>(), rand::random::<u64>()); }
         if !["auto", "on", "off"].contains(&st.away.as_str()) { st.away = "auto".into(); }
+        for s in st.sessions.values_mut() { if let Some(o) = s.as_object_mut() { o.insert("listening".into(), json!(false)); } }
         st.version = 1;
         st.save();
         st
@@ -101,14 +108,17 @@ const LISTEN_SECS: u64 = 1200;
 fn hook_command(port: u16, ev: &str) -> String {
     // curl.exe ships with Windows 10 and 11; `|| exit 0` keeps Claude quiet when Dev Room is closed.
     let max = if ev == "Stop" { LISTEN_SECS + 50 } else { 2 };
-    format!("curl -s -m {max} -X POST -H \"Content-Type: application/json\" --data-binary @- http://127.0.0.1:{port}/hook || exit 0")
+    format!("curl -s --noproxy 127.0.0.1 -m {max} -X POST -H \"Content-Type: application/json\" --data-binary @- http://127.0.0.1:{port}/hook?devroom=1 || exit 0")
 }
 fn hook_timeout(ev: &str) -> u64 { if ev == "Stop" { LISTEN_SECS + 60 } else { 3 } }
 
+/// A Dev Room hook command: today's (marked with `/hook?devroom=1`) or an older one (curl posting stdin to /hook).
+fn is_our_cmd(h: &Value) -> bool {
+    h.get("command").and_then(|c| c.as_str()).map(|c| c.contains("/hook?devroom=1")
+        || (c.contains("--data-binary @- http://127.0.0.1:") && c.trim_end().ends_with("/hook || exit 0"))).unwrap_or(false)
+}
 fn is_ours(entry: &Value) -> bool {
-    entry.get("hooks").and_then(|h| h.as_array()).map(|hs| hs.iter().any(|h|
-        h.get("command").and_then(|c| c.as_str()).map(|c| c.contains("127.0.0.1:") && c.contains("/hook")).unwrap_or(false)
-    )).unwrap_or(false)
+    entry.get("hooks").and_then(|h| h.as_array()).map(|hs| hs.iter().any(is_our_cmd)).unwrap_or(false)
 }
 
 /// True when settings.json already holds at least one Dev Room hook.
@@ -147,13 +157,19 @@ pub fn install_hooks(port: u16) -> Result<Value, String> {
         let list = hooks.as_object_mut().unwrap().entry(ev).or_insert_with(|| json!([]));
         if !list.is_array() { *list = json!([]); }
         let arr = list.as_array_mut().unwrap();
-        arr.retain(|e| !is_ours(e));
+        // take out only our own hook; an entry that held nothing else goes too
+        for e in arr.iter_mut() {
+            if let Some(hs) = e.get_mut("hooks").and_then(|h| h.as_array_mut()) { hs.retain(|h| !is_our_cmd(h)); }
+        }
+        arr.retain(|e| e.get("hooks").and_then(|h| h.as_array()).map(|hs| !hs.is_empty()).unwrap_or(true));
         let mut entry = json!({"hooks": [{"type": "command", "command": cmd, "timeout": hook_timeout(ev)}]});
         if ev == "PreToolUse" || ev == "PostToolUse" { entry["matcher"] = json!("*"); }
         arr.push(entry);
     }
     if let Some(dir) = path.parent() { fs::create_dir_all(dir).map_err(|e| e.to_string())?; }
-    fs::write(&path, serde_json::to_vec_pretty(&root).unwrap()).map_err(|e| format!("Hindi maisulat ang {}: {e}", path.display()))?;
+    let tmp = path.with_extension("json.devroom-tmp");
+    fs::write(&tmp, serde_json::to_vec_pretty(&root).unwrap()).map_err(|e| format!("Hindi maisulat ang {}: {e}", path.display()))?;
+    fs::rename(&tmp, &path).map_err(|e| format!("Hindi maisulat ang {}: {e}", path.display()))?;
     Ok(json!({"ok": true, "path": path.display().to_string(), "backup": backup}))
 }
 
@@ -227,6 +243,7 @@ fn last_question(text: &str) -> Option<String> {
 fn apply_hook(st: &mut State, v: &Value) {
     let ev = v.get("hook_event_name").and_then(|x| x.as_str()).unwrap_or("");
     let Some(sid) = v.get("session_id").and_then(|x| x.as_str()).map(String::from) else { return };
+    if sid.is_empty() || sid.len() > 80 || !sid.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') { return; }
     if ev == "SessionEnd" {
         if st.sessions.remove(&sid).is_some() { st.bump(); st.save(); }
         return;
@@ -249,8 +266,13 @@ fn apply_hook(st: &mut State, v: &Value) {
         }
     }
     s.insert("updated_at".into(), json!(now));
+    s.insert("hook_at".into(), json!(now));
     s.insert("last_event".into(), json!(ev));
     s.remove("live_guess");
+    // a hook after a hand-over means Claude received it
+    if let Some(inbox) = s.get_mut("inbox").and_then(|i| i.as_array_mut()) {
+        for m in inbox.iter_mut() { if m.get("state").and_then(|x| x.as_str()) == Some("sent") { m["state"] = json!("delivered"); } }
+    }
     if s.get("listening").and_then(|x| x.as_bool()).unwrap_or(false) { s.insert("listening".into(), json!(false)); }
     let gen = s.get("listen_gen").and_then(|x| x.as_u64()).unwrap_or(0) + 1;
     s.insert("listen_gen".into(), json!(gen));
@@ -341,8 +363,8 @@ fn take_queued(s: &mut Map<String, Value>) -> Option<(Vec<u64>, String)> {
         if m.get("state").and_then(|x| x.as_str()) == Some("queued") {
             ids.push(m.get("id").and_then(|x| x.as_u64()).unwrap_or(0));
             texts.push(m.get("text").and_then(|x| x.as_str()).unwrap_or("").to_string());
-            m["state"] = json!("delivered");
-            m["delivered_at"] = json!(now_ms());
+            m["state"] = json!("sent");
+            m["sent_at"] = json!(now_ms());
         }
     }
     if ids.is_empty() { return None; }
@@ -351,7 +373,7 @@ fn take_queued(s: &mut Map<String, Value>) -> Option<(Vec<u64>, String)> {
 
 /// Put messages back in the queue when they could not be handed over (the hook was cancelled).
 fn requeue(st: &Mutex<State>, sid: &str, ids: &[u64]) {
-    let mut g = st.lock().unwrap();
+    let mut g = lk(st);
     if let Some(inbox) = g.sessions.get_mut(sid).and_then(|s| s.get_mut("inbox")).and_then(|i| i.as_array_mut()) {
         for m in inbox.iter_mut() {
             if ids.contains(&m.get("id").and_then(|x| x.as_u64()).unwrap_or(0)) { m["state"] = json!("queued"); }
@@ -372,6 +394,12 @@ fn mark_prompted(s: &mut Map<String, Value>, text: &str) {
     s.insert("listening".into(), json!(false));
 }
 
+/// Stop hooks waiting for a phone message right now (the updater does not restart while any wait).
+pub static LISTENERS: AtomicUsize = AtomicUsize::new(0);
+struct Waiter;
+impl Waiter { fn new() -> Waiter { LISTENERS.fetch_add(1, Ordering::Relaxed); Waiter } }
+impl Drop for Waiter { fn drop(&mut self) { LISTENERS.fetch_sub(1, Ordering::Relaxed); } }
+
 fn wants_listen(g: &State, window_ms: u64) -> bool {
     match g.away.as_str() { "on" => true, "off" => false, _ => now_ms().saturating_sub(g.remote_seen) < window_ms }
 }
@@ -381,8 +409,11 @@ fn wants_listen(g: &State, window_ms: u64) -> bool {
 fn hook_reply(req: Request, st: &Mutex<State>, v: &Value) {
     let ev = v.get("hook_event_name").and_then(|x| x.as_str()).unwrap_or("").to_string();
     let sid = v.get("session_id").and_then(|x| x.as_str()).unwrap_or("").to_string();
-    let mut g = st.lock().unwrap();
+    let mut g = lk(st);
     apply_hook(&mut g, v);
+    // a subagent's tool call carries the parent's session id; messages are for the main session only
+    let sub = v.get("agent_id").is_some() || v.get("transcript_path").and_then(|x| x.as_str()).map(|t| t.contains("subagents")).unwrap_or(false);
+    if sub { drop(g); return respond_json(req, 200, &json!({})); }
     if ev == "PostToolUse" || ev == "UserPromptSubmit" {
         let got = g.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()).and_then(take_queued);
         let Some((ids, text)) = got else { drop(g); return respond_json(req, 200, &json!({})) };
@@ -395,8 +426,9 @@ fn hook_reply(req: Request, st: &Mutex<State>, v: &Value) {
     let deadline = now_ms() + LISTEN_SECS * 1000;
     let mut gen = 0;
     let mut first = true;
+    let _waiter = Waiter::new();
     let got = loop {
-        let listen = wants_listen(&g, if first { 120_000 } else { 600_000 });
+        let listen = wants_listen(&g, if first { 120_000 } else { 600_000 }) && LISTENERS.load(Ordering::Relaxed) <= 16;
         let Some(s) = g.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()) else { break None };
         if first { gen = s.get("listen_gen").and_then(|x| x.as_u64()).unwrap_or(0); }
         else if s.get("listen_gen").and_then(|x| x.as_u64()).unwrap_or(0) != gen { break None; }   // the session moved on
@@ -405,10 +437,10 @@ fn hook_reply(req: Request, st: &Mutex<State>, v: &Value) {
             if !first { s.insert("listening".into(), json!(false)); g.bump(); }
             break None;
         }
-        if first { s.insert("listening".into(), json!(true)); g.bump(); first = false; }
+        if first { s.insert("listening".into(), json!(true)); s.insert("listen_at".into(), json!(now_ms())); g.bump(); first = false; }
         drop(g);
         std::thread::sleep(std::time::Duration::from_millis(400));
-        g = st.lock().unwrap();
+        g = lk(st);
     };
     drop(g);
     match got {
@@ -416,7 +448,7 @@ fn hook_reply(req: Request, st: &Mutex<State>, v: &Value) {
             let out = json!({"decision": "block", "reason": text});
             if req.respond(json_response(200, &out)).is_err() {
                 requeue(st, &sid, &ids);
-                let mut g = st.lock().unwrap();
+                let mut g = lk(st);
                 if let Some(s) = g.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()) { s.insert("status".into(), json!("idle")); }
                 g.bump();
             }
@@ -445,7 +477,7 @@ fn record(s: &Value, names: &Value) -> Value {
     let cwd = s.get("cwd").and_then(|x| x.as_str()).unwrap_or("");
     let auto = s.get("auto_title").and_then(|x| x.as_str()).filter(|t| !t.is_empty()).map(String::from);
     let title = names.get(id).and_then(|x| x.as_str()).filter(|t| !t.trim().is_empty()).map(String::from)
-        .or(auto).unwrap_or_else(|| if cwd.is_empty() { format!("Session {}", &id[..id.len().min(8)]) } else { base_name(cwd) });
+        .or(auto).unwrap_or_else(|| if cwd.is_empty() { format!("Session {}", id.chars().take(8).collect::<String>()) } else { base_name(cwd) });
     let bucket = match s.get("status").and_then(|x| x.as_str()).unwrap_or("idle") {
         "working" => "SESSION_STATUS_BUCKET_WORKING",
         "needs" => "SESSION_STATUS_BUCKET_BLOCKED",
@@ -513,14 +545,30 @@ fn read_body(req: &mut Request) -> Option<Value> {
     serde_json::from_slice(&buf).ok()
 }
 
+/// Requests must name this PC (DNS rebinding) and, when a browser sends an Origin, come from Dev Room
+/// itself or the Android app shell. A web page open on the PC therefore cannot drive Dev Room.
+fn request_allowed(req: &Request, port: u16) -> bool {
+    let hv = |k: &'static str| req.headers().iter().find(|h| h.field.equiv(k)).map(|h| h.value.as_str().to_ascii_lowercase());
+    let Some(host) = hv("Host") else { return false };
+    // An IP address (any of this PC's adapters) or localhost: a rebinding attack always uses a host name.
+    let ok_host = host == format!("localhost:{port}")
+        || host.parse::<SocketAddr>().map(|a| a.port() == port).unwrap_or(false);
+    if !ok_host { return false; }
+    match hv("Origin") {
+        None => true,
+        Some(o) => o == format!("http://{host}") || o == "http://localhost" || o == "https://localhost" || o == "capacitor://localhost",
+    }
+}
+
 fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
+    if !request_allowed(&req, port) { return respond_json(req, 403, &json!({"error": "origin"})); }
     let local = is_loopback(req.remote_addr());
     let url = req.url().to_string();
     let (path, query) = url.split_once('?').unwrap_or((url.as_str(), ""));
     let path = path.to_string();
     let q: HashMap<String, String> = query.split('&').filter_map(|kv| kv.split_once('=')).map(|(k, v)| (k.to_string(), v.to_string())).collect();
     let token_ok = local || {
-        let token = st.lock().unwrap().token.clone();
+        let token = lk(st).token.clone();
         let given = req.headers().iter().find(|h| h.field.equiv("X-DevRoom-Token")).map(|h| h.value.as_str().to_string())
             .or_else(|| q.get("t").cloned()).unwrap_or_default();
         given == token
@@ -547,7 +595,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
         (Method::Get, "/api/state") => {
             if !token_ok { return respond_json(req, 401, &json!({"error": "pairing"})); }
             let since: u64 = q.get("v").and_then(|v| v.parse().ok()).unwrap_or(0);
-            let mut s = st.lock().unwrap();
+            let mut s = lk(st);
             if !local && q.get("bg").map(|b| b != "1").unwrap_or(true) { s.remote_seen = now_ms(); }
             if since == s.version { drop(s); let _ = req.respond(Response::empty(204).with_header(header("Access-Control-Allow-Origin", "*"))); return; }
             let names = s.team.get("names").cloned().unwrap_or(json!({}));
@@ -567,7 +615,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
         (Method::Post, "/api/team") => {
             if !token_ok { return respond_json(req, 401, &json!({"error": "pairing"})); }
             let Some(v) = read_body(&mut req) else { return respond_json(req, 400, &json!({"error": "bad json"})) };
-            let mut s = st.lock().unwrap();
+            let mut s = lk(st);
             let lead = v.get("lead").cloned().filter(|x| x.is_string()).unwrap_or(Value::Null);
             let ids: Vec<Value> = v.get("ids").and_then(|x| x.as_array()).cloned().unwrap_or_default().into_iter().filter(|x| x.is_string()).collect();
             let names: Map<String, Value> = v.get("names").and_then(|x| x.as_object()).cloned().unwrap_or_default()
@@ -582,7 +630,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
             let sid = v.get("sid").and_then(|x| x.as_str()).unwrap_or("").to_string();
             let text = v.get("text").and_then(|x| x.as_str()).unwrap_or("").trim().chars().take(4000).collect::<String>();
             if text.is_empty() { return respond_json(req, 400, &json!({"error": "empty"})); }
-            let mut g = st.lock().unwrap();
+            let mut g = lk(st);
             let Some(s) = g.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()) else { drop(g); return respond_json(req, 404, &json!({"error": "no session"})) };
             let id = now_ms();
             let inbox = s.entry("inbox").or_insert_with(|| json!([]));
@@ -596,7 +644,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
         (Method::Get, "/api/convo") => {
             // Conversations are fetched apart from /api/state, only when a session's convo_n changes.
             if !token_ok { return respond_json(req, 401, &json!({"error": "pairing"})); }
-            let g = st.lock().unwrap();
+            let g = lk(st);
             let all: Map<String, Value> = g.sessions.iter().map(|(k, s)| (k.clone(), s.get("convo").cloned().unwrap_or(json!([])))).collect();
             drop(g);
             respond_json(req, 200, &Value::Object(all));
@@ -611,20 +659,20 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
             let Some(v) = read_body(&mut req) else { return respond_json(req, 400, &json!({"error": "bad json"})) };
             let mode = v.get("mode").and_then(|x| x.as_str()).unwrap_or("auto");
             if !["auto", "on", "off"].contains(&mode) { return respond_json(req, 400, &json!({"error": "mode"})); }
-            let mut g = st.lock().unwrap();
+            let mut g = lk(st);
             g.away = mode.to_string(); g.bump(); g.save(); drop(g);
             respond_json(req, 200, &json!({"ok": true}));
         }
         (Method::Post, "/api/install-hooks") => {
             if !local { return respond_json(req, 403, &json!({"error": "Sa PC lang puwedeng i-set up ang hooks."})); }
             match install_hooks(port) {
-                Ok(v) => { st.lock().unwrap().bump(); respond_json(req, 200, &v) }
+                Ok(v) => { lk(st).bump(); respond_json(req, 200, &v) }
                 Err(e) => respond_json(req, 500, &json!({"error": e})),
             }
         }
         (Method::Get, "/pair.svg") => {
             if !local { return respond_json(req, 403, &json!({"error": "loopback only"})); }
-            let token = st.lock().unwrap().token.clone();
+            let token = lk(st).token.clone();
             let Some(link) = pair_link(port, &token) else { return respond_json(req, 404, &json!({"error": "no network address"})) };
             let svg = qrcode::QrCode::new(link.as_bytes()).map(|c| c.render::<qrcode::render::svg::Color>().min_dimensions(240, 240)
                 .dark_color(qrcode::render::svg::Color("#2a201a")).light_color(qrcode::render::svg::Color("#ffffff")).build()).unwrap_or_default();
@@ -637,7 +685,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
         }
         (Method::Get, "/pair.json") => {
             if !local { return respond_json(req, 403, &json!({"error": "loopback only"})); }
-            let token = st.lock().unwrap().token.clone();
+            let token = lk(st).token.clone();
             respond_json(req, 200, &json!({"link": pair_link(port, &token)}));
         }
         _ => respond_json(req, 404, &json!({"error": "not found"})),
@@ -663,28 +711,35 @@ fn latest_write(t: &Path) -> u64 {
 /// session resumes on its own) without sending a prompt hook. If its transcript is still being written
 /// well after the last hook, it is working; once the writes stop for a while, it is idle again.
 fn liveness(st: &Mutex<State>) {
+    // 1. which transcripts to look at (under the lock), 2. look at them (without it), 3. apply.
+    let todo: Vec<(String, String)> = lk(st).sessions.iter().filter_map(|(k, v)| {
+        let st = v.get("status").and_then(|x| x.as_str()).unwrap_or("idle");
+        let guess = v.get("live_guess").and_then(|x| x.as_bool()).unwrap_or(false);
+        if st != "idle" && !guess { return None; }
+        v.get("transcript").and_then(|x| x.as_str()).map(|t| (k.clone(), t.to_string()))
+    }).collect();
+    let writes: HashMap<String, u64> = todo.into_iter().map(|(k, t)| { let w = latest_write(Path::new(&t)); (k, w) }).collect();
     let now = now_ms();
-    let mut s = st.lock().unwrap();
+    let mut s = lk(st);
     let mut changed = false;
-    for v in s.sessions.values_mut() {
+    let mut save = false;
+    for (sid, v) in s.sessions.iter_mut() {
         let Some(o) = v.as_object_mut() else { continue };
-        let Some(t) = o.get("transcript").and_then(|x| x.as_str()).map(String::from) else { continue };
         let status = o.get("status").and_then(|x| x.as_str()).unwrap_or("idle").to_string();
         let hook_at = o.get("updated_at").and_then(|x| x.as_u64()).unwrap_or(0);
         let guess = o.get("live_guess").and_then(|x| x.as_bool()).unwrap_or(false);
-        if status == "idle" {
-            let w = latest_write(Path::new(&t));
-            if w > hook_at + 5000 && now.saturating_sub(w) < 15_000 {
-                o.insert("status".into(), json!("working"));
-                o.insert("short".into(), json!("Tuloy ang trabaho."));
-                o.insert("detail".into(), json!("May ginagawa pa sa background."));
-                o.insert("live_guess".into(), json!(true));
-                o.insert("live_at".into(), json!(now));
-                changed = true;
-            }
-        } else if guess && status == "working" {
-            let w = latest_write(Path::new(&t)).max(hook_at);
-            if now.saturating_sub(w) > 60_000 {
+        let listening = o.get("listening").and_then(|x| x.as_bool()).unwrap_or(false);
+        if let Some(&w) = writes.get(sid) {
+            if status == "idle" && !listening {
+                if w > hook_at + 5000 && now.saturating_sub(w) < 15_000 {
+                    o.insert("status".into(), json!("working"));
+                    o.insert("short".into(), json!("Tuloy ang trabaho."));
+                    o.insert("detail".into(), json!("May ginagawa pa sa background."));
+                    o.insert("live_guess".into(), json!(true));
+                    o.insert("live_at".into(), json!(now));
+                    changed = true;
+                }
+            } else if guess && status == "working" && now.saturating_sub(w.max(hook_at)) > 60_000 {
                 o.insert("status".into(), json!("idle"));
                 o.insert("short".into(), json!(""));
                 o.insert("detail".into(), json!(""));
@@ -692,8 +747,35 @@ fn liveness(st: &Mutex<State>) {
                 changed = true;
             }
         }
+        // a wait whose hook is long gone
+        if listening && now.saturating_sub(o.get("listen_at").and_then(|x| x.as_u64()).unwrap_or(0)) > (LISTEN_SECS + 60) * 1000 {
+            o.insert("listening".into(), json!(false));
+            changed = true;
+        }
+        // a message handed over but never acknowledged by a later hook (the hook was cancelled): queue it again
+        let last_hook = o.get("hook_at").and_then(|x| x.as_u64()).unwrap_or(0);
+        let mut back = false;
+        if let Some(inbox) = o.get_mut("inbox").and_then(|i| i.as_array_mut()) {
+            for m in inbox.iter_mut() {
+                let sent_at = m.get("sent_at").and_then(|x| x.as_u64()).unwrap_or(0);
+                if m.get("state").and_then(|x| x.as_str()) == Some("sent") && now.saturating_sub(sent_at) > 180_000 && last_hook < sent_at {
+                    m["state"] = json!("queued");
+                    back = true;
+                }
+            }
+        }
+        if back {
+            if status == "working" && last_hook < now.saturating_sub(180_000) { o.insert("status".into(), json!("idle")); }
+            changed = true; save = true;
+        }
     }
+    // forget sessions that ended without SessionEnd (3 days quiet)
+    let cutoff = now.saturating_sub(3 * 24 * 3600 * 1000);
+    let before = s.sessions.len();
+    s.sessions.retain(|_, v| v.get("updated_at").and_then(|t| t.as_u64()).unwrap_or(0) > cutoff);
+    if s.sessions.len() != before { changed = true; save = true; }
     if changed { s.bump(); }
+    if save { s.save(); }
 }
 
 pub fn start(port: u16) -> Option<u16> {

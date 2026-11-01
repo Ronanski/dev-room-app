@@ -61,10 +61,15 @@ fn main() {
     // One Dev Room at a time: starting it again just opens the window of the one that is running.
     if !std::env::args().any(|a| a == "--restarted") {
         let url = format!("http://127.0.0.1:{}/api/show", server::DEFAULT_PORT);
-        let agent = ureq::AgentBuilder::new().timeout(std::time::Duration::from_millis(1500)).build();
+        let agent = ureq::AgentBuilder::new().timeout(std::time::Duration::from_millis(4000)).build();
         if agent.post(&url).call().is_ok() { return; }
     }
-    let port = server::start(server::DEFAULT_PORT).unwrap_or(server::DEFAULT_PORT);
+    let Some(port) = server::start(server::DEFAULT_PORT) else {
+        // another copy holds the port: show its window and leave
+        let url = format!("http://127.0.0.1:{}/api/show", server::DEFAULT_PORT);
+        let _ = ureq::AgentBuilder::new().timeout(std::time::Duration::from_secs(5)).build().post(&url).call();
+        return;
+    };
     updater::start();
     // Started with Windows: stay in the tray until the user opens the window.
     let hidden = std::env::args().any(|a| a == "--tray");
