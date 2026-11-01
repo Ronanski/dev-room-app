@@ -149,8 +149,10 @@ pub fn restart(hidden: bool) {
             let mut cmd = std::process::Command::new(exe);
             cmd.arg("--restarted");
             if hidden { cmd.arg("--tray"); }
+            crate::tunnel::shutdown();
             let _ = cmd.spawn();
         }
+        crate::tunnel::shutdown();
         std::process::exit(0);
     });
 }

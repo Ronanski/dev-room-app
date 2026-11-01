@@ -118,6 +118,32 @@ public class WatchService extends Service {
         return c;
     }
 
+    private static final java.util.regex.Pattern RELAY = java.util.regex.Pattern.compile("^https://[a-z0-9-]+\\.trycloudflare\\.com$");
+
+    /** The PC's current internet address, published by Dev Room to a topic named after a hash of the pairing token. */
+    private String relay(String token) {
+        try {
+            byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest(("devroom-relay:" + token).getBytes("UTF-8"));
+            StringBuilder t = new StringBuilder("devroom-");
+            for (int i = 0; i < 16; i++) t.append(String.format("%02x", d[i] & 0xff));
+            HttpURLConnection c = (HttpURLConnection) new URL("https://ntfy.sh/" + t + "/json?poll=1&since=13h").openConnection();
+            c.setConnectTimeout(6000);
+            c.setReadTimeout(8000);
+            String found = null;
+            try (BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"))) {
+                String line;
+                while ((line = r.readLine()) != null) {
+                    try {
+                        JSONObject m = new JSONObject(line);
+                        String u = m.optString("message");
+                        if ("message".equals(m.optString("event")) && RELAY.matcher(u).matches()) found = u;
+                    } catch (Exception ignored) { }
+                }
+            } finally { c.disconnect(); }
+            return found;
+        } catch (Exception e) { return null; }
+    }
+
     private void poll() throws Exception {
         SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE);
         String base = p.getString("url", null);
@@ -129,7 +155,15 @@ public class WatchService extends Service {
         String first = good != null ? good : base;
         String second = first.equals(base) ? alt : base;
         try { c = open(first, token); good = first; }
-        catch (Exception e) { if (second == null || second.isEmpty()) throw e; c = open(second, token); good = second; }
+        catch (Exception e) {
+            try { if (second == null || second.isEmpty()) throw e; c = open(second, token); good = second; }
+            catch (Exception e2) {
+                // away from home: the PC's internet address (Malayo mode), from the private relay topic
+                String r = relay(token);
+                if (r == null) throw e2;
+                c = open(r, token); good = r;
+            }
+        }
         int code = c.getResponseCode();
         if (code == 204) { c.disconnect(); return; }   // nothing changed since the last poll
         if (code == 401) { c.disconnect(); update("Kailangang i-pair ulit ang phone. I-scan ang QR code sa PC."); running = false; stopSelf(); return; }

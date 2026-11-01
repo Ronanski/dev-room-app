@@ -69,16 +69,31 @@ function parseLink(s){
   }catch(e){return null;}
 }
 let unpaired=false,watchKey='';
-function save(p){store.set('devroom.url',p.url);store.set('devroom.token',p.token);store.set('devroom.alt',p.alt||'');unpaired=false;current='';misses=0;watchKey='';}
+function save(p){store.set('devroom.url',p.url);store.set('devroom.token',p.token);store.set('devroom.alt',p.alt||'');store.set('devroom.relay','');unpaired=false;current='';misses=0;watchKey='';}
 // Home Wi-Fi first, then the PC's Tailscale address when away from home.
 async function reachable(base,token){try{const c=new AbortController();const tm=setTimeout(()=>c.abort(),2500);const r=await fetch(`${base}/api/state?bg=1&t=${encodeURIComponent(token)}&v=-1`,{cache:'no-store',signal:c.signal});clearTimeout(tm);return r.status!==0;}catch(e){return false;}}
 // Sticky: keep the address in use while it answers; switch only after it fails twice in a row,
 // so a slow reply never reloads the office (that showed as the map blinking).
 let current='',misses=0;
+// Malayo mode: away from home Wi-Fi, the PC publishes its internet address (a Cloudflare tunnel) to a
+// private topic named after a hash of the pairing token. No extra app, no account.
+async function relayTopic(token){const d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('devroom-relay:'+token));return 'devroom-'+[...new Uint8Array(d)].slice(0,16).map(b=>b.toString(16).padStart(2,'0')).join('');}
+const RELAY_RE=/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/;
+async function relayBase(token){
+  try{const t=await relayTopic(token);const c=new AbortController();const tm=setTimeout(()=>c.abort(),8000);
+    const r=await fetch(`https://ntfy.sh/${t}/json?poll=1&since=13h`,{cache:'no-store',signal:c.signal});clearTimeout(tm);
+    let u='';for(const line of (await r.text()).split('\n')){try{const m=JSON.parse(line);if(m.event==='message'&&RELAY_RE.test(m.message))u=m.message;}catch(e){}}
+    if(u)store.set('devroom.relay',u);return u;}catch(e){return '';}}
+function via(base){const url=store.get('devroom.url'),alt=store.get('devroom.alt');return base===url?'wifi':base&&base===alt?'tailscale':base?'remote':'';}
+function sendVia(){const w=$('office').contentWindow;if(w&&current)try{w.postMessage({type:'devroom:via',via:via(current)},new URL(current).origin);}catch(e){}}
 async function activeBase(){const url=store.get('devroom.url'),alt=store.get('devroom.alt'),token=store.get('devroom.token');
   if(current){if(await reachable(current,token)){misses=0;return current;}if(++misses<2)return current;}
   misses=0;
-  if(await reachable(url,token))return url;if(alt&&await reachable(alt,token))return alt;return current||url;}
+  if(await reachable(url,token))return url;if(alt&&await reachable(alt,token))return alt;
+  // away from home: the PC's internet address, the saved one first, then the newest from the relay
+  const saved=store.get('devroom.relay');if(saved&&RELAY_RE.test(saved)&&await reachable(saved,token))return saved;
+  const fresh=await relayBase(token);if(fresh&&fresh!==saved&&await reachable(fresh,token))return fresh;
+  return current||url;}
 function showPair(msg){
   claudeHide();
   $('office').style.display='none';$('pair').hidden=false;
@@ -121,7 +136,7 @@ let apk=null;
 function sendApk(){const w=$('office').contentWindow;if(w&&apk&&current)try{w.postMessage(Object.assign({type:'devroom:apk'},apk),new URL(current).origin);}catch(e){}}
 function getApk(){DevRoom?DevRoom.openExternal({url:APK_URL}):location.assign(APK_URL);}
 function sendCaps(){const w=$('office').contentWindow;if(w&&canView&&current)try{w.postMessage({type:'devroom:caps',claudeView:true},new URL(current).origin);}catch(e){}}
-$('office').addEventListener('load',()=>{sendCaps();sendApk();});
+$('office').addEventListener('load',()=>{sendCaps();sendApk();sendVia();});
 let claudeOn=false;
 function claudeHide(){if(claudeOn&&DevRoom){claudeOn=false;DevRoom.claudeView({show:false}).catch(()=>{});}}
 const num=v=>Math.round(Math.max(0,Math.min(10000,Number(v)||0)));
@@ -129,7 +144,7 @@ window.addEventListener('message',e=>{
   // only the office frame, served by the paired PC, may ask
   if(e.source!==$('office').contentWindow)return;
   const d=e.data||{};
-  if(d.type==='devroom:hello'){sendCaps();sendApk();return;}
+  if(d.type==='devroom:hello'){sendCaps();sendApk();sendVia();return;}
   if(d.type==='devroom:update'){getApk();return;}
   if(d.type==='devroom:claudeView'){
     if(!canView)return;
@@ -156,7 +171,8 @@ $('go').onclick=()=>{const p=parseLink($('link').value);if(!p){showPair('Hindi t
     App.addListener('resume',()=>{checkUpdate();showOffice();});
   }
   setInterval(checkUpdate,10*60*1000);
-  setInterval(()=>{if(store.get('devroom.alt'))showOffice();},30000);
+  // keep checking the connection: home Wi-Fi, Tailscale or the internet (Malayo mode), whichever answers
+  setInterval(()=>{if(!document.hidden)showOffice();},30000);
   try{const l=App&&await App.getLaunchUrl();if(l&&l.url){handleUrl(l.url);return;}}catch(e){}
   showOffice();
 })();

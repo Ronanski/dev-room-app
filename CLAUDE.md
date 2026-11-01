@@ -40,6 +40,10 @@ The user's real team is **LOGIC_SIM_PROJECT**: a leader plus subsessions (CODE F
     - Every `POST /api/*` needs the `X-DevRoom` header, and `/hook` refuses requests that carry an `Origin`.
     - Remote callers need the pairing token.
     - `/api/claude-view` needs the per-launch `app_key()`.
+  - **Malayo mode** (`tunnel.rs`): cloudflared quick tunnel → loopback port 4318.
+    - Every request on that port is treated as remote: token required, hooks and PC-only routes refused.
+    - The address is published to the ntfy topic `devroom-<sha256("devroom-relay:"+token)[:16 bytes hex]>`.
+    - The phone shell and `WatchService` use it as the last fallback.
   - A liveness thread marks a session as working while its transcript keeps being written after Stop.
   - State lives in `%APPDATA%\DevRoom\state.json` and is written atomically.
 - **`app/src-tauri/src/main.rs`:**

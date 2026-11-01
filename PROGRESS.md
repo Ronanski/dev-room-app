@@ -11,17 +11,25 @@ Dev Room shows them all in one place instead. Each session is a character in a s
 - who needs the user's input,
 - what each session is doing right now, and how far along it is.
 
-## Current state (v0.6.5, 2026-11-01)
+## Current state (v0.7.0, 2026-11-01)
 
 Shipped and auto-updating:
 - **Windows tray app:** hooks give live status, the map is an isometric power plant, there is a chat feed, and the real claude.ai chat is embedded in the panel.
-- **Android app:** shows the office, sends alerts, and has an in-app Claude screen.
+- **Android app:** shows the office and sends alerts. The real claude.ai chat sits right on the Chat tab, as a native view over it.
+- **Update status:** a pill in the header says whether the PC app and the phone app are up to date.
+- **How the phone connects:** Dev Room runs in the PC's tray (window closed is fine) and the PC must be on and awake.
+  - At home, the phone uses Wi-Fi.
+  - Away, it uses **Malayo mode** (0.7.0): a Cloudflare quick tunnel, whose address is found through a private ntfy.sh topic. No extra app, no account.
+  - Tailscale still works but is not needed. The user rejected needing extra apps.
+  - The Claude chat on the phone goes straight to claude.ai and does not need the PC.
 
 A full UI/UX, functional and code audit was done, and its fixes went into 0.6.5.
 
 ### Not yet verified on real devices
 - The embedded Claude view and its sign-in inside the Windows window (Tauri multiwebview).
-- The Android app's Claude screen, its sign-in, and the pairing confirmation.
+- The Android Claude view on the Chat tab (position, keyboard, Back), its sign-in, and the pairing confirmation.
+- The update status pill on the real PC and phone.
+- Malayo mode end to end. The sandbox may not open a tunnel, so this was tested with a simulated tunnel and relay: cloudflared download and start on Windows, ntfy publish, and the phone switching over on mobile data.
 - The auto-restart from the tray on Windows.
 
 ### Backlog (ask the user before starting; they pick the order)
@@ -34,6 +42,13 @@ A full UI/UX, functional and code audit was done, and its fixes went into 0.6.5.
 7. Signed updates. This needs a signing key in the repo secrets, so ask the user first.
 8. Approve or deny permission prompts from the app. This needs Claude Code's PermissionRequest hook; check the docs first.
 9. Phone: show at most one toast plus a "+N" count, and a compact header everywhere.
+10. **Standalone Android app (no PC app at all), saved for later by the user.** Remote access while the PC app runs is done (Malayo mode). Plan for the rest:
+    - A small cloud relay (a Cloudflare Worker, free tier) receives the hook events, protected by its own token.
+    - Hooks POST to the relay directly, or to the PC and the relay.
+    - The APK bundles the office UI and reads from the relay. It works anywhere, with no Wi-Fi or Tailscale pairing.
+    - With Claude Code in the cloud (claude.ai/code), no PC is needed at all.
+    - Keep two modes: home (the PC tray app, no cloud) and away (the relay). The phone picks whichever is reachable.
+    - Needs from the user: a Cloudflare account and an API token stored as a GitHub secret. Never print it. Walk them through it step by step, with no links.
 
 ## Status (history)
 
