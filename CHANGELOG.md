@@ -7,6 +7,13 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.6.6 (2026-11-01)
+
+The Chat tab is the real Claude Code chat itself, on the PC and on the phone, so you read the sessions' latest replies and talk to them in real time without extra buttons.
+- **Phone:** the Android app lays a native claude.ai view exactly over the office's Chat tab (like the PC's embedded view) instead of switching to a separate screen. It follows the tab's position, stays above the keyboard, keeps the sign-in, and Back goes back inside Claude first. Older office pages still use the full Claude screen.
+- **One way in:** the separate **Claude** and **Kausapin sa Claude** buttons are gone wherever Claude is embedded; **Sagutin** on an alarm opens that session's Chat. A plain browser keeps the buttons.
+- **Claude screen:** respects edge-to-edge on new Android (status bar and keyboard), and Back uses the modern back handling.
+
 ## 0.6.5 (2026-11-01)
 
 A full audit: a UI/UX inspection on PC, tablet and phone in light and dark mode, end-to-end tests of every flow against the real server, and a code review. Everything found is fixed here.

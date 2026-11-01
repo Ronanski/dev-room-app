@@ -80,6 +80,7 @@ async function activeBase(){const url=store.get('devroom.url'),alt=store.get('de
   misses=0;
   if(await reachable(url,token))return url;if(alt&&await reachable(alt,token))return alt;return current||url;}
 function showPair(msg){
+  claudeHide();
   $('office').style.display='none';$('pair').hidden=false;
   const e=$('err');e.hidden=!msg;e.textContent=msg||'';
 }
@@ -111,11 +112,27 @@ async function checkUpdate(){
     }
   }catch(e){}
 }
-// The office runs in an iframe served by the PC; it asks the shell to open the Claude Code chat.
+// The real Claude Code chat sits right on the office's Chat tab: the office tells us where, we lay the
+// native Claude view over that spot. (Old office pages without this still use the full Claude screen.)
+const canView=!!(DevRoom&&window.Capacitor&&Capacitor.isPluginAvailable&&Capacitor.isPluginAvailable('DevRoom'));
+function sendCaps(){const w=$('office').contentWindow;if(w&&canView&&current)try{w.postMessage({type:'devroom:caps',claudeView:true},new URL(current).origin);}catch(e){}}
+$('office').addEventListener('load',sendCaps);
+let claudeOn=false;
+function claudeHide(){if(claudeOn&&DevRoom){claudeOn=false;DevRoom.claudeView({show:false}).catch(()=>{});}}
+const num=v=>Math.round(Math.max(0,Math.min(10000,Number(v)||0)));
 window.addEventListener('message',e=>{
   // only the office frame, served by the paired PC, may ask
   if(e.source!==$('office').contentWindow)return;
-  const d=e.data||{};if(d.type!=='devroom:openClaude')return;
+  const d=e.data||{};
+  if(d.type==='devroom:hello'){sendCaps();return;}
+  if(d.type==='devroom:claudeView'){
+    if(!canView)return;
+    const r=$('office').getBoundingClientRect();
+    claudeOn=!!d.show&&$('office').style.display!=='none';
+    DevRoom.claudeView({show:claudeOn,x:Math.round(r.left)+num(d.x),y:Math.round(r.top)+num(d.y),w:num(d.w),h:num(d.h)}).catch(()=>{});
+    return;
+  }
+  if(d.type!=='devroom:openClaude')return;
   const url=typeof d.url==='string'&&d.url.startsWith('https://claude.ai/')?d.url:'https://claude.ai/code';
   if(DevRoom&&DevRoom.openClaude)DevRoom.openClaude({url});
 });

@@ -1,33 +1,23 @@
 package app.devroom.mobile;
 
-import android.annotation.SuppressLint;
 import androidx.appcompat.app.AppCompatActivity;
 import android.content.Intent;
 import android.graphics.Color;
-import android.net.Uri;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.webkit.CookieManager;
-import android.webkit.ValueCallback;
-import android.webkit.WebChromeClient;
-import android.webkit.WebResourceRequest;
-import android.webkit.WebSettings;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.LinearLayout;
 
 /**
- * The official Claude Code chat (claude.ai/code, with the PC's sessions through Remote Control),
- * shown inside the Dev Room app. Sign-in is kept between visits.
+ * The official Claude Code chat as a full screen, for office pages that cannot place it on the Chat tab.
+ * Sign-in is kept between visits (shared cookies with the Chat tab view).
  */
 public class ClaudeActivity extends AppCompatActivity {
-    private static final int PICK_FILE = 41;
     private WebView web;
-    private ValueCallback<Uri[]> pending;
 
-    @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -44,44 +34,21 @@ public class ClaudeActivity extends AppCompatActivity {
         back.setOnClickListener(v -> finish());
         root.addView(back, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        web = new WebView(this);
-        WebSettings s = web.getSettings();
-        s.setJavaScriptEnabled(true);
-        s.setDomStorageEnabled(true);
-        s.setDatabaseEnabled(true);
-        s.setMediaPlaybackRequiresUserGesture(false);
-        s.setSupportMultipleWindows(false);
-        // A plain mobile browser user agent, so sign-in pages treat this like the phone's browser.
-        s.setUserAgentString(s.getUserAgentString().replace("; wv", "").replaceAll("Version/[\\d.]+ ", ""));
-        CookieManager cm = CookieManager.getInstance();
-        cm.setAcceptCookie(true);
-        cm.setAcceptThirdPartyCookies(web, true);
-        web.setWebViewClient(new WebViewClient() {
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
-                String scheme = req.getUrl().getScheme();
-                if ("http".equals(scheme) || "https".equals(scheme)) return false;
-                // only mail and phone links leave the app; never devroom:, intent: or other app links
-                if (("mailto".equals(scheme) || "tel".equals(scheme)) && req.hasGesture()) {
-                    try { startActivity(new Intent(Intent.ACTION_VIEW, req.getUrl())); } catch (Exception ignored) { }
-                }
-                return true;
-            }
-        });
-        web.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public boolean onShowFileChooser(WebView v, ValueCallback<Uri[]> cb, FileChooserParams p) {
-                if (pending != null) pending.onReceiveValue(null);
-                pending = cb;
-                try { startActivityForResult(p.createIntent(), PICK_FILE); } catch (Exception e) { pending = null; return false; }
-                return true;
-            }
-        });
+        web = ClaudeWeb.create(this);
         root.addView(web, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         setContentView(root);
+        // edge to edge on new Android: keep the bar below the status bar and the chat above the keyboard
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root, (v, in) -> {
+            androidx.core.graphics.Insets i = in.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars() | androidx.core.view.WindowInsetsCompat.Type.ime());
+            v.setPadding(i.left, i.top, i.right, i.bottom);
+            return androidx.core.view.WindowInsetsCompat.CONSUMED;
+        });
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override public void handleOnBackPressed() { if (web.canGoBack()) web.goBack(); else finish(); }
+        });
 
         String url = getIntent().getStringExtra("url");
-        if (url == null || !url.startsWith("https://claude.ai/")) url = "https://claude.ai/code";
+        if (url == null || !url.startsWith("https://claude.ai/")) url = ClaudeWeb.HOME;
         if (state != null) web.restoreState(state); else web.loadUrl(url);
     }
 
@@ -91,15 +58,7 @@ public class ClaudeActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
-        if (req == PICK_FILE && pending != null) {
-            pending.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(res, data));
-            pending = null;
-        }
-    }
-
-    @Override
-    public void onBackPressed() {
-        if (web.canGoBack()) web.goBack(); else super.onBackPressed();
+        ClaudeWeb.onResult(req, res, data);
     }
 
     @Override
