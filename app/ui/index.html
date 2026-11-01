@@ -241,6 +241,8 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
   .pane,.dockwrap{display:none}
   .app[data-tab="office"] .pane[data-pane="office"],.app[data-tab="office"] .dockwrap,
   .app[data-tab="chat"] .pane[data-pane="chat"]{display:block}
+  .app.typing .tabs,.app.typing .cp-head,.app.typing .cp-tabs,.app.typing .composer .away,.app.typing .cfilter{display:none}
+  .app.typing .chatpanel{height:calc(100dvh - 16px)}
   .app[data-tab="chat"] .pane[data-pane="office"],.app[data-tab="chat"] .dockwrap,.app[data-tab="office"] .pane[data-pane="chat"]{display:none!important}
   .pane[data-pane="chat"]{min-height:0}
   .chatpanel{position:static;height:min(620px,72vh)}
@@ -1039,6 +1041,10 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.6.2':{news:['<b>Ayos na ang chat sa phone.</b> Habang nagta-type ka, tumatabi ang Office/Chat bar at ang header para kita ang mensahe mo at ang usapan.',
+    'Malinis na ang usapan: wala nang lumalabas na system text (gaya ng <code>&lt;system-reminder&gt;</code>).',
+    'Kapag hindi naipadala ang mensahe, nakasulat na kung bakit. Kapag tapos na ang session bago mo binuksan ang app, sinasabi na kung kailan niya ito matatanggap.'],
+    todo:['Wala kang kailangang gawin.']},
   '0.6.1':{news:['<b>Wala nang pagkurap ng playroom.</b> Isang beses na lang iginuguhit ang bawat gamit kada frame.',
     '<b>Mas magaan sa phone at tablet.</b> Hindi na binabago bawat segundo ang mga card, at mas matipid ang background na bantay.',
     '<b>Mas maaasahan ang chat.</b> "Naipasa ✓" lang kapag natanggap na talaga ng session. Hindi na ito tumatalon pababa habang nagbabasa ka, at hindi na napupunta sa maling session.',
@@ -1647,32 +1653,38 @@ function addChatFor(s,st,why){
 async function answer(s,text){
   if(!s||!text.trim())return false;
   const p={sid:s.sid,text,at:Date.now(),state:'sending',id:0};PENDING.push(p);forceScroll=true;chatKey='';renderPanel();
-  try{const r=await fetch('/api/send',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({sid:s.sid,text})});if(!r.ok)throw 0;
+  try{const r=await fetch('/api/send',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({sid:s.sid,text})});
+    if(!r.ok){let why='';try{why=(await r.json()).error||'';}catch(e){}throw new Error(r.status+(why?' '+why:''));}
     const j=await r.json();p.id=j.id;p.state='queued';}
-  catch(e){p.state='failed';chatKey='';renderPanel();return false;}
+  catch(e){p.state='failed';p.why=String(e&&e.message||'walang koneksyon');chatKey='';renderPanel();return false;}
   chatKey='';renderPanel();
   log('Boss',`Mensahe kay ${s.short}: ${text.length>60?text.slice(0,60)+'…':text}`,s);return true;
 }
 async function setAway(m){awayMode=m;chatKey='';renderPanel();try{await fetch('/api/away',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({mode:m})});}catch(e){}}
+function cleanMsg(t){
+  return String(t||'').replace(/<([a-z][\w]*-[\w-]*)[^>]*>[\s\S]*?<\/\1>/gi,'').replace(/<\/?[a-z][\w]*-[\w-]*[^>]*>/gi,'').replace(/\n{3,}/g,'\n\n').trim();
+}
 // One feed for the whole team: your prompts, the sessions' replies and messages sent from this app.
 function chatFeed(){
   const list=chatFilter==='all'?sessions:sessions.filter(s=>s.sid===chatFilter);
   PENDING=PENDING.filter(p=>!(p.id&&(bySid(p.sid)?.inbox||[]).some(m=>m.id===p.id)));
   const items=[];
   for(const s of list){
-    for(const m of (CONVO[s.sid]||[]))items.push({s,t:m.at,you:m.role==='user',text:m.text});
+    for(const m of (CONVO[s.sid]||[])){const text=cleanMsg(m.text);if(text)items.push({s,t:m.at,you:m.role==='user',text});}
     for(const m of (s.inbox||[]))items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true});
-    for(const m of PENDING)if(m.sid===s.sid)items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true});
+    for(const m of PENDING)if(m.sid===s.sid)items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true,why:m.why});
   }
   items.sort((a,b)=>a.t-b.t);
   const out=items.slice(-120).map(it=>{
     const who=it.you?`<b>Boss</b> → ${esc(it.s.short)}`:`<i style="background:${it.s.pal.shirt}"></i><b>${esc(it.s.short)}</b>`;
-    const st=it.app?`<span class="st">${{sending:'Ipinapadala…',queued:'Naghihintay maipasa',sent:'Ipinasa na, hinihintay ang session',delivered:'Naipasa ✓',failed:'Hindi naipadala. Subukan ulit.'}[it.st]||''}${it.app?' · mula sa app':''}</span>`:'';
+    const st=it.app?`<span class="st">${{sending:'Ipinapadala…',queued:'Naghihintay maipasa',sent:'Ipinasa na, hinihintay ang session',delivered:'Naipasa ✓',failed:'Hindi naipadala. Subukan ulit.'}[it.st]||''}${it.why?' ('+esc(it.why)+')':''}${it.app?' · mula sa app':''}</span>`:'';
     return `<div class="cmsg ${it.you?'you':''}" data-chatto="${esc(it.s.sid)}"><span class="who">${who} · ${simLabel(it.t)}</span><div class="msg ${it.you?'you':'agent'}">${esc(it.text)}</div>${st}</div>`;
   });
+  // a queued message to a session that already stopped (and is not waiting) only arrives with its next turn
+  const stuck=list.filter(s=>!s.listening&&s.status!=='working'&&((s.inbox||[]).some(m=>m.state==='queued')||PENDING.some(p=>p.sid===s.sid&&p.state==='queued'))).map(s=>`<div class="listen">Tapos na ang turn ni <b>${esc(s.short)}</b> bago mo binuksan ang app, kaya hindi pa niya natatanggap ang mensahe. Papasok ito sa susunod niyang kilos (halimbawa, kapag may in-utos ka sa kanya sa PC). Sa mga susunod na turn, kapag bukas ang app, aabangan na niya ang mensahe mo.</div>`);
   const listening=list.filter(s=>s.listening).map(s=>`<div class="listen">📱 Naka-abang si <b>${esc(s.short)}</b> sa utos mo. Mag-type sa ibaba para ituloy niya.</div>`);
   const asks=list.filter(s=>s.status==='needs'&&s.ask).map(s=>`<div class="cmsg" data-chatto="${esc(s.sid)}"><span class="who"><i style="background:${s.pal.shirt}"></i><b>${esc(s.short)}</b> · tanong</span><div class="msg agent asking"><b>Tanong:</b> ${esc(s.ask)}</div></div>`);
-  return (out.length?out.join(''):'<div class="msg sys">Wala pang usapan. Lalabas dito ang mga utos mo at ang sagot ng bawat session.</div>')+asks.join('')+listening.join('');
+  return (out.length?out.join(''):'<div class="msg sys">Wala pang usapan. Lalabas dito ang mga utos mo at ang sagot ng bawat session.</div>')+asks.join('')+listening.join('')+stuck.join('');
 }
 function msgHTML(s,m){
   if(m.from==='sys')return `<div class="msg sys">${esc(m.text)} · ${simLabel(m.t)}</div>`;
@@ -1815,6 +1827,8 @@ $('composer').addEventListener('submit',async e=>{e.preventDefault();const s=byS
   if(!s){connMsg='Wala na sa office ang napiling session. Pumili ulit sa Para kay.';setConn();return;}
   $('msgInput').value='';if(!await answer(s,v)&&!$('msgInput').value)$('msgInput').value=v;});
 $('chatTo').addEventListener('change',e=>{chatTo=e.target.value;});
+$('composer').addEventListener('focusin',()=>{$('app').classList.add('typing');setTimeout(()=>{document.querySelector('.chatpanel').scrollIntoView({block:'start'});const b=$('cpBody');b.scrollTop=b.scrollHeight;},350);});
+$('composer').addEventListener('focusout',()=>setTimeout(()=>{if(!$('composer').contains(document.activeElement))$('app').classList.remove('typing');},200));
 $('awaySel').addEventListener('change',e=>setAway(e.target.value));
 $('cpBody').addEventListener('click',e=>{
   const f=e.target.closest('[data-cf]');if(f){chatFilter=f.dataset.cf;if(chatFilter!=='all')chatTo=chatFilter;forceScroll=true;chatKey='';renderPanel();return;}
