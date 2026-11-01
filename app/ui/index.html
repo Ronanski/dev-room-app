@@ -895,7 +895,7 @@ const titleCase=w=>w.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
 function parseTitle(title,isLead){
   const m=String(title||'').match(/^([^:]+):\s*(.+)$/);
   if(isLead)return{code:'LEAD',role:'Team Lead',short:'Lead',pal:'LEAD',task:String(title||'Walang pangalan')};
-  if(!m){const t=String(title||'Session');return{code:t.replace(/[^A-Za-z0-9]/g,'').slice(0,4).toUpperCase()||'DEV',role:t,short:t.length>14?t.slice(0,13).trim()+'.':t,pal:'BE',task:'Walang role sa pangalan. Palitan sa Piliin ang team.'};}
+  if(!m){const t=String(title||'Session');return{code:t.replace(/[^A-Za-z0-9]/g,'').slice(0,4).toUpperCase()||'DEV',role:t,short:t.length>14?t.slice(0,13).trim()+'.':t,pal:'BE',task:''};}
   const word=m[1].trim(),hit=ROLE_WORDS.find(r=>r[0].test(word));
   if(hit)return{code:hit[1],role:hit[2],short:hit[3],pal:hit[4],task:m[2]};
   return{code:word.replace(/[^A-Za-z]/g,'').slice(0,4).toUpperCase()||'DEV',role:titleCase(word),short:titleCase(word).split(' ')[0],pal:'BE',task:m[2]};
@@ -973,6 +973,8 @@ function applyRecords(records){
     else if(i.at!==prevAt&&prevDetail!==(s.detail+'|'+s.recent+'|'+s.ask)&&s.status!=='working'){log(s.short,statusLine(s),s);say2(s,'agent',statusLine(s));}
     else if(s.status==='working'&&prevDetail!==(s.detail+'|'+s.recent+'|'+s.ask))log(s.short,statusLine(s),s);
   }
+  {const seen={};for(const s of sessions.slice().sort((a,b)=>a.id-b.id)){const base=s.baseShort??(s.baseShort=s.short),baseRole=s.baseRole??(s.baseRole=s.role);const n=(seen[base]=(seen[base]||0)+1);
+    s.short=n>1?base.replace(/\.$/,'')+' '+n:base;s.role=n>1?baseRole+' '+n:baseRole;}}
   if(!sessions.some(x=>x.id===selected)){const q=sessions.filter(x=>x.status==='needs').sort((a,b)=>b.at-a.at)[0]||sessions.find(x=>x.lead)||sessions[0];selected=q?q.id:0;}
   if(firstLoad){
     log('Guard',`Bukas na ang office. ${sessions.length} na session ang naka-duty.`);
@@ -1065,6 +1067,9 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.6.5':{news:['Mas madaling makilala ang mga session: kapag walang pangalan, ang unang utos mo ang nagiging pangalan, at may numero kapag magkapareho. Sa card, kung ano ang ipinagawa mo ang makikita, hindi na ang paulit-ulit na paalala.',
+    'Nagsasara na sa <b>Esc</b> o sa pag-click sa labas ang Piliin ang team, I-connect ang phone at ang card na ito. Lumalabas na rin sa fullscreen ang Esc.'],
+    todo:['Wala kang kailangang gawin.']},
   '0.6.4':{news:['<b>Ang Chat sa PC ay ang mismong Claude Code na.</b> Buksan ang Panel → Chat (o pindutin ang <b>Claude</b>): nandoon na mismo sa loob ng Dev Room ang Claude Code chat ng mga session mo, hindi na hiwalay na window. Mag-login isang beses; bubukas ang login sa loob ng app.',
     'Wala nang scrollbar sa ibaba at kanan ng window.',
     'Naayos ang malaking pulang bilog sa itaas ng map, ang nagpapatong na pangalan at bubbles, at ang mga button sa phone.'],
@@ -1821,7 +1826,7 @@ async function saveTeam(t){
 function rebuildTeam(){for(const s of sessions.slice())dropSession(s,'');firstLoad=true;logs.length=0;applyRecords(allRecords);setConn();}
 function collectNames(){const n=Object.assign({},TEAM.names||{});document.querySelectorAll('#teamPanel .tname').forEach(i=>{const r=allRecords.find(x=>x.id===i.dataset.id);const v=i.value.trim();if(v&&(!r||v!==r.title||n[i.dataset.id]))n[i.dataset.id]=v;});return n;}
 function dockCard(s){
-  return `<button type="button" class="dcard ${s.id===selected?'sel':''} ${s.status==='needs'?'needcard':''}" data-id="${s.id}">${av(s)}<span style="min-width:0"><span class="nm" style="display:block">${esc(s.role)}${FX.mood?`<span class="mood" title="Energy ${Math.round(energy(s)*100)}%">${moodOf(s)}</span>`:''}</span><span class="rl" style="display:block">${esc(s.task)}</span></span><span class="ft">${pill(s)}<span class="dur">${dur(now()-s.since)}</span></span>${FX.timeline?tlHTML(s):''}</button>`;
+  return `<button type="button" class="dcard ${s.id===selected?'sel':''} ${s.status==='needs'?'needcard':''}" data-id="${s.id}">${av(s)}<span style="min-width:0"><span class="nm" style="display:block">${esc(s.role)}${FX.mood?`<span class="mood" title="Energy ${Math.round(energy(s)*100)}%">${moodOf(s)}</span>`:''}</span><span class="rl" style="display:block">${esc(s.task||actText(s))}</span></span><span class="ft">${pill(s)}<span class="dur">${dur(now()-s.since)}</span></span>${FX.timeline?tlHTML(s):''}</button>`;
 }
 function render(){
   pruneToasts();
@@ -1946,7 +1951,13 @@ applyBS();
  });
  document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&app.classList.contains('focus'))setFocus(false);else fit();});}
 $('chatToggle').addEventListener('click',()=>setDrawer(!$('app').classList.contains('drawer')));
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('app').classList.contains('drawer'))setDrawer(false);});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return;
+  if(!$('whatsNew').hidden){$('whatsNew').querySelector('[data-act="wn-ok"]')?.click();return;}
+  if(!$('teamPanel').hidden){$('teamPanel').hidden=true;return;}
+  if($('app').classList.contains('drawer')){setDrawer(false);return;}
+  if($('app').classList.contains('focus'))$('fsBtn').click();});
+['teamPanel','whatsNew'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target===e.currentTarget){if(id==='whatsNew')$(id).querySelector('[data-act="wn-ok"]')?.click();else $(id).hidden=true;}}));
 // keep the drawer clear of the session cards
 {const dw=document.querySelector('.dockwrap');const upd=()=>{if(dw)$('app').style.setProperty('--dockh',dw.offsetHeight+'px');};if(window.ResizeObserver&&dw)new ResizeObserver(upd).observe(dw);upd();}
 $('pauseBtn').addEventListener('click',()=>{

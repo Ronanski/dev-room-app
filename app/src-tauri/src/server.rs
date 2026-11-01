@@ -297,6 +297,11 @@ fn apply_hook(st: &mut State, v: &Value) {
             s.insert("prompt_at".into(), json!(now));
             let p = v.get("prompt").and_then(|x| x.as_str()).unwrap_or("");
             push_convo(s, "user", p, 2000);
+            // a session without a name is called after its first prompt, not after the folder every session shares
+            let first = p.trim();
+            if !s.contains_key("first_prompt") && !first.is_empty() && !first.starts_with('<') {
+                s.insert("first_prompt".into(), json!(clip(first, 48)));
+            }
             s.insert("detail".into(), json!(format!("Inutusan: {}", clip(p, 140))));
         }
         "PreToolUse" => {
@@ -483,7 +488,9 @@ fn record(s: &Value, names: &Value) -> Value {
     let cwd = s.get("cwd").and_then(|x| x.as_str()).unwrap_or("");
     let auto = s.get("auto_title").and_then(|x| x.as_str()).filter(|t| !t.is_empty()).map(String::from);
     let title = names.get(id).and_then(|x| x.as_str()).filter(|t| !t.trim().is_empty()).map(String::from)
-        .or(auto).unwrap_or_else(|| if cwd.is_empty() { format!("Session {}", id.chars().take(8).collect::<String>()) } else { base_name(cwd) });
+        .or(auto)
+        .or_else(|| s.get("first_prompt").and_then(|x| x.as_str()).filter(|t| !t.is_empty()).map(String::from))
+        .unwrap_or_else(|| if cwd.is_empty() { format!("Session {}", id.chars().take(8).collect::<String>()) } else { base_name(cwd) });
     let bucket = match s.get("status").and_then(|x| x.as_str()).unwrap_or("idle") {
         "working" => "SESSION_STATUS_BUCKET_WORKING",
         "needs" => "SESSION_STATUS_BUCKET_BLOCKED",

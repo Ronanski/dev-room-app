@@ -7,6 +7,16 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.6.5 (2026-11-01)
+
+### Fixed (found by using the app end to end)
+- **Dialogs that would not close:** the team picker and the phone pairing dialog stayed open on Esc and on a click outside them, and they blocked the map controls. Now Esc or a click on the dimmed backdrop closes them, and the What's new card too.
+- **Fullscreen and Esc:** Esc now leaves fullscreen.
+- **Indistinguishable sessions:** sessions without a name all showed the folder name (for example, every one was "LOGIC_SIM_PRO.").
+  - An unnamed session is now called after its first prompt.
+  - Sessions that still share a name get a number.
+- **Cards:** each card shows what the session was asked to do or is doing. Before, every unnamed session's card repeated "Walang role sa pangalan…".
+
 ## 0.6.4 (2026-11-01)
 
 ### Changed
