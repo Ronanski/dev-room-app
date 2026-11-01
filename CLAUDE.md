@@ -68,7 +68,8 @@ The user's real team is **LOGIC_SIM_PROJECT**: a leader plus subsessions (CODE F
   - With no playrooms saved, it groups sessions by team or project folder, and the units alternate scenes.
   - The **Mga Playroom** editor is `openTeam` / `renderRooms` / `roomsClick`.
   - New scenes must keep the same desk and spot coordinates.
-- **Tablet portrait:** with the panel open on a portrait screen ≥ 641 px wide, the panel docks under the office (grid `office / dock / chat`) instead of overlaying it.
+- **Tablet portrait:** with the panel open on a portrait screen ≥ 641 px wide, the panel docks under the office (grid `office / dock / chat`) instead of overlaying it. The bar above it (`#pSplit`) sets its height (`--chath`, remembered in localStorage `devroom.chath`).
+- **Session tiles (`#dock`):** an equal-width grid, up to 4 a row (`dockCols`), with the session's face (`faceURL`, cut from her sprite), one short name and a status dot; lower in portrait and fullscreen.
 - **`mobile/`:** the Capacitor Android shell.
   - It shows the office in an iframe, served by the PC.
   - `ClaudeActivity` is the in-app claude.ai screen.

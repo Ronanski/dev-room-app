@@ -7,6 +7,15 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.12.0 (2026-11-01)
+
+- **Session tiles.** The cards under the office are now equal tiles that fill the full width: up to 4 a row (`dockCols`: fewer when the screen is narrow, 2 on a phone), and the rest wrap below instead of scrolling sideways.
+  - Each tile shows the session's **face**, cut from her own pixel sprite (`faceURL`, cached), and **one name** (the short name). A dot on the face shows the status; PC and landscape also show the status pill.
+  - Lower tiles in portrait and in fullscreen (one line, 42 px and 36 px), with no timeline strip.
+  - The same faces are used for the other avatars (panel header and lists).
+- **Adjustable panel height in portrait.** Drag the bar above the panel up or down (`#pSplit`); the height is remembered (`devroom.chath`), and a double tap resets it.
+- Tested here with Playwright at 800×1280 (dark and light), 1280×800, 1366×768, 1920×1080 and 412×900: equal tile widths, 4 per row (2 on the phone), faces loaded, drag and remembered height, fullscreen, no page errors, no overflow.
+
 ## 0.11.1 (2026-11-01)
 
 - **Messages reach a lead that has agents running in the background right away.** Subagent hooks carry the parent's session id; they used to mark the parent as working (and `SubagentStop` turned an idle parent into "working"), so a message to a lead whose own turn was over sat in the queue for up to ten minutes. Now subagent hooks (with `agent_id`, or a `subagents` transcript) only update the parent's detail text while it works, never its status or its transcript; `SubagentStop` never marks a free session busy. Tested with a fake `claude`: the message went out in under a second.

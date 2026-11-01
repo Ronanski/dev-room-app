@@ -491,7 +491,49 @@ body{margin:0}
   .app.drawer .mapwrap{min-height:0}
   .app.focus.drawer .body{row-gap:6px}
   .app.drawer .mlegend{display:none}
+  /* the panel's height follows the bar you drag (remembered) */
+  .app.drawer .body{grid-template-rows:minmax(160px,1fr) auto minmax(200px,var(--chath,56%))}
+  .app.drawer .psplit{display:block}
 }}
+/* Session tiles: equal width, filling the row; up to 4 a row (dockCols), the rest wrap below. Face, one name, status. */
+.app .dock{display:grid;grid-template-columns:repeat(var(--cols,4),minmax(0,1fr));gap:8px;overflow:visible;mask-image:none;padding-bottom:0}
+.app .dock .dcard{width:auto;max-width:none;min-width:0;min-height:0;display:grid;grid-template-columns:38px minmax(0,1fr);grid-template-rows:auto auto;align-items:center;gap:3px 9px;padding:6px 9px 6px 6px;border-radius:10px}
+.app .dock .dcard .face{grid-row:1/3}
+.app .dock .dcard .nm{grid-column:2;min-width:0;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;align-self:end}
+.app .dock .dcard .ft{grid-column:2;min-width:0;justify-content:flex-start;align-self:start}
+.app .dock .dcard .pill{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;font-size:11px}
+.app .dock .dcard .tl8{grid-column:1/-1}
+.app .dock .addcard{width:auto;min-width:0;padding:6px 8px;font-size:12.5px}
+.app .dock>*{min-height:52px}
+.av.avf{background:linear-gradient(180deg,color-mix(in srgb,var(--shirt) 18%,var(--chip)),color-mix(in srgb,var(--shirt) 38%,var(--chip)))}
+.av.avf img{width:100%;height:100%;image-rendering:pixelated;display:block}
+.face{position:relative;width:38px;height:38px;border-radius:9px;overflow:visible;display:grid;place-items:center;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--shirt) 18%,var(--chip)),color-mix(in srgb,var(--shirt) 38%,var(--chip)));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--shirt) 45%,transparent)}
+.face img{width:100%;height:100%;image-rendering:pixelated;border-radius:9px;display:block}
+.face b{font-family:var(--f-mono);font-size:10px;color:var(--ink)}
+.face .sdot{position:absolute;right:-3px;bottom:-3px;width:11px;height:11px;border-radius:50%;background:var(--st);box-shadow:0 0 0 2px var(--panel)}
+/* lower tiles in portrait and on phones: one line (face, name; the dot on the face shows the status) */
+@media (orientation:portrait){
+  .app .dock .dcard{grid-template-columns:30px minmax(0,1fr);grid-template-rows:auto;padding:5px 8px 5px 5px;gap:0 8px}
+  .app .dock .dcard .face{grid-row:auto;width:30px;height:30px}
+  .app .dock .dcard .face img{border-radius:7px}
+  .app .dock .dcard .nm{align-self:center}
+  .app .dock .dcard .ft{display:none}
+  .app .dock .addcard{padding:4px 6px}
+  .app .dock .dcard .tl8{display:none}
+  .app .dock>*{min-height:42px}
+}
+/* fullscreen: the same tiles, a bit smaller */
+.app.focus .dock .dcard{grid-template-columns:28px minmax(0,1fr);grid-template-rows:auto;padding:4px 8px 4px 4px;gap:0 8px}
+.app.focus .dock .dcard .face{grid-row:auto;width:28px;height:28px}
+.app.focus .dock .dcard .nm{align-self:center;font-size:12.5px}
+.app.focus .dock .dcard .ft{display:none}
+.app.focus .dock .dcard .tl8{display:none}
+.app.focus .dock>*{min-height:36px}
+.psplit{display:none;position:absolute;left:0;right:0;top:-9px;height:14px;z-index:3;cursor:row-resize;touch-action:none}
+.psplit::after{content:"";position:absolute;left:50%;top:5px;width:46px;height:4px;margin-left:-23px;border-radius:2px;background:var(--muted);opacity:.55}
+.psplit:hover::after,.psplit.on::after{opacity:1;background:var(--accent)}
+@media (pointer:coarse){.psplit{top:-14px;height:24px}.psplit::after{top:10px}}
 </style>
 </head>
 <body>
@@ -530,6 +572,7 @@ body{margin:0}
       </section>
 
       <section class="pane" data-pane="chat" aria-label="Chat">
+        <div class="psplit" id="pSplit" role="separator" aria-orientation="horizontal" aria-label="Hilahin pataas o pababa para baguhin ang taas ng panel" title="Hilahin para baguhin ang taas ng panel"></div>
         <div class="chatpanel"><button type="button" class="drawer-x" data-act="drawer-close" aria-label="Isara ang panel">×</button>
           <div class="cp-head" id="cpHead"></div>
           <div class="cp-tabs" role="tablist">
@@ -1351,6 +1394,10 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.12.0':{news:['<b>Bagong session tiles:</b> pantay-pantay na ang laki at sakop ang buong lapad ng screen. Hanggang 4 kada row, at nasa ibaba ang iba. May <b>mukha</b> na ang bawat isa (galing sa mismong character niya), at <b>isang pangalan</b> lang. Ang tuldok sa mukha ang nagsasabi ng status.',
+    '<b>Naaayos na ang taas ng panel sa portrait:</b> i-drag pataas o pababa ang maliit na bar sa ibabaw ng panel. Tatandaan ito ng app. I-double tap para ibalik sa dati.',
+    'Mas mababa na rin ang tiles sa portrait at fullscreen.'],
+    todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
   '0.11.1':{news:['<b>Agad nang sumasagot ang Lead kahit may agent sa background:</b> dati, kapag may pinapatakbong agent ang Lead, mukha siyang "Nagtatrabaho" at nakapila lang ang mensahe mo. Ngayon, kapag tapos na ang turn niya, ipinapasa agad ang mensahe mo, tulad sa Claude app.',
     '<b>Wala na ang mahahabang system message</b> (hal. "None of the sessions you started…") na mukhang galing sa iyo. Hindi mo iyon isinulat; galing iyon sa Claude Code mismo.',
     '<b>Tablet na naka-portrait:</b> nasa ilalim na ng office ang panel (office, session cards, tapos chat sa buong lapad), hindi na nakapatong sa kalahati ng office.'],
@@ -2236,7 +2283,7 @@ function actText(s){
   if(s.status==='failed')return sent(s.detail)||'May nag-fail sa huling turn niya.';
   return`${IDLE_SENT[s.idle]||'Naka-break.'} Idle na siya nang ${dur(now()-s.idleStart)}.`;
 }
-function av(s,size){return `<span class="av" style="${size?`width:${size}px;height:${size}px;`:''}background:${s.pal.shirt};--hair:${s.pal.hair}"><span>${esc(s.code)}</span></span>`;}
+function av(s,size){const u=s.pal&&s.look!==undefined?faceURL(s):'';return u?`<span class="av avf" style="${size?`width:${size}px;height:${size}px;`:''}--shirt:${s.pal.shirt}"><img src="${u}" alt="" draggable="false"></span>`:`<span class="av" style="${size?`width:${size}px;height:${size}px;`:''}background:${s.pal.shirt};--hair:${s.pal.hair}"><span>${esc(s.code)}</span></span>`;}
 function pill(s){return `<span class="pill${s.status==='needs'?' solid':''}" style="--st:var(${stColor(s)})">${esc(stLabel(s))}</span>`;}
 const sel=()=>sessions.find(x=>x.id===selected)||sessions[0];
 
@@ -2519,9 +2566,23 @@ async function saveTeam(t){
 function switchUnit(k){if(k===UNIT&&applyRecords.unit===k)return;UNIT=k;try{localStorage.setItem('devroom.unit',k);}catch(e){}applyRecords(allRecords);firstLoad=false;chatKey='';render();setConn();}
 function rebuildTeam(){for(const s of sessions.slice())dropSession(s,'');firstLoad=true;logs.length=0;applyRecords(allRecords);setConn();}
 function collectNames(){const n=Object.assign({},TEAM.names||{});document.querySelectorAll('#teamPanel .tname').forEach(i=>{const r=allRecords.find(x=>x.id===i.dataset.id);const v=i.value.trim();if(!v||(r&&v===r.title&&!n[i.dataset.id]))delete n[i.dataset.id];else n[i.dataset.id]=v;});return n;}
-function dockCard(s){
-  return `<button type="button" class="dcard ${s.id===selected?'sel':''} ${s.status==='needs'?'needcard':''}" data-id="${s.id}">${av(s)}<span style="min-width:0"><span class="nm" style="display:block">${esc(s.role)}${FX.mood?`<span class="mood" title="Energy ${Math.round(energy(s)*10)*10}%">${moodOf(s)}</span>`:''}</span><span class="rl" style="display:block">${esc(s.task||actText(s))}</span></span><span class="ft">${pill(s)}<span class="dur">${dur(now()-s.since)}</span></span>${FX.timeline?tlHTML(s):''}</button>`;
+// Each session's face, cut from her own pixel sprite (same hair, skin and shirt as on the map); cached.
+const FACES=new Map();
+function faceURL(s){
+  const key=JSON.stringify([s.pal,s.look]);let u=FACES.get(key);if(u)return u;
+  const e={pal:s.pal,look:s.look,pose:'stand',seed:0,idle:'',sleepy:false,raise:false,prop:null,task:null,crew:false,small:false,face:1};
+  try{sprite(e,1);const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');g.imageSmoothingEnabled=false;
+    g.drawImage(spr,4,1,16,16,0,0,64,64);u=c.toDataURL();}catch(err){u='';}
+  FACES.set(key,u);return u;
 }
+function faceHTML(s){const u=faceURL(s);
+  return `<span class="face" style="--shirt:${s.pal.shirt}">${u?`<img src="${u}" alt="" draggable="false">`:`<b>${esc(s.code)}</b>`}<i class="sdot" style="--st:var(${stColor(s)})"></i></span>`;}
+function dockCard(s){
+  return `<button type="button" class="dcard ${s.id===selected?'sel':''} ${s.status==='needs'?'needcard':''}" data-id="${s.id}" title="${esc(s.role)}${s.task?' · '+esc(s.task):''}">${faceHTML(s)}<span class="nm">${esc(s.short||s.role)}</span><span class="ft">${pill(s)}</span>${FX.timeline?tlHTML(s):''}</button>`;
+}
+// equal tiles across the full width: up to 4 a row (fewer on narrow screens), the rest wrap below
+function dockCols(){const d=$('dock');if(!d)return;const n=[...d.children].filter(c=>c.getClientRects().length).length||1,W=d.clientWidth||innerWidth;
+  const c=Math.max(1,Math.min(4,n,Math.floor(W/150)||1));if(d._c!==c){d._c=c;d.style.setProperty('--cols',c);}}
 function render(){
   pruneToasts();
   const by=st=>sessions.filter(s=>s.status===st).length;
@@ -2533,7 +2594,7 @@ function render(){
     <span class="count"><i class="dot" style="background:var(--idle)"></i><b>${by('idle')-sleepN}</b> naka-break</span>
     <span class="count"><i class="dot" style="background:var(--sleep)"></i><b>${sleepN}</b> tulog</span>
     <span class="count"><i class="dot" style="background:var(--done)"></i><b>${by('done')+by('failed')}</b> tapos o may error</span>`);
-  {const dh=sessions.map(dockCard).join('')+`<button type="button" class="addcard" data-act="add">+ Magdagdag ng session</button>`;if(dh!==render.dock){render.dock=dh;const f=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#dock [data-id]');const fid=f&&f.dataset.id;$('dock').innerHTML=dh;if(fid)$('dock').querySelector(`[data-id="${fid}"]`)?.focus();}}
+  {const dh=sessions.map(dockCard).join('')+`<button type="button" class="addcard" data-act="add">+ Magdagdag ng session</button>`;if(dh!==render.dock){render.dock=dh;const f=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#dock [data-id]');const fid=f&&f.dataset.id;$('dock').innerHTML=dh;dockCols();if(fid)$('dock').querySelector(`[data-id="${fid}"]`)?.focus();}}
   renderPanel();
   const tb=$('tabBadge');tb.hidden=!needN;tb.textContent=needN;
   $('clock').textContent=dayLabel(now())+', '+simLabel(now());$('sbClock').textContent=simLabel(now()).replace(/ (AM|PM)/,'');
@@ -2683,8 +2744,18 @@ document.addEventListener('keydown',e=>{
 // the dock scrolls sideways with the mouse wheel and fades at the edge while there is more
 {const d=$('dock');const edge=()=>d.classList.toggle('at-end',d.scrollLeft+d.clientWidth>=d.scrollWidth-4);
  d.addEventListener('wheel',e=>{if(Math.abs(e.deltaY)>Math.abs(e.deltaX)&&d.scrollWidth>d.clientWidth){d.scrollLeft+=e.deltaY;e.preventDefault();}},{passive:false});
- d.addEventListener('scroll',edge,{passive:true});new ResizeObserver(edge).observe(d);setInterval(edge,2000);}
+ d.addEventListener('scroll',edge,{passive:true});new ResizeObserver(()=>{edge();dockCols();}).observe(d);new MutationObserver(()=>requestAnimationFrame(dockCols)).observe($('app'),{attributes:true,attributeFilter:['class']});setInterval(edge,2000);}
 ['teamPanel','whatsNew'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target===e.currentTarget){if(id==='whatsNew')$(id).querySelector('[data-act="wn-ok"]')?.click();else $(id).hidden=true;}}));
+// tablet portrait: drag the bar above the panel to make the panel taller or shorter (remembered; double tap resets)
+{const sp=$('pSplit'),app=$('app');let d=null;
+ try{const f=parseFloat(localStorage.getItem('devroom.chath'));if(f>.15&&f<.85)app.style.setProperty('--chath',(f*100).toFixed(1)+'%');}catch(e){}
+ const body=()=>document.querySelector('.body').getBoundingClientRect();
+ sp.addEventListener('pointerdown',e=>{if(e.button>0)return;d={id:e.pointerId};sp.setPointerCapture(e.pointerId);sp.classList.add('on');e.preventDefault();});
+ sp.addEventListener('pointermove',e=>{if(!d||e.pointerId!==d.id)return;const b=body(),dock=document.querySelector('.dockwrap').offsetHeight;
+   const h=Math.max(200,Math.min(b.height-dock-170,b.bottom-e.clientY));d.f=h/b.height;app.style.setProperty('--chath',h+'px');});
+ const end=e=>{if(!d||e.pointerId!==d.id)return;sp.classList.remove('on');if(d.f){app.style.setProperty('--chath',(d.f*100).toFixed(1)+'%');try{localStorage.setItem('devroom.chath',d.f.toFixed(3));}catch(err){}}d=null;};
+ sp.addEventListener('pointerup',end);sp.addEventListener('pointercancel',end);
+ sp.addEventListener('dblclick',()=>{app.style.removeProperty('--chath');try{localStorage.removeItem('devroom.chath');}catch(e){}});}
 // keep the drawer clear of the session cards
 {const dw=document.querySelector('.dockwrap');const upd=()=>{if(dw)$('app').style.setProperty('--dockh',dw.offsetHeight+'px');};if(window.ResizeObserver&&dw)new ResizeObserver(upd).observe(dw);upd();}
 $('pauseBtn').addEventListener('click',()=>{
