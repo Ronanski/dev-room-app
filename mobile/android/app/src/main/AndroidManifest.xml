@@ -33,6 +33,15 @@
 
         </activity>
 
+        <activity
+            android:name=".ClaudeActivity"
+            android:exported="false"
+            android:label="Claude"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|screenLayout|uiMode"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/AppTheme.NoActionBar" />
+
         <service
             android:name=".WatchService"
             android:exported="false"

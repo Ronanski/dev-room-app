@@ -24,7 +24,7 @@ Phone on the same Wi-Fi  (http://<PC IP>:4317/?t=<pairing token>, from the QR co
   - `SessionEnd` removes the session.
 - **Chat from the app:** `POST /api/send` queues a message in the session's inbox.
   - **Working session:** the next `PostToolUse` or `UserPromptSubmit` reply carries it as `additionalContext`.
-  - **Finished session:** the `Stop` reply returns `{"decision":"block","reason":…}`, so the session continues with it. When nothing is queued, `Stop` waits for a message (up to 20 minutes) if the away mode allows it. In `auto` mode, it waits while a phone or tablet has had the office open in the last 2 minutes; background watchers (`bg=1`) do not count.
+  - **Finished session:** the `Stop` reply returns `{"decision":"block","reason":…}`, so the session continues with it. When nothing is queued, `Stop` waits for a message (up to 20 minutes) if the away mode allows it. The default is `off`, because a held Stop hook keeps the session busy in Claude Code. In `auto` mode, it waits while a phone or tablet has had the office open in the last 2 minutes; background watchers (`bg=1`) do not count.
   - **Cancelled hook:** a message that could not be handed over goes back to the queue.
   - **Feed:** `GET /api/convo` returns each session's prompts and replies.
 - **Session names** come from the transcript (`/rename` title or summary), otherwise the folder name. You can rename sessions in **Piliin ang team**. Use `ROLE: task` (for example `CODE FIXER: logic`) to get the role, and pick the leader there.

@@ -151,6 +151,10 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .msg.asking b{color:var(--need)}
 .msg time{display:block;font-family:var(--f-mono);font-size:10px;opacity:.7;margin-top:3px}
 .msg .row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.claudebar{display:flex;gap:10px;align-items:center;padding:8px 12px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--accent) 8%,var(--panel))}
+.claudebar .hint{font-size:11.5px}
+.zoom .claudebtn{background:var(--accent);color:var(--panel);border-color:var(--accent);font-weight:700}
+.app.typing .claudebar{display:none}
 /* team chat: every session's conversation in one feed */
 .cfilter{position:sticky;top:-12px;z-index:1;background:var(--panel);display:flex;gap:6px;overflow-x:auto;padding:8px 0;margin:-8px 0 4px;border-bottom:1px solid var(--line);scrollbar-width:thin}
 .cfilter button{flex:none;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:3px 10px;font-size:12px;display:flex;align-items:center;gap:5px}
@@ -342,7 +346,7 @@ body{margin:0}
           <canvas id="map" width="2240" height="1260" aria-label="Isometric café-style office map with session characters"></canvas>
           <div class="overlay" id="overlay"></div>
           <div class="feed" id="feed" aria-live="polite"></div>
-          <div class="zoom"><button type="button" id="zOut" aria-label="Zoom out">−</button><button type="button" id="zIn" aria-label="Zoom in">+</button><button type="button" id="bsDown" aria-label="Paliitin ang text ng bubbles">A−</button><button type="button" id="bsUp" aria-label="Palakihin ang text ng bubbles">A+</button><button type="button" id="zFit">Buong office</button><button type="button" id="fsBtn">Fullscreen</button><button type="button" id="chatToggle">Panel</button></div>
+          <div class="zoom"><button type="button" id="zOut" aria-label="Zoom out">−</button><button type="button" id="zIn" aria-label="Zoom in">+</button><button type="button" id="bsDown" aria-label="Paliitin ang text ng bubbles">A−</button><button type="button" id="bsUp" aria-label="Palakihin ang text ng bubbles">A+</button><button type="button" id="zFit">Buong office</button><button type="button" id="fsBtn">Fullscreen</button><button type="button" id="chatToggle">Panel</button><button type="button" class="claudebtn" data-act="claude">Claude</button></div>
           <div class="toasts" id="toasts" aria-live="assertive"></div>
           <div class="mlegend"><span><i class="dot" style="background:var(--work)"></i>Nagtatrabaho</span><span><i class="dot" style="background:var(--need)"></i>Kailangan ka</span><span><i class="dot" style="background:var(--idle)"></i>Naka-break</span><span><i class="dot" style="background:var(--sleep)"></i>Tulog</span><span><i class="dot" style="background:var(--done)"></i>Pa-review</span><span><i class="dot" style="background:var(--fail)"></i>May error</span></div>
         </div>
@@ -359,10 +363,11 @@ body{margin:0}
             <button type="button" role="tab" data-ptab="log" aria-selected="false">Lahat ng activity</button>
           </div>
           <div class="cp-body" id="cpBody"></div>
+          <div class="claudebar"><button type="button" class="btn primary" data-act="claude">Kausapin sa Claude</button><span class="hint">Ang mismong Claude Code chat ng mga session sa PC mo: instant, totoong sagot.</span></div>
           <form class="composer" id="composer">
             <div class="to"><label for="chatTo" id="msgLabel">Para kay</label><select id="chatTo"></select></div>
             <textarea id="msgInput" rows="2" placeholder="Ano ang gusto mong ipagawa?"></textarea>
-            <div class="row"><span class="away"><label for="awaySel">Kapag tapos na ang session, abangan ang utos mula sa app:</label><select id="awaySel"><option value="auto">Kapag may phone na nakabukas</option><option value="on">Palagi</option><option value="off">Hindi</option></select></span><button type="submit" class="btn primary">Ipadala</button></div>
+            <div class="row"><span class="away"><label for="awaySel">Kapag tapos na ang session, abangan ang utos mula sa app:</label><select id="awaySel"><option value="off">Hindi (normal na tatapusin ang turn)</option><option value="auto">Kapag may phone na nakabukas</option><option value="on">Palagi</option></select></span><button type="submit" class="btn primary">Ipadala</button></div>
           </form>
         </div>
       </section>
@@ -1041,6 +1046,10 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.6.3':{news:['<b>Bago: ang mismong Claude Code chat, nasa loob ng Dev Room.</b> Pindutin ang <b>Claude</b> (sa map) o <b>Kausapin sa Claude</b> (sa Chat): bubukas sa loob ng app ang chat ng mga session sa PC mo (Remote Control). Instant at totoong sagot, walang hintayan. Mag-login sa Claude isang beses lang; kung ayaw ng Google login, gamitin ang email.','<b>Naka-off na bilang default ang pag-abang sa utos mula sa app.</b> Dati, kapag may phone na nakabukas, hindi agad natatapos ang turn ng session pagkatapos sumagot (naghihintay ito ng mensahe mo), kaya mukhang may ginagawa pa siya pero walang reply.',
+    'Ngayon, normal nang natatapos ang bawat turn. Ang mensahe mula sa app ay papasok habang nagtatrabaho ang session, o sa susunod niyang turn.',
+    'Kung gusto mo pa rin ang pag-abang, i-on ito sa Chat (may babala).'],
+    todo:['Kung may session na mukhang naka-stuck pa rin ngayon, pindutin ang <b>Esc</b> sa session na iyon sa PC.']},
   '0.6.2':{news:['<b>Ayos na ang chat sa phone.</b> Habang nagta-type ka, tumatabi ang Office/Chat bar at ang header para kita ang mensahe mo at ang usapan.',
     'Malinis na ang usapan: wala nang lumalabas na system text (gaya ng <code>&lt;system-reminder&gt;</code>).',
     'Kapag hindi naipadala ang mensahe, nakasulat na kung bakit. Kapag tapos na ang session bago mo binuksan ang app, sinasabi na kung kailan niya ito matatanggap.'],
@@ -1064,7 +1073,7 @@ function showWhatsNew(){
   el.hidden=false;
 }
 // chatTo and the filter hold session ids from the PC (sid), which survive a team rebuild; PENDING keeps sends until the PC lists them
-let convoKey='',CONVO={},awayMode='auto',chatFilter='all',chatTo='',PENDING=[],forceScroll=false,convoBusy=false;
+let convoKey='',CONVO={},awayMode='off',chatFilter='all',chatTo='',PENDING=[],forceScroll=false,convoBusy=false;
 const bySid=sid=>sessions.find(x=>x.sid===sid);
 async function loadConvo(){if(convoBusy){loadConvo.again=true;return;}convoBusy=true;try{const r=await fetch('/api/convo',{headers:hdr(),cache:'no-store'});if(r.ok){CONVO=await r.json();chatKey='';renderPanel();}}catch(e){}convoBusy=false;if(loadConvo.again){loadConvo.again=false;loadConvo();}}
 function updates(j){
@@ -1660,7 +1669,17 @@ async function answer(s,text){
   chatKey='';renderPanel();
   log('Boss',`Mensahe kay ${s.short}: ${text.length>60?text.slice(0,60)+'…':text}`,s);return true;
 }
-async function setAway(m){awayMode=m;chatKey='';renderPanel();try{await fetch('/api/away',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({mode:m})});}catch(e){}}
+// The official Claude Code chat: in the Android app a screen inside the app, on the PC a Dev Room window,
+// in a plain browser a new tab.
+function openClaude(){
+  const url='https://claude.ai/code';
+  if(window.parent!==window){window.parent.postMessage({type:'devroom:openClaude',url},'*');connMsg='Kung walang bumukas, i-update muna ang Dev Room app (pindutin ang I-update sa banner sa ibaba ng app).';setConn();setTimeout(()=>{connMsg='';setConn();},8000);return;}
+  if(isLocal){fetch('/api/open-claude',{method:'POST'}).then(r=>{if(!r.ok)window.open(url,'_blank');}).catch(()=>window.open(url,'_blank'));return;}
+  window.open(url,'_blank','noopener');
+}
+async function setAway(m){
+  if(m!=='off'&&!confirm('Kapag naka-on ito, hindi muna matatapos ang turn ng session pagkatapos niyang sumagot: maghihintay siya ng utos mo mula sa app nang hanggang 20 minuto. Habang naghihintay, mukha siyang "may ginagawa" sa Claude Code at hindi ka makakapag-utos doon nang normal (pindutin ang Esc para ituloy). Ituloy?')){$('awaySel').value=awayMode;return;}
+  awayMode=m;chatKey='';renderPanel();try{await fetch('/api/away',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({mode:m})});}catch(e){}}
 function cleanMsg(t){
   return String(t||'').replace(/<([a-z][\w]*-[\w-]*)[^>]*>[\s\S]*?<\/\1>/gi,'').replace(/<\/?[a-z][\w]*-[\w-]*[^>]*>/gi,'').replace(/\n{3,}/g,'\n\n').trim();
 }
@@ -1805,6 +1824,7 @@ document.addEventListener('click',e=>{
   if(e.target.closest('[data-act="hooks"]')){installHooks();return;}
   if(e.target.closest('[data-act="restart"]')){restartApp(false);return;}
   if(e.target.closest('[data-act="restart-wait"]')){autoRestart.wait();return;}
+  if(e.target.closest('[data-act="claude"]')){openClaude();return;}
   if(e.target.closest('[data-act="wn-ok"]')){$('whatsNew').hidden=true;try{localStorage.setItem('devroom.seenNotes',NOTES_VER);}catch(e){}return;}
   if(e.target.closest('[data-act="pair"]')){openPair();return;}
   if(e.target.closest('[data-act="team-cancel"]')){$('teamPanel').hidden=true;return;}

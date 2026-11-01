@@ -22,6 +22,8 @@ const MAX_BODY: usize = 4 * 1024 * 1024;
 
 /// Set by the app: opens the Dev Room window (used when DevRoom.exe is started a second time).
 pub static ON_SHOW: std::sync::OnceLock<Box<dyn Fn() + Send + Sync>> = std::sync::OnceLock::new();
+/// Set by the app: opens the official Claude Code chat in its own Dev Room window.
+pub static ON_CLAUDE: std::sync::OnceLock<Box<dyn Fn() + Send + Sync>> = std::sync::OnceLock::new();
 
 /// Lock the shared state; a panic in another request must not take the whole server down.
 fn lk(m: &Mutex<State>) -> std::sync::MutexGuard<'_, State> { m.lock().unwrap_or_else(|e| e.into_inner()) }
@@ -46,7 +48,7 @@ struct State {
     version: u64,
     token: String,
     dir: PathBuf,
-    /// "auto" (wait for phone messages while a phone has Dev Room open), "on" or "off".
+    /// "off" (default: a finished turn ends normally), "auto" (wait while a phone has Dev Room open) or "on".
     away: String,
     /// Last time a phone or tablet had the office on screen (background watchers do not count).
     remote_seen: u64,
@@ -57,7 +59,7 @@ impl State {
 
     fn save(&self) {
         let _ = fs::create_dir_all(&self.dir);
-        let data = json!({"sessions": self.sessions, "team": self.team, "token": self.token, "away": self.away});
+        let data = json!({"sessions": self.sessions, "team": self.team, "token": self.token, "away": self.away, "away_v": 2});
         // write then rename, so a crash never leaves a half-written file (which would unpair every phone)
         let tmp = self.dir.join("state.json.tmp");
         if fs::write(&tmp, serde_json::to_vec(&data).unwrap_or_default()).is_ok() { let _ = fs::rename(&tmp, self.dir.join("state.json")); }
@@ -77,11 +79,14 @@ impl State {
                 }
                 if let Some(t) = v.get("team") { if t.is_object() { st.team = t.clone(); } }
                 if let Some(t) = v.get("token").and_then(|t| t.as_str()) { st.token = t.to_string(); }
-                if let Some(a) = v.get("away").and_then(|t| t.as_str()) { st.away = a.to_string(); }
+                // 0.6.0-0.6.2 defaulted to "auto"; a held Stop hook looks like a session that never answers, so start from "off"
+                if v.get("away_v").and_then(|x| x.as_u64()).unwrap_or(0) >= 2 {
+                    if let Some(a) = v.get("away").and_then(|t| t.as_str()) { st.away = a.to_string(); }
+                }
             }
         }
         if st.token.len() < 16 { st.token = format!("{:016x}{:016x}", rand::random::<u64>(), rand::random::<u64>()); }
-        if !["auto", "on", "off"].contains(&st.away.as_str()) { st.away = "auto".into(); }
+        if !["auto", "on", "off"].contains(&st.away.as_str()) { st.away = "off".into(); }
         for s in st.sessions.values_mut() { if let Some(o) = s.as_object_mut() { o.insert("listening".into(), json!(false)); } }
         st.version = 1;
         st.save();
@@ -648,6 +653,11 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
             let all: Map<String, Value> = g.sessions.iter().map(|(k, s)| (k.clone(), s.get("convo").cloned().unwrap_or(json!([])))).collect();
             drop(g);
             respond_json(req, 200, &Value::Object(all));
+        }
+        (Method::Post, "/api/open-claude") => {
+            if !local { return respond_json(req, 403, &json!({"error": "loopback only"})); }
+            let ok = ON_CLAUDE.get().map(|f| f()).is_some();
+            respond_json(req, if ok { 200 } else { 503 }, &json!({"ok": ok}));
         }
         (Method::Post, "/api/show") => {
             if !local { return respond_json(req, 403, &json!({"error": "loopback only"})); }
