@@ -16,6 +16,7 @@ The version lives in `VERSION`. Each build is published as release `v<VERSION>-b
   - **A finished session** waits for your message and continues with it. By default it waits while a phone or tablet has Dev Room open (**Kapag may phone na nakabukas**). You can also choose **Palagi** (always) or **Hindi** (never). It waits up to 20 minutes; at the PC, press Esc in Claude Code to stop the wait.
   - **Delivery state:** each message shows **Naghihintay maipasa** (waiting to be handed over) or **Naipasa ✓** (handed over).
 - **Team chat feed:** the prompts and replies of every session in one feed, with filter chips per session. Questions and waiting sessions show at the end.
+- **Ano ang bago:** after each update, every device shows a one-time card with what is new and the steps to take (**Gawin mo**).
 - **One Dev Room at a time:** starting `DevRoom.exe` again opens the window of the one that is running.
 
 ### Changed

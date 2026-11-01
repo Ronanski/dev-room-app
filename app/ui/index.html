@@ -212,6 +212,13 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .conn[data-mode="stale"] .dot{background:var(--idle)}
 .conn[data-mode="sample"] .dot{background:var(--sleep)}
 .conn .cm{flex:1;min-width:200px}
+.wn-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;max-width:520px;width:100%;display:flex;flex-direction:column;gap:10px;max-height:85vh;overflow:auto;box-shadow:0 20px 50px rgba(42,32,26,.3)}
+.wn-card h2{margin:0;font-size:18px}
+.wn-card h3{margin:4px 0 0;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.wn-card ul,.wn-card ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px;font-size:13.5px}
+.wn-card .todo{border:1px solid var(--work);border-radius:10px;padding:10px 12px;background:color-mix(in srgb,var(--work) 10%,var(--panel))}
+.wn-card .row{display:flex;justify-content:flex-end}
+#whatsNew{z-index:70}
 .teampanel{position:absolute;inset:0;z-index:10;background:color-mix(in srgb,var(--ink) 35%,transparent);display:flex;align-items:flex-start;justify-content:center;padding:40px 12px}
 .tp-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;max-width:560px;width:100%;display:flex;flex-direction:column;gap:10px;max-height:80vh}
 .tlist{overflow:auto;display:flex;flex-direction:column;gap:6px;min-height:0}
@@ -367,6 +374,7 @@ body{margin:0}
     
 <div id="toast" hidden></div>
     <div class="teampanel" id="teamPanel" hidden></div>
+    <div class="teampanel" id="whatsNew" hidden></div>
   </div>
 </div>
 <p class="devnote">Galing ang data sa Claude Code hooks sa PC mo.</p>
@@ -1025,6 +1033,21 @@ async function poll(){
   setConn();setTimeout(poll,mode==='live'?1000:3000);
 }
 let uiBuild=null;
+/* What's new: shown once per version after an update, on every device, with the steps to take. */
+const NOTES={
+  '0.6.0':{news:['<b>Chat dito mismo.</b> Panel → Chat: kita ang usapan ng lahat ng session. Piliin sa <b>Para kay</b> kung sino ang kakausapin, o i-tap ang mensahe niya.',
+    'Habang nagtatrabaho ang session, aabot ang mensahe mo sa susunod niyang hakbang. Kapag tapos na siya, aabangan niya ang utos mo habang may phone na nakabukas sa Dev Room.',
+    'Sa PC, ang <b>X</b> ay tuluyang nagsasara ng window para gumaan ang PC; tuloy pa rin ang phone at tablet. Buksan ulit mula sa icon sa tray o sa DevRoom.exe.',
+    'Kusang nagsisimula ang Dev Room kasabay ng Windows, nakatago sa tray.'],
+    todo:['<b>I-restart nang isang beses ang mga bukas na Claude Code session</b> sa PC (isara at buksan ulit), para mabasa nila ang bagong hooks.','Iyon lang. Lahat ng susunod na update ay kusa nang papasok.']}};
+const NOTES_VER=Object.keys(NOTES).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})).pop();
+function showWhatsNew(){
+  let seen='';try{seen=localStorage.getItem('devroom.seenNotes')||'';}catch(e){}
+  if(seen===NOTES_VER)return;
+  const n=NOTES[NOTES_VER],el=$('whatsNew');
+  el.innerHTML=`<div class="wn-card" role="dialog" aria-modal="true" aria-labelledby="wnT"><h2 id="wnT">Bago sa Dev Room v${NOTES_VER}</h2><ul>${n.news.map(x=>`<li>${x}</li>`).join('')}</ul><div class="todo"><h3>Gawin mo</h3><ol>${n.todo.map(x=>`<li>${x}</li>`).join('')}</ol></div><div class="row"><button type="button" class="btn primary" data-act="wn-ok">Sige, gets</button></div></div>`;
+  el.hidden=false;
+}
 let convoKey='',CONVO={},awayMode='auto',chatFilter='all',chatTo=0;
 async function loadConvo(){try{const r=await fetch('/api/convo',{headers:hdr(),cache:'no-store'});if(r.ok){CONVO=await r.json();chatKey='';renderPanel();}}catch(e){}}
 function updates(j){
@@ -1754,6 +1777,7 @@ document.addEventListener('click',e=>{
   if(e.target.closest('[data-act="hooks"]')){installHooks();return;}
   if(e.target.closest('[data-act="restart"]')){restartApp(false);return;}
   if(e.target.closest('[data-act="restart-wait"]')){autoRestart.wait();return;}
+  if(e.target.closest('[data-act="wn-ok"]')){$('whatsNew').hidden=true;try{localStorage.setItem('devroom.seenNotes',NOTES_VER);}catch(e){}return;}
   if(e.target.closest('[data-act="pair"]')){openPair();return;}
   if(e.target.closest('[data-act="team-cancel"]')){$('teamPanel').hidden=true;return;}
   if(e.target.closest('[data-act="team-reset"]')){saveTeam({lead:null,ids:[],names:TEAM.names||{}});$('teamPanel').hidden=true;return;}
@@ -1834,7 +1858,7 @@ function addSession(){
   guardWake();say(guard,'Wala pang bagong dumarating, boss.');
   log('Guard','Kapag nagsimula o nag-prompt ka ng session sa Claude, papasok siya rito agad. Puwede mo rin siyang idagdag sa Piliin ang team.');
 }
-render();renderLog();requestAnimationFrame(frame);setConn();poll();
+render();renderLog();requestAnimationFrame(frame);setConn();poll();setTimeout(showWhatsNew,1500);
 })();
 </script>
 </body>
