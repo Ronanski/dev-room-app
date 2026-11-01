@@ -46,6 +46,22 @@ fn make_window(app: &AppHandle, port: u16) {
         .build();
 }
 
+/// The official Claude Code chat (claude.ai/code, with this PC's sessions through Remote Control) in its own window.
+fn show_claude(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("claude") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+        return;
+    }
+    let url = "https://claude.ai/code".parse().expect("valid url");
+    let _ = tauri::WebviewWindowBuilder::new(app, "claude", tauri::WebviewUrl::External(url))
+        .title("Claude · Dev Room")
+        .inner_size(1100.0, 860.0)
+        .min_inner_size(420.0, 520.0)
+        .build();
+}
+
 fn show_main(app: &AppHandle, port: u16) {
     updater::set_hidden(false);
     if let Some(w) = app.get_webview_window("main") {
@@ -84,6 +100,11 @@ fn main() {
     let app = tauri::Builder::default()
         .setup(move |app| {
             if !hidden { make_window(app.handle(), port); }
+            let ch = app.handle().clone();
+            let _ = server::ON_CLAUDE.set(Box::new(move || {
+                let h = ch.clone();
+                let _ = ch.run_on_main_thread(move || show_claude(&h));
+            }));
             let handle = app.handle().clone();
             let _ = server::ON_SHOW.set(Box::new(move || {
                 let h = handle.clone();
@@ -117,8 +138,8 @@ fn main() {
             tray.build(app)?;
             Ok(())
         })
-        .on_window_event(|_window, event| {
-            if let WindowEvent::Destroyed = event { updater::set_hidden(true); }
+        .on_window_event(|window, event| {
+            if let WindowEvent::Destroyed = event { if window.label() == "main" { updater::set_hidden(true); } }
         })
         .build(tauri::generate_context!())
         .expect("error while building Dev Room");

@@ -67,6 +67,16 @@ public class DevRoomPlugin extends Plugin {
         call.resolve();
     }
 
+    /** Opens the official Claude Code chat inside the app. */
+    @PluginMethod
+    public void openClaude(PluginCall call) {
+        String url = call.getString("url", "https://claude.ai/code");
+        Intent i = new Intent(getContext(), ClaudeActivity.class);
+        i.putExtra("url", url);
+        getActivity().startActivity(i);
+        call.resolve();
+    }
+
     @PluginMethod
     public void info(PluginCall call) {
         JSObject r = new JSObject();

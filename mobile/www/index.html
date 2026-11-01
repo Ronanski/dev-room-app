@@ -111,6 +111,12 @@ async function checkUpdate(){
     }
   }catch(e){}
 }
+// The office runs in an iframe served by the PC; it asks the shell to open the Claude Code chat.
+window.addEventListener('message',e=>{
+  const d=e.data||{};if(d.type!=='devroom:openClaude')return;
+  const url=typeof d.url==='string'&&d.url.startsWith('https://claude.ai/')?d.url:'https://claude.ai/code';
+  if(DevRoom&&DevRoom.openClaude)DevRoom.openClaude({url});
+});
 function handleUrl(u){const p=parseLink(u);if(p&&p.url&&p.token){save(p);showOffice();}}
 $('go').onclick=()=>{const p=parseLink($('link').value);if(!p){showPair('Hindi tama ang link. Kopyahin ang buong link mula sa QR code, kasama ang ?t= sa dulo.');return;}save(p);showOffice();};
 

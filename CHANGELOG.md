@@ -9,6 +9,12 @@ The version lives in `VERSION`. Each build is published as release `v<VERSION>-b
 
 ## 0.6.3 (2026-11-01)
 
+### Added
+- **The official Claude Code chat inside Dev Room.** The **Claude** button on the map and **Kausapin sa Claude** in Chat open claude.ai/code, which lists this PC's sessions through Remote Control, for instant replies with no waiting.
+  - **Android:** it opens on a screen inside the app. This needs the new app version; tap **I-update** on the banner.
+  - **PC:** it opens in its own Dev Room window.
+  - **Signing in:** you sign in to Claude once. If Google sign-in is refused inside the app, use the email code.
+
 ### Fixed
 - **Sessions looked busy without replying.** Since 0.6.0, a finished session waited up to 20 minutes for a message from the app whenever a phone had Dev Room open. While it waited, the session stayed "running" in Claude Code and could not take prompts. This waiting is now off by default, and existing setups are switched to off once.
   - Messages from the app still reach a working session at its next step, and a stopped one with its next turn.

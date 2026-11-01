@@ -22,6 +22,8 @@ const MAX_BODY: usize = 4 * 1024 * 1024;
 
 /// Set by the app: opens the Dev Room window (used when DevRoom.exe is started a second time).
 pub static ON_SHOW: std::sync::OnceLock<Box<dyn Fn() + Send + Sync>> = std::sync::OnceLock::new();
+/// Set by the app: opens the official Claude Code chat in its own Dev Room window.
+pub static ON_CLAUDE: std::sync::OnceLock<Box<dyn Fn() + Send + Sync>> = std::sync::OnceLock::new();
 
 /// Lock the shared state; a panic in another request must not take the whole server down.
 fn lk(m: &Mutex<State>) -> std::sync::MutexGuard<'_, State> { m.lock().unwrap_or_else(|e| e.into_inner()) }
@@ -651,6 +653,11 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
             let all: Map<String, Value> = g.sessions.iter().map(|(k, s)| (k.clone(), s.get("convo").cloned().unwrap_or(json!([])))).collect();
             drop(g);
             respond_json(req, 200, &Value::Object(all));
+        }
+        (Method::Post, "/api/open-claude") => {
+            if !local { return respond_json(req, 403, &json!({"error": "loopback only"})); }
+            let ok = ON_CLAUDE.get().map(|f| f()).is_some();
+            respond_json(req, if ok { 200 } else { 503 }, &json!({"ok": ok}));
         }
         (Method::Post, "/api/show") => {
             if !local { return respond_json(req, 403, &json!({"error": "loopback only"})); }
