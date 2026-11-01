@@ -92,7 +92,7 @@ public class WatchService extends Service {
     }
 
     private HttpURLConnection open(String base, String token) throws Exception {
-        URL url = new URL(base.replaceAll("/+$", "") + "/api/state?t=" + URLEncoder.encode(token, "UTF-8"));
+        URL url = new URL(base.replaceAll("/+$", "") + "/api/state?bg=1&t=" + URLEncoder.encode(token, "UTF-8"));
         HttpURLConnection c = (HttpURLConnection) url.openConnection();
         c.setConnectTimeout(4000);
         c.setReadTimeout(8000);

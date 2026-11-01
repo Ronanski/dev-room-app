@@ -132,6 +132,7 @@ pub fn restart(hidden: bool) {
         std::thread::sleep(Duration::from_millis(300));
         if let Ok(exe) = std::env::current_exe() {
             let mut cmd = std::process::Command::new(exe);
+            cmd.arg("--restarted");
             if hidden { cmd.arg("--tray"); }
             let _ = cmd.spawn();
         }

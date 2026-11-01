@@ -5,7 +5,7 @@ mod updater;
 
 use tauri::menu::{CheckMenuItem, Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, WindowEvent};
+use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
 
 const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
 
@@ -35,31 +35,55 @@ fn set_autostart(on: bool) {
     }
 }
 
-fn show_main(app: &AppHandle) {
+/// The window is created on demand and destroyed when closed, so a closed Dev Room costs almost nothing:
+/// only the small server keeps running in the tray for phones, tablets and the hooks.
+fn make_window(app: &AppHandle, port: u16) {
+    let url = format!("http://127.0.0.1:{port}/").parse().expect("valid url");
+    let _ = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::External(url))
+        .title("Dev Room")
+        .inner_size(1440.0, 900.0)
+        .min_inner_size(820.0, 560.0)
+        .build();
+}
+
+fn show_main(app: &AppHandle, port: u16) {
+    updater::set_hidden(false);
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
-        updater::set_hidden(false);
         let _ = w.unminimize();
         let _ = w.set_focus();
+    } else {
+        make_window(app, port);
     }
 }
 
 fn main() {
-    // If the port is taken, another Dev Room is already running: just show its UI.
+    // One Dev Room at a time: starting it again just opens the window of the one that is running.
+    if !std::env::args().any(|a| a == "--restarted") {
+        let url = format!("http://127.0.0.1:{}/api/show", server::DEFAULT_PORT);
+        let agent = ureq::AgentBuilder::new().timeout(std::time::Duration::from_millis(1500)).build();
+        if agent.post(&url).call().is_ok() { return; }
+    }
     let port = server::start(server::DEFAULT_PORT).unwrap_or(server::DEFAULT_PORT);
     updater::start();
     // Started with Windows: stay in the tray until the user opens the window.
     let hidden = std::env::args().any(|a| a == "--tray");
     updater::set_hidden(hidden);
-    tauri::Builder::default()
+    // First run: start with Windows (hidden in the tray), so phones work without opening anything.
+    let marker = server::data_dir().join("autostart-default");
+    if cfg!(windows) && !marker.exists() {
+        set_autostart(true);
+        let _ = std::fs::create_dir_all(server::data_dir());
+        let _ = std::fs::write(&marker, "1");
+    }
+    let app = tauri::Builder::default()
         .setup(move |app| {
-            let url = format!("http://127.0.0.1:{port}/").parse().expect("valid url");
-            tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::External(url))
-                .title("Dev Room")
-                .inner_size(1440.0, 900.0)
-                .min_inner_size(820.0, 560.0)
-                .visible(!hidden)
-                .build()?;
+            if !hidden { make_window(app.handle(), port); }
+            let handle = app.handle().clone();
+            let _ = server::ON_SHOW.set(Box::new(move || {
+                let h = handle.clone();
+                let _ = handle.run_on_main_thread(move || show_main(&h, port));
+            }));
 
             // Closing the window keeps Dev Room running in the tray, so phones and tablets stay connected.
             let open = MenuItem::with_id(app, "open", "Buksan ang Dev Room", true, None::<&str>)?;
@@ -72,14 +96,14 @@ fn main() {
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(move |app, ev| match ev.id().as_ref() {
-                    "open" => show_main(app),
+                    "open" => show_main(app, port),
                     "autostart" => set_autostart(auto_item.is_checked().unwrap_or(false)),
                     "quit" => app.exit(0),
                     _ => {}
                 })
-                .on_tray_icon_event(|tray, ev| {
+                .on_tray_icon_event(move |tray, ev| {
                     if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = ev {
-                        show_main(tray.app_handle());
+                        show_main(tray.app_handle(), port);
                     }
                 });
             if let Some(icon) = app.default_window_icon() {
@@ -88,13 +112,15 @@ fn main() {
             tray.build(app)?;
             Ok(())
         })
-        .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                let _ = window.hide();
-                updater::set_hidden(true);
-                api.prevent_close();
-            }
+        .on_window_event(|_window, event| {
+            if let WindowEvent::Destroyed = event { updater::set_hidden(true); }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Dev Room");
+        .build(tauri::generate_context!())
+        .expect("error while building Dev Room");
+    app.run(|_app, event| {
+        // The last window closing must not end the app; only "Isara nang tuluyan" (exit with a code) does.
+        if let RunEvent::ExitRequested { api, code, .. } = event {
+            if code.is_none() { api.prevent_exit(); }
+        }
+    });
 }

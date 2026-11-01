@@ -151,6 +151,22 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .msg.asking b{color:var(--need)}
 .msg time{display:block;font-family:var(--f-mono);font-size:10px;opacity:.7;margin-top:3px}
 .msg .row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+/* team chat: every session's conversation in one feed */
+.cfilter{position:sticky;top:-12px;z-index:1;background:var(--panel);display:flex;gap:6px;overflow-x:auto;padding:8px 0;margin:-8px 0 4px;border-bottom:1px solid var(--line);scrollbar-width:thin}
+.cfilter button{flex:none;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:3px 10px;font-size:12px;display:flex;align-items:center;gap:5px}
+.cfilter button i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.cfilter button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:var(--panel)}
+.cmsg{display:flex;flex-direction:column;gap:2px;max-width:92%;cursor:pointer}
+.cmsg.you{align-self:flex-end;align-items:flex-end}
+.cmsg .who{font-size:11px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.cmsg .who b{color:var(--ink)}
+.cmsg .who i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.cmsg .msg{max-width:100%;white-space:pre-wrap}
+.cmsg .st{font-size:10.5px;color:var(--muted)}
+.listen{align-self:stretch;font-size:12px;border:1px dashed var(--work);border-radius:8px;padding:6px 9px;color:var(--ink);background:color-mix(in srgb,var(--work) 10%,var(--panel))}
+.composer .to{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+.composer select{font:inherit;font-size:12.5px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);padding:3px 6px;max-width:100%}
+.composer .away{display:flex;gap:6px;align-items:center;font-size:11.5px;color:var(--muted);flex-wrap:wrap}
 .info dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 12px;margin:0 0 14px;font-size:12.5px}
 .info dt{color:var(--muted)}
 .info dd{margin:0;overflow-wrap:anywhere}
@@ -266,7 +282,6 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .ackd{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
 /* app build: no device preview, no in-app reply yet */
 .seg{display:none!important}
-.composer{display:none!important}
 .qr{display:grid;place-items:center;background:#fff;border-radius:10px;padding:10px;border:1px solid var(--line)}
 .qr img{width:min(240px,70vw);height:auto;display:block}
 .okmsg{color:var(--work);font-weight:700}
@@ -335,9 +350,9 @@ body{margin:0}
           </div>
           <div class="cp-body" id="cpBody"></div>
           <form class="composer" id="composer">
-            <label for="msgInput" class="hint" id="msgLabel">Mensahe</label>
+            <div class="to"><label for="chatTo" id="msgLabel">Para kay</label><select id="chatTo"></select></div>
             <textarea id="msgInput" rows="2" placeholder="Ano ang gusto mong ipagawa?"></textarea>
-            <div class="row"><span class="hint">Pindutin ang Enter para ipadala.</span><button type="submit" class="btn primary">Ipadala</button></div>
+            <div class="row"><span class="away"><label for="awaySel">Kapag tapos na ang session, abangan ang utos mula sa app:</label><select id="awaySel"><option value="auto">Kapag may phone na nakabukas</option><option value="on">Palagi</option><option value="off">Hindi</option></select></span><button type="submit" class="btn primary">Ipadala</button></div>
           </form>
         </div>
       </section>
@@ -856,7 +871,7 @@ function infoOf(r){
   const url=(((sc.sources||[])[0]||{}).git_repository||{}).url||'';const repo=url.replace(/^https:\/\/github\.com\//,'');
   const br=em.current_branches||{};
   const o={prio:/permission/i.test(p.needs_action||'')?1:2,status:BUCKET[r.status_bucket]||'idle',at:(typeof r.updated_at==='number'?r.updated_at:Date.parse(r.updated_at))||now(),cwd:r.cwd||'',act:r.short||'',prompt_at:r.prompt_at||0,ask:sent(p.needs_action),detail:p.status_detail||r.task_summary||'',recent:p.recent_action||'',
-    source:src[0],host:src[1],archived:r.session_status==='SESSION_STATUS_ARCHIVED'};
+    source:src[0],host:src[1],archived:r.session_status==='SESSION_STATUS_ARCHIVED',inbox:r.inbox||[],convo_n:r.convo_n||0,listening:!!r.listening};
   if(repo)o.repo=repo;if(repo&&(br[repo]||br['']))o.branch=br[repo]||br[''];
   if(sc.model)o.model=sc.model;if(em.context_usage)o.ctx=em.context_usage;if(em.artifacts)o.artifacts=em.artifacts;
   return o;
@@ -1003,11 +1018,15 @@ async function poll(){
       version=j.version;TEAM=j.team||TEAM;isLocal=!!j.local;hooksOk=j.hooks_installed;settingsPath=j.settings_path||'';lanUrl=j.lan_url||'';tsUrl=j.ts_url||'';
       mode='live';lastSync=Date.now();
       if(teamChanged&&!firstLoad){allRecords=j.sessions;rebuildTeam();}else applyRecords(j.sessions);
+      awayMode=j.away||awayMode;
+      {const cn=(j.sessions||[]).map(r=>r.id+':'+(r.convo_n||0)).join(',');if(cn!==convoKey){convoKey=cn;loadConvo();}}
     }else mode='offline';
   }catch(e){mode='offline';}
   setConn();setTimeout(poll,mode==='live'?1000:3000);
 }
 let uiBuild=null;
+let convoKey='',CONVO={},awayMode='auto',chatFilter='all',chatTo=0;
+async function loadConvo(){try{const r=await fetch('/api/convo',{headers:hdr(),cache:'no-store'});if(r.ok){CONVO=await r.json();chatKey='';renderPanel();}}catch(e){}}
 function updates(j){
   if(j.app_version){const v=$('ver');const t=`v${j.app_version} (build ${j.app_build}) · `;if(v.textContent!==t)v.textContent=t;}
   if(j.ui_build!=null){if(uiBuild===null)uiBuild=j.ui_build;else if(j.ui_build!==uiBuild){location.reload();return;}}
@@ -1415,10 +1434,12 @@ function updateOverlay(t){
 const cam={x:0,y:0,z:1.25,tx:0,ty:0,follow:null};
 let VW=SW,VH=SH,BASE=1,DPR=1;
 // Quality governor: a slow device gets a lower canvas resolution instead of a choppy picture.
-const Q={cap:2,acc:0,n:0,good:0,
-  tick(ms){if(document.hidden||ms>250)return;this.acc+=ms;if(++this.n<90)return;const avg=this.acc/this.n;this.acc=this.n=0;
-    if(avg>21&&this.cap>1){this.cap=Math.max(1,this.cap-.5);this.good=0;resizeMap();}
-    else if(avg<13&&this.cap<2&&++this.good>=6){this.cap+=.5;this.good=0;resizeMap();}}};
+const COARSE=matchMedia('(pointer:coarse)').matches;
+const Q={cap:COARSE?1.5:2,max:COARSE?1.5:2,acc:0,n:0,good:0,
+  tick(ms,budget){if(document.hidden||ms>250||budget>40)return;this.acc+=ms;if(++this.n<90)return;const avg=this.acc/this.n;this.acc=this.n=0;
+    const slow=Math.max(21,budget*1.25),fast=Math.max(13,budget+4);
+    if(avg>slow&&this.cap>1){this.cap=Math.max(1,this.cap-.5);this.good=0;resizeMap();}
+    else if(avg<fast&&this.cap<this.max&&++this.good>=6){this.cap+=.5;this.good=0;resizeMap();}}};
 const kc=()=>BASE*cam.z;
 const viewW=()=>VW/kc(),viewH=()=>VH/kc();
 function resizeMap(){
@@ -1477,8 +1498,10 @@ function redrawSet(people){
 
 /* ---------- loop ---------- */
 let last=performance.now();
+// 60 fps; the browser pauses this loop by itself when the page is not on screen.
 function frame(ts){
-  Q.tick(ts-last);const dt=Math.min(.05,(ts-last)/1000);last=ts;const t=ts/1000;
+  const budget=0;
+  Q.tick(ts-last,budget);const dt=Math.min(.05,(ts-last)/1000);last=ts;const t=ts/1000;
   if(!paused){
     for(const e of PEOPLE()){
       if(e.path.length){const p=e.path[0];const dx=p.x-e.x,dy=p.y-e.y,d=Math.hypot(dx,dy),sp=(e.hurry?50:e.lead?34:30)*dt;
@@ -1587,7 +1610,32 @@ function addChatFor(s,st,why){
   if(st==='needs')say2(s,'agent',s.ask||'May tanong ako sa iyo.',{ask:true});
   else say2(s,'agent',statusLine(s));
 }
-async function answer(){}
+async function answer(s,text){
+  if(!s||!text.trim())return;
+  s.inbox=(s.inbox||[]).concat([{id:Date.now(),text,at:Date.now(),state:'sending'}]);chatKey='';renderPanel();
+  try{const r=await fetch('/api/send',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({sid:s.sid,text})});if(!r.ok)throw 0;}
+  catch(e){s.inbox[s.inbox.length-1].state='failed';chatKey='';renderPanel();return;}
+  log('Boss',`Mensahe kay ${s.short}: ${text.length>60?text.slice(0,60)+'…':text}`,s);
+}
+async function setAway(m){awayMode=m;chatKey='';renderPanel();try{await fetch('/api/away',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({mode:m})});}catch(e){}}
+// One feed for the whole team: your prompts, the sessions' replies and messages sent from this app.
+function chatFeed(){
+  const list=chatFilter==='all'?sessions:sessions.filter(s=>s.id===chatFilter);
+  const items=[];
+  for(const s of list){
+    for(const m of (CONVO[s.sid]||[]))items.push({s,t:m.at,you:m.role==='user',text:m.text});
+    for(const m of (s.inbox||[]))items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true});
+  }
+  items.sort((a,b)=>a.t-b.t);
+  const out=items.slice(-120).map(it=>{
+    const who=it.you?`<b>Boss</b> → ${esc(it.s.short)}`:`<i style="background:${it.s.pal.shirt}"></i><b>${esc(it.s.short)}</b>`;
+    const st=it.app?`<span class="st">${{sending:'Ipinapadala…',queued:'Naghihintay maipasa',delivered:'Naipasa ✓',failed:'Hindi naipadala'}[it.st]||''}${it.app?' · mula sa app':''}</span>`:'';
+    return `<div class="cmsg ${it.you?'you':''}" data-chatto="${it.s.id}"><span class="who">${who} · ${simLabel(it.t)}</span><div class="msg ${it.you?'you':'agent'}">${esc(it.text)}</div>${st}</div>`;
+  });
+  const listening=list.filter(s=>s.listening).map(s=>`<div class="listen">📱 Naka-abang si <b>${esc(s.short)}</b> sa utos mo. Mag-type sa ibaba para ituloy niya.</div>`);
+  const asks=list.filter(s=>s.status==='needs'&&s.ask).map(s=>`<div class="cmsg" data-chatto="${s.id}"><span class="who"><i style="background:${s.pal.shirt}"></i><b>${esc(s.short)}</b> · tanong</span><div class="msg agent asking"><b>Tanong:</b> ${esc(s.ask)}</div></div>`);
+  return (out.length?out.join(''):'<div class="msg sys">Wala pang usapan. Lalabas dito ang mga utos mo at ang sagot ng bawat session.</div>')+asks.join('')+listening.join('');
+}
 function msgHTML(s,m){
   if(m.from==='sys')return `<div class="msg sys">${esc(m.text)} · ${simLabel(m.t)}</div>`;
   const open=false;
@@ -1601,15 +1649,23 @@ function renderPanel(){
   $('cpHead').innerHTML=`${av(s,38)}<div class="who"><div class="nm">${esc(s.role)}${s.lead?' (leader)':''}</div><div class="raw">${esc(s.name)}</div></div><div class="side">${pill(s)}<span class="src">${s.source} · ${esc(s.host)}</span></div>`;
   document.querySelectorAll('.cp-tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.ptab===ptab));
   $('composer').hidden=ptab!=='chat';
-  $('msgLabel').textContent=`Mensahe para kay ${s.role}`;
+
   const body=$('cpBody');
   if(ptab==='alarms'){
     const al=sessions.filter(x=>x.status==='needs'||x.status==='failed').sort((a,b)=>(a.acked-b.acked)||((a.prio||2)-(b.prio||2))||(b.alarmAt||0)-(a.alarmAt||0));
     const key='a'+al.map(x=>x.id+':'+x.status+':'+(x.acked?1:0)).join('|');
     if(key!==chatKey){chatKey=key;body.innerHTML=al.length?`<ul class="alist">${al.map(x=>`<li class="alrow ${x.status==='failed'||x.prio===1?'p1':'p2'} ${x.acked?'':'unack'}" data-pick="${x.id}"><i></i><span class="m"><b>${esc(x.short)} · ${x.status==='failed'?'TRIP':'NEEDS INPUT'} · ${x.status==='failed'||x.prio===1?'HIGH':'MEDIUM'}</b><span>${esc(x.status==='failed'?(x.detail||'May pumalyang command.'):(x.ask||'May tanong sa iyo.'))}</span></span>${x.acked?'<span class="ackd">ACK</span>':`<button type="button" class="btn" data-ack="${x.id}">ACK</button>`}</li>`).join('')}</ul>`:'<p class="sub2">Walang alarm. Normal ang lahat ng operator.</p>';}
   }else if(ptab==='chat'){
-    const key=`c${s.id}:${s.chat.length}:${s.status}:${s.chat.filter(m=>m.answered).length}`;
-    if(key!==chatKey){chatKey=key;body.innerHTML=`<div class="msgs">${s.chat.map(m=>msgHTML(s,m)).join('')}</div>`;body.scrollTop=body.scrollHeight;}
+    if(renderPanel.sel!==s.id){renderPanel.sel=s.id;chatTo=s.id;}
+    if(!sessions.some(x=>x.id===chatTo))chatTo=s.id;
+    const key='c'+chatFilter+'|'+convoKey+'|'+sessions.map(x=>x.id+':'+x.status+':'+(x.listening?1:0)+':'+(x.inbox||[]).map(m=>m.state).join('')).join(',');
+    if(key!==chatKey){chatKey=key;
+      const near=body.scrollHeight-body.scrollTop-body.clientHeight<60;
+      body.innerHTML=`<div class="cfilter"><button type="button" data-cf="all" aria-pressed="${chatFilter==='all'}">Lahat</button>${sessions.map(x=>`<button type="button" data-cf="${x.id}" aria-pressed="${chatFilter===x.id}"><i style="background:${x.pal.shirt}"></i>${esc(x.short)}</button>`).join('')}</div><div class="msgs">${chatFeed()}</div>`;
+      if(near||chatKey.startsWith('c'))body.scrollTop=body.scrollHeight;}
+    const sel2=$('chatTo');const opts=sessions.map(x=>`<option value="${x.id}">${esc(x.role)}${x.listening?' · naka-abang':x.status==='working'?' · nagtatrabaho':''}</option>`).join('');
+    if(sel2.dataset.k!==opts){sel2.dataset.k=opts;sel2.innerHTML=opts;}sel2.value=String(chatTo);
+    const aw=$('awaySel');if(aw.value!==awayMode)aw.value=awayMode;
   }else if(ptab==='info'){
     chatKey='';
     loadDetail(s);
@@ -1715,7 +1771,13 @@ document.addEventListener('click',e=>{
   const tab=e.target.closest('.tabs button');if(tab){$('app').dataset.tab=tab.dataset.tab;chatKey='';document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b===tab));render();return;}
   const dv=e.target.closest('.seg button');if(dv){$('stage').dataset.device=dv.dataset.device;document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',b===dv));chatKey='';render();return;}
 });
-$('composer').addEventListener('submit',e=>{e.preventDefault();const s=sel();const v=$('msgInput').value;if(!v.trim())return;$('msgInput').value='';answer(s,v,'text');});
+$('composer').addEventListener('submit',e=>{e.preventDefault();const s=sessions.find(x=>x.id===chatTo)||sel();const v=$('msgInput').value;if(!v.trim())return;$('msgInput').value='';answer(s,v);});
+$('chatTo').addEventListener('change',e=>{chatTo=+e.target.value;});
+$('awaySel').addEventListener('change',e=>setAway(e.target.value));
+$('cpBody').addEventListener('click',e=>{
+  const f=e.target.closest('[data-cf]');if(f){chatFilter=f.dataset.cf==='all'?'all':+f.dataset.cf;if(chatFilter!=='all')chatTo=chatFilter;chatKey='';renderPanel();return;}
+  const m=e.target.closest('[data-chatto]');if(m){chatTo=+m.dataset.chatto;$('chatTo').value=String(chatTo);$('msgInput').focus();}
+});
 $('msgInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('composer').requestSubmit();}});
 let drag=null;
 const toScreen=(e)=>{const r=cv.getBoundingClientRect();return{x:cam.x+(e.clientX-r.left)/kc(),y:cam.y+(e.clientY-r.top)/kc()};};
