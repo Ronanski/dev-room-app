@@ -7,6 +7,15 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.6.2 (2026-11-01)
+
+### Fixed
+- **Chat on phones:**
+  - While you type, the Office/Chat bar, the panel header, the tabs and the away setting step aside. The message box and the conversation stay in view above the keyboard. Before, the bar covered the message box.
+  - The feed hides the system blocks that Claude Code adds to prompts, such as `<system-reminder>`.
+  - A failed send says why (status and reason).
+  - A message to a session that had already stopped before the app was opened explains that it arrives with that session's next turn.
+
 ## 0.6.1 (2026-11-01)
 
 ### Fixed
