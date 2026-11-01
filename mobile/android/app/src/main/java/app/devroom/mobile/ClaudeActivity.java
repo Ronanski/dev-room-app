@@ -61,7 +61,10 @@ public class ClaudeActivity extends AppCompatActivity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
                 String scheme = req.getUrl().getScheme();
                 if ("http".equals(scheme) || "https".equals(scheme)) return false;
-                try { startActivity(new Intent(Intent.ACTION_VIEW, req.getUrl())); } catch (Exception ignored) { }
+                // only mail and phone links leave the app; never devroom:, intent: or other app links
+                if (("mailto".equals(scheme) || "tel".equals(scheme)) && req.hasGesture()) {
+                    try { startActivity(new Intent(Intent.ACTION_VIEW, req.getUrl())); } catch (Exception ignored) { }
+                }
                 return true;
             }
         });

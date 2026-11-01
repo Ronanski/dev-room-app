@@ -98,7 +98,8 @@ fn check_once() -> Result<(), String> {
     let bytes = get(&format!("{BASE}DevRoom.exe"), 200 * 1024 * 1024)?;
     if bytes.len() < 1024 * 1024 || &bytes[..2] != b"MZ" { return Err("download looks wrong".into()); }
     let fresh = dir.join("DevRoom.new.exe");
-    let old = dir.join("DevRoom.old.exe");
+    // a name per build: the previous old copy may still be the running image and cannot be replaced
+    let old = dir.join(format!("DevRoom.old-{build}.exe"));
     fs::write(&fresh, &bytes).map_err(|e| format!("Hindi maisulat ang bagong app sa {}: {e}", dir.display()))?;
     let _ = fs::remove_file(&old);
     fs::rename(&exe, &old).map_err(|e| e.to_string())?;
@@ -110,7 +111,15 @@ fn check_once() -> Result<(), String> {
 pub fn start() {
     load_cache();
     if let Ok(exe) = std::env::current_exe() {
-        if let Some(d) = exe.parent() { let _ = fs::remove_file(d.join("DevRoom.old.exe")); }
+        // clean up copies left by earlier updates (the running exe is never one of them)
+        if let Some(d) = exe.parent() {
+            if let Ok(rd) = fs::read_dir(d) {
+                for e in rd.flatten() {
+                    let n = e.file_name().to_string_lossy().to_string();
+                    if n.starts_with("DevRoom.old") && n.ends_with(".exe") && e.path() != exe { let _ = fs::remove_file(e.path()); }
+                }
+            }
+        }
     }
     std::thread::spawn(|| {
         std::thread::sleep(Duration::from_secs(15));

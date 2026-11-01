@@ -69,7 +69,7 @@ function parseLink(s){
   }catch(e){return null;}
 }
 let unpaired=false,watchKey='';
-function save(p){store.set('devroom.url',p.url);store.set('devroom.token',p.token);store.set('devroom.alt',p.alt||'');unpaired=false;}
+function save(p){store.set('devroom.url',p.url);store.set('devroom.token',p.token);store.set('devroom.alt',p.alt||'');unpaired=false;current='';misses=0;watchKey='';}
 // Home Wi-Fi first, then the PC's Tailscale address when away from home.
 async function reachable(base,token){try{const c=new AbortController();const tm=setTimeout(()=>c.abort(),2500);const r=await fetch(`${base}/api/state?bg=1&t=${encodeURIComponent(token)}&v=-1`,{cache:'no-store',signal:c.signal});clearTimeout(tm);return r.status!==0;}catch(e){return false;}}
 // Sticky: keep the address in use while it answers; switch only after it fails twice in a row,
@@ -113,11 +113,17 @@ async function checkUpdate(){
 }
 // The office runs in an iframe served by the PC; it asks the shell to open the Claude Code chat.
 window.addEventListener('message',e=>{
+  // only the office frame, served by the paired PC, may ask
+  if(e.source!==$('office').contentWindow)return;
   const d=e.data||{};if(d.type!=='devroom:openClaude')return;
   const url=typeof d.url==='string'&&d.url.startsWith('https://claude.ai/')?d.url:'https://claude.ai/code';
   if(DevRoom&&DevRoom.openClaude)DevRoom.openClaude({url});
 });
-function handleUrl(u){const p=parseLink(u);if(p&&p.url&&p.token){save(p);showOffice();}}
+// A pairing link from outside (QR page, a tapped link) must not silently move the app to another PC.
+function handleUrl(u){const p=parseLink(u);if(!(p&&p.url&&p.token))return;
+  const old=store.get('devroom.url');
+  if(old&&old!==p.url&&!confirm('Ikonekta ang Dev Room app sa ibang PC?\n\nBago: '+p.url+'\nNgayon: '+old+'\n\nPindutin lang ang OK kung ikaw mismo ang nag-scan ng QR code sa PC mo.'))return;
+  save(p);showOffice();}
 $('go').onclick=()=>{const p=parseLink($('link').value);if(!p){showPair('Hindi tama ang link. Kopyahin ang buong link mula sa QR code, kasama ang ?t= sa dulo.');return;}save(p);showOffice();};
 
 (async()=>{
@@ -125,11 +131,11 @@ $('go').onclick=()=>{const p=parseLink($('link').value);if(!p){showPair('Hindi t
   if(App){
     App.addListener('appUrlOpen',e=>handleUrl(e.url));
     App.addListener('resume',()=>{checkUpdate();showOffice();});
-    try{const l=await App.getLaunchUrl();if(l&&l.url){handleUrl(l.url);return;}}catch(e){}
   }
-  showOffice();
   setInterval(checkUpdate,10*60*1000);
   setInterval(()=>{if(store.get('devroom.alt'))showOffice();},30000);
+  try{const l=App&&await App.getLaunchUrl();if(l&&l.url){handleUrl(l.url);return;}}catch(e){}
+  showOffice();
 })();
 })();
 </script>
