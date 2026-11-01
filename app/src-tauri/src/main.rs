@@ -198,10 +198,11 @@ fn main() {
         .expect("error while building Dev Room");
     app.run(|_app, event| {
         // The last window closing must not end the app; only "Isara nang tuluyan" (exit with a code) does.
-        if let RunEvent::ExitRequested { api, code, .. } = event {
-            if code.is_none() { api.prevent_exit(); }
+        match event {
+            RunEvent::ExitRequested { api, code, .. } => { if code.is_none() { api.prevent_exit(); } }
+            // never leave the tunnel helper running after Dev Room quits
+            RunEvent::Exit => tunnel::shutdown(),
+            _ => {}
         }
-        // never leave the tunnel helper running after Dev Room quits
-        if let RunEvent::Exit = event { tunnel::shutdown(); }
     });
 }
