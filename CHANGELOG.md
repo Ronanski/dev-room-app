@@ -7,6 +7,24 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.6.0 (2026-11-01)
+
+### Added
+- **Chat with your sessions from the app (PC, phone or tablet).** Nothing else opens.
+  - **Choosing who gets it:** pick the session in **Para kay**, or tap a message or a filter chip.
+  - **A working session** gets your message at its next step, as extra context for the turn it is on.
+  - **A finished session** waits for your message and continues with it. By default it waits while a phone or tablet has Dev Room open (**Kapag may phone na nakabukas**). You can also choose **Palagi** (always) or **Hindi** (never). It waits up to 20 minutes; at the PC, press Esc in Claude Code to stop the wait.
+  - **Delivery state:** each message shows **Naghihintay maipasa** (waiting to be handed over) or **Naipasa ✓** (handed over).
+- **Team chat feed:** the prompts and replies of every session in one feed, with filter chips per session. Questions and waiting sessions show at the end.
+- **Ano ang bago:** after each update, every device shows a one-time card with what is new and the steps to take (**Gawin mo**).
+- **One Dev Room at a time:** starting `DevRoom.exe` again opens the window of the one that is running.
+
+### Changed
+- **Closing the window frees its memory and CPU.** Only the small server keeps running in the tray for phones, tablets and the hooks. The tray icon or **Buksan ang Dev Room** brings the window back.
+- Dev Room now starts with Windows, hidden in the tray. You can turn this off in the tray menu.
+- Phones and tablets start at a lighter resolution. The map stays at 60 fps.
+- The Stop hook may now wait up to 20 minutes. Dev Room updates the hook by itself.
+
 ## 0.5.1 (2026-11-01)
 
 ### Changed

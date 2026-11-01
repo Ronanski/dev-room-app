@@ -19,6 +19,9 @@ const INDEX_HTML: &str = include_str!("../../ui/index.html");
 const HOOK_EVENTS: [&str; 8] = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "SubagentStop", "Notification", "Stop", "SessionEnd"];
 const MAX_BODY: usize = 4 * 1024 * 1024;
 
+/// Set by the app: opens the Dev Room window (used when DevRoom.exe is started a second time).
+pub static ON_SHOW: std::sync::OnceLock<Box<dyn Fn() + Send + Sync>> = std::sync::OnceLock::new();
+
 fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
 }
@@ -39,6 +42,10 @@ struct State {
     version: u64,
     token: String,
     dir: PathBuf,
+    /// "auto" (wait for phone messages while a phone has Dev Room open), "on" or "off".
+    away: String,
+    /// Last time a phone or tablet had the office on screen (background watchers do not count).
+    remote_seen: u64,
 }
 
 impl State {
@@ -46,7 +53,7 @@ impl State {
 
     fn save(&self) {
         let _ = fs::create_dir_all(&self.dir);
-        let data = json!({"sessions": self.sessions, "team": self.team, "token": self.token});
+        let data = json!({"sessions": self.sessions, "team": self.team, "token": self.token, "away": self.away});
         let _ = fs::write(self.dir.join("state.json"), serde_json::to_vec_pretty(&data).unwrap_or_default());
     }
 
@@ -64,9 +71,11 @@ impl State {
                 }
                 if let Some(t) = v.get("team") { if t.is_object() { st.team = t.clone(); } }
                 if let Some(t) = v.get("token").and_then(|t| t.as_str()) { st.token = t.to_string(); }
+                if let Some(a) = v.get("away").and_then(|t| t.as_str()) { st.away = a.to_string(); }
             }
         }
         if st.token.len() < 16 { st.token = format!("{:016x}{:016x}", rand::random::<u64>(), rand::random::<u64>()); }
+        if !["auto", "on", "off"].contains(&st.away.as_str()) { st.away = "auto".into(); }
         st.version = 1;
         st.save();
         st
@@ -86,10 +95,15 @@ pub fn claude_settings_path() -> PathBuf {
         .join(".claude").join("settings.json")
 }
 
-fn hook_command(port: u16) -> String {
+/// Seconds a finished session may wait for a message from the phone (the Stop hook holds the turn open).
+const LISTEN_SECS: u64 = 1200;
+
+fn hook_command(port: u16, ev: &str) -> String {
     // curl.exe ships with Windows 10 and 11; `|| exit 0` keeps Claude quiet when Dev Room is closed.
-    format!("curl -s -m 2 -X POST -H \"Content-Type: application/json\" --data-binary @- http://127.0.0.1:{port}/hook || exit 0")
+    let max = if ev == "Stop" { LISTEN_SECS + 50 } else { 2 };
+    format!("curl -s -m {max} -X POST -H \"Content-Type: application/json\" --data-binary @- http://127.0.0.1:{port}/hook || exit 0")
 }
+fn hook_timeout(ev: &str) -> u64 { if ev == "Stop" { LISTEN_SECS + 60 } else { 3 } }
 
 fn is_ours(entry: &Value) -> bool {
     entry.get("hooks").and_then(|h| h.as_array()).map(|hs| hs.iter().any(|h|
@@ -107,10 +121,9 @@ fn has_any_ours() -> bool {
 pub fn hooks_installed(port: u16) -> bool {
     let Ok(text) = fs::read_to_string(claude_settings_path()) else { return false };
     let Ok(v) = serde_json::from_str::<Value>(&text) else { return false };
-    let cmd = hook_command(port);
-    HOOK_EVENTS.iter().all(|ev| v.pointer(&format!("/hooks/{ev}")).and_then(|a| a.as_array()).map(|a| a.iter().any(|e|
+    HOOK_EVENTS.iter().all(|ev| { let cmd = hook_command(port, ev); v.pointer(&format!("/hooks/{ev}")).and_then(|a| a.as_array()).map(|a| a.iter().any(|e|
         e.get("hooks").and_then(|h| h.as_array()).map(|hs| hs.iter().any(|h| h.get("command").and_then(|c| c.as_str()) == Some(cmd.as_str()))).unwrap_or(false)
-    )).unwrap_or(false))
+    )).unwrap_or(false) })
 }
 
 /// Merge Dev Room's hooks into ~/.claude/settings.json, keeping everything else and writing a backup first.
@@ -129,13 +142,13 @@ pub fn install_hooks(port: u16) -> Result<Value, String> {
     }
     let hooks = root.as_object_mut().unwrap().entry("hooks").or_insert_with(|| json!({}));
     if !hooks.is_object() { *hooks = json!({}); }
-    let cmd = hook_command(port);
     for ev in HOOK_EVENTS {
+        let cmd = hook_command(port, ev);
         let list = hooks.as_object_mut().unwrap().entry(ev).or_insert_with(|| json!([]));
         if !list.is_array() { *list = json!([]); }
         let arr = list.as_array_mut().unwrap();
         arr.retain(|e| !is_ours(e));
-        let mut entry = json!({"hooks": [{"type": "command", "command": cmd, "timeout": 3}]});
+        let mut entry = json!({"hooks": [{"type": "command", "command": cmd, "timeout": hook_timeout(ev)}]});
         if ev == "PreToolUse" || ev == "PostToolUse" { entry["matcher"] = json!("*"); }
         arr.push(entry);
     }
@@ -238,6 +251,9 @@ fn apply_hook(st: &mut State, v: &Value) {
     s.insert("updated_at".into(), json!(now));
     s.insert("last_event".into(), json!(ev));
     s.remove("live_guess");
+    if s.get("listening").and_then(|x| x.as_bool()).unwrap_or(false) { s.insert("listening".into(), json!(false)); }
+    let gen = s.get("listen_gen").and_then(|x| x.as_u64()).unwrap_or(0) + 1;
+    s.insert("listen_gen".into(), json!(gen));
     let mut persist = true;
     match ev {
         "SessionStart" => {
@@ -252,6 +268,7 @@ fn apply_hook(st: &mut State, v: &Value) {
             s.insert("short".into(), json!("Nagbabasa ng utos."));
             s.insert("prompt_at".into(), json!(now));
             let p = v.get("prompt").and_then(|x| x.as_str()).unwrap_or("");
+            push_convo(s, "user", p, 2000);
             s.insert("detail".into(), json!(format!("Inutusan: {}", clip(p, 140))));
         }
         "PreToolUse" => {
@@ -298,6 +315,7 @@ fn apply_hook(st: &mut State, v: &Value) {
                 if let Some(title) = title { s.insert("auto_title".into(), json!(title)); }
             }
             let text = text.unwrap_or_default();
+            push_convo(s, "assistant", &text, 4000);
             s.insert("recent".into(), json!(clip(&text, 300)));
             s.insert("detail".into(), json!(""));
             match last_question(&text) {
@@ -309,6 +327,117 @@ fn apply_hook(st: &mut State, v: &Value) {
     }
     st.bump();
     if persist { st.save(); }
+}
+
+/* ---------- messages from the app to a session ----------
+   A message waits in the session's inbox and reaches Claude through the next hook that can carry text:
+   PostToolUse / UserPromptSubmit (extra context for the running turn) or Stop (the turn continues with it). */
+
+/// Mark the queued messages as delivered and return their ids and the text for Claude.
+fn take_queued(s: &mut Map<String, Value>) -> Option<(Vec<u64>, String)> {
+    let inbox = s.get_mut("inbox")?.as_array_mut()?;
+    let (mut ids, mut texts) = (Vec::new(), Vec::new());
+    for m in inbox.iter_mut() {
+        if m.get("state").and_then(|x| x.as_str()) == Some("queued") {
+            ids.push(m.get("id").and_then(|x| x.as_u64()).unwrap_or(0));
+            texts.push(m.get("text").and_then(|x| x.as_str()).unwrap_or("").to_string());
+            m["state"] = json!("delivered");
+            m["delivered_at"] = json!(now_ms());
+        }
+    }
+    if ids.is_empty() { return None; }
+    Some((ids, format!("Mensahe mula kay Boss (ipinadala mula sa Dev Room app):\n\n{}", texts.join("\n\n"))))
+}
+
+/// Put messages back in the queue when they could not be handed over (the hook was cancelled).
+fn requeue(st: &Mutex<State>, sid: &str, ids: &[u64]) {
+    let mut g = st.lock().unwrap();
+    if let Some(inbox) = g.sessions.get_mut(sid).and_then(|s| s.get_mut("inbox")).and_then(|i| i.as_array_mut()) {
+        for m in inbox.iter_mut() {
+            if ids.contains(&m.get("id").and_then(|x| x.as_u64()).unwrap_or(0)) { m["state"] = json!("queued"); }
+        }
+    }
+    g.bump(); g.save();
+}
+
+/// The session starts working on a message from the app, like a new prompt.
+fn mark_prompted(s: &mut Map<String, Value>, text: &str) {
+    let now = now_ms();
+    s.insert("status".into(), json!("working"));
+    s.insert("ask".into(), json!(""));
+    s.insert("short".into(), json!("Nagbabasa ng utos."));
+    s.insert("detail".into(), json!(format!("Inutusan: {}", clip(text.rsplit("\n\n").next().unwrap_or(text), 140))));
+    s.insert("prompt_at".into(), json!(now));
+    s.insert("updated_at".into(), json!(now));
+    s.insert("listening".into(), json!(false));
+}
+
+fn wants_listen(g: &State, window_ms: u64) -> bool {
+    match g.away.as_str() { "on" => true, "off" => false, _ => now_ms().saturating_sub(g.remote_seen) < window_ms }
+}
+
+/// Answer a hook. PostToolUse and UserPromptSubmit carry queued messages as extra context. Stop hands them
+/// over as a reason to continue, and while a phone has Dev Room open it waits for one.
+fn hook_reply(req: Request, st: &Mutex<State>, v: &Value) {
+    let ev = v.get("hook_event_name").and_then(|x| x.as_str()).unwrap_or("").to_string();
+    let sid = v.get("session_id").and_then(|x| x.as_str()).unwrap_or("").to_string();
+    let mut g = st.lock().unwrap();
+    apply_hook(&mut g, v);
+    if ev == "PostToolUse" || ev == "UserPromptSubmit" {
+        let got = g.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()).and_then(take_queued);
+        let Some((ids, text)) = got else { drop(g); return respond_json(req, 200, &json!({})) };
+        g.bump(); g.save(); drop(g);
+        let out = json!({"hookSpecificOutput": {"hookEventName": ev, "additionalContext": text}});
+        if req.respond(json_response(200, &out)).is_err() { requeue(st, &sid, &ids); }
+        return;
+    }
+    if ev != "Stop" { drop(g); return respond_json(req, 200, &json!({})); }
+    let deadline = now_ms() + LISTEN_SECS * 1000;
+    let mut gen = 0;
+    let mut first = true;
+    let got = loop {
+        let listen = wants_listen(&g, if first { 120_000 } else { 600_000 });
+        let Some(s) = g.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()) else { break None };
+        if first { gen = s.get("listen_gen").and_then(|x| x.as_u64()).unwrap_or(0); }
+        else if s.get("listen_gen").and_then(|x| x.as_u64()).unwrap_or(0) != gen { break None; }   // the session moved on
+        if let Some((ids, text)) = take_queued(s) { mark_prompted(s, &text); g.bump(); g.save(); break Some((ids, text)); }
+        if !listen || now_ms() > deadline {
+            if !first { s.insert("listening".into(), json!(false)); g.bump(); }
+            break None;
+        }
+        if first { s.insert("listening".into(), json!(true)); g.bump(); first = false; }
+        drop(g);
+        std::thread::sleep(std::time::Duration::from_millis(400));
+        g = st.lock().unwrap();
+    };
+    drop(g);
+    match got {
+        Some((ids, text)) => {
+            let out = json!({"decision": "block", "reason": text});
+            if req.respond(json_response(200, &out)).is_err() {
+                requeue(st, &sid, &ids);
+                let mut g = st.lock().unwrap();
+                if let Some(s) = g.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()) { s.insert("status".into(), json!("idle")); }
+                g.bump();
+            }
+        }
+        None => respond_json(req, 200, &json!({})),
+    }
+}
+
+/// The visible conversation: your prompts and the session's replies at the end of each turn (newest 40).
+fn push_convo(s: &mut Map<String, Value>, role: &str, text: &str, max: usize) {
+    let text = text.trim();
+    if text.is_empty() { return; }
+    let t: String = if text.chars().count() > max { format!("{}…", text.chars().take(max).collect::<String>()) } else { text.to_string() };
+    let c = s.entry("convo").or_insert_with(|| json!([]));
+    if !c.is_array() { *c = json!([]); }
+    let arr = c.as_array_mut().unwrap();
+    if arr.last().map(|m| m.get("text").and_then(|x| x.as_str()) == Some(t.as_str())).unwrap_or(false) { return; }
+    arr.push(json!({"role": role, "text": t, "at": now_ms()}));
+    if arr.len() > 40 { let n = arr.len() - 40; arr.drain(..n); }
+    let n = s.get("convo_n").and_then(|x| x.as_u64()).unwrap_or(0) + 1;
+    s.insert("convo_n".into(), json!(n));
 }
 
 fn record(s: &Value, names: &Value) -> Value {
@@ -329,6 +458,9 @@ fn record(s: &Value, names: &Value) -> Value {
         "environment_kind": "bridge", "origin": "local_pc", "cwd": cwd,
         "short": s.get("short").cloned().unwrap_or(json!("")),
         "prompt_at": s.get("prompt_at").cloned().unwrap_or(json!(0)),
+        "inbox": s.get("inbox").cloned().unwrap_or(json!([])),
+        "convo_n": s.get("convo_n").cloned().unwrap_or(json!(0)),
+        "listening": s.get("listening").cloned().unwrap_or(json!(false)),
         "post_turn_summary": {
             "status_detail": s.get("detail").cloned().unwrap_or(json!("")),
             "recent_action": s.get("recent").cloned().unwrap_or(json!("")),
@@ -359,6 +491,12 @@ fn pair_link(port: u16, token: &str) -> Option<String> {
 fn is_loopback(addr: Option<&SocketAddr>) -> bool { addr.map(|a| a.ip().is_loopback()).unwrap_or(false) }
 
 fn header(k: &str, v: &str) -> Header { Header::from_bytes(k.as_bytes(), v.as_bytes()).unwrap() }
+
+fn json_response(code: u16, v: &Value) -> Response<std::io::Cursor<Vec<u8>>> {
+    Response::from_data(serde_json::to_vec(v).unwrap_or_default()).with_status_code(StatusCode(code))
+        .with_header(header("Content-Type", "application/json; charset=utf-8"))
+        .with_header(header("Cache-Control", "no-store"))
+}
 
 fn respond_json(req: Request, code: u16, v: &Value) {
     let r = Response::from_data(serde_json::to_vec(v).unwrap_or_default()).with_status_code(StatusCode(code))
@@ -404,20 +542,20 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
         }
         (Method::Post, "/hook") => {
             if !local { return respond_json(req, 403, &json!({"error": "loopback only"})); }
-            if let Some(v) = read_body(&mut req) { apply_hook(&mut st.lock().unwrap(), &v); }
-            respond_json(req, 200, &json!({}));
+            match read_body(&mut req) { Some(v) => hook_reply(req, st, &v), None => respond_json(req, 200, &json!({})) }
         }
         (Method::Get, "/api/state") => {
             if !token_ok { return respond_json(req, 401, &json!({"error": "pairing"})); }
             let since: u64 = q.get("v").and_then(|v| v.parse().ok()).unwrap_or(0);
-            let s = st.lock().unwrap();
+            let mut s = st.lock().unwrap();
+            if !local && q.get("bg").map(|b| b != "1").unwrap_or(true) { s.remote_seen = now_ms(); }
             if since == s.version { drop(s); let _ = req.respond(Response::empty(204).with_header(header("Access-Control-Allow-Origin", "*"))); return; }
             let names = s.team.get("names").cloned().unwrap_or(json!({}));
             let mut list: Vec<Value> = s.sessions.values().map(|x| record(x, &names)).collect();
             list.sort_by_key(|r| std::cmp::Reverse(r.get("updated_at").and_then(|t| t.as_u64()).unwrap_or(0)));
             let lan = lan_ip().map(|ip| format!("http://{ip}:{port}/"));
             let body = json!({"version": s.version, "sessions": list, "team": s.team, "local": local,
-                "hooks_installed": if local { json!(hooks_installed(port)) } else { Value::Null },
+                "hooks_installed": if local { json!(hooks_installed(port)) } else { Value::Null }, "away": s.away,
                 "settings_path": if local { json!(claude_settings_path().display().to_string()) } else { Value::Null },
                 "lan_url": lan, "ts_url": tailscale_ip().map(|ip| format!("http://{ip}:{port}/")),
                 "app_build": crate::updater::BUILD, "app_version": crate::updater::VERSION, "ui_build": crate::updater::ui_build(),
@@ -436,6 +574,45 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
                 .into_iter().filter(|(_, n)| n.is_string()).map(|(k, n)| (k, json!(clip(n.as_str().unwrap(), 120)))).collect();
             s.team = json!({"lead": lead, "ids": ids, "names": names});
             s.bump(); s.save();
+            respond_json(req, 200, &json!({"ok": true}));
+        }
+        (Method::Post, "/api/send") => {
+            if !token_ok { return respond_json(req, 401, &json!({"error": "pairing"})); }
+            let Some(v) = read_body(&mut req) else { return respond_json(req, 400, &json!({"error": "bad json"})) };
+            let sid = v.get("sid").and_then(|x| x.as_str()).unwrap_or("").to_string();
+            let text = v.get("text").and_then(|x| x.as_str()).unwrap_or("").trim().chars().take(4000).collect::<String>();
+            if text.is_empty() { return respond_json(req, 400, &json!({"error": "empty"})); }
+            let mut g = st.lock().unwrap();
+            let Some(s) = g.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()) else { drop(g); return respond_json(req, 404, &json!({"error": "no session"})) };
+            let id = now_ms();
+            let inbox = s.entry("inbox").or_insert_with(|| json!([]));
+            if !inbox.is_array() { *inbox = json!([]); }
+            let arr = inbox.as_array_mut().unwrap();
+            arr.push(json!({"id": id, "text": text, "at": id, "state": "queued"}));
+            if arr.len() > 30 { let n = arr.len() - 30; arr.drain(..n); }
+            g.bump(); g.save(); drop(g);
+            respond_json(req, 200, &json!({"ok": true, "id": id}));
+        }
+        (Method::Get, "/api/convo") => {
+            // Conversations are fetched apart from /api/state, only when a session's convo_n changes.
+            if !token_ok { return respond_json(req, 401, &json!({"error": "pairing"})); }
+            let g = st.lock().unwrap();
+            let all: Map<String, Value> = g.sessions.iter().map(|(k, s)| (k.clone(), s.get("convo").cloned().unwrap_or(json!([])))).collect();
+            drop(g);
+            respond_json(req, 200, &Value::Object(all));
+        }
+        (Method::Post, "/api/show") => {
+            if !local { return respond_json(req, 403, &json!({"error": "loopback only"})); }
+            let shown = ON_SHOW.get().map(|f| f()).is_some();
+            respond_json(req, if shown { 200 } else { 503 }, &json!({"ok": shown}));
+        }
+        (Method::Post, "/api/away") => {
+            if !token_ok { return respond_json(req, 401, &json!({"error": "pairing"})); }
+            let Some(v) = read_body(&mut req) else { return respond_json(req, 400, &json!({"error": "bad json"})) };
+            let mode = v.get("mode").and_then(|x| x.as_str()).unwrap_or("auto");
+            if !["auto", "on", "off"].contains(&mode) { return respond_json(req, 400, &json!({"error": "mode"})); }
+            let mut g = st.lock().unwrap();
+            g.away = mode.to_string(); g.bump(); g.save(); drop(g);
             respond_json(req, 200, &json!({"ok": true}));
         }
         (Method::Post, "/api/install-hooks") => {
@@ -531,7 +708,10 @@ pub fn start(port: u16) -> Option<u16> {
     let live = st.clone();
     std::thread::spawn(move || loop { std::thread::sleep(std::time::Duration::from_secs(3)); liveness(&live); });
     std::thread::spawn(move || {
-        for req in server.incoming_requests() { handle(req, &st, port); }
+        for req in server.incoming_requests() {
+            let st = st.clone();
+            std::thread::spawn(move || handle(req, &st, port));
+        }
     });
     Some(port)
 }

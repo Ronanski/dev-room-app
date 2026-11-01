@@ -22,6 +22,11 @@ Phone on the same Wi-Fi  (http://<PC IP>:4317/?t=<pairing token>, from the QR co
   - **Work after the turn:** if the transcript, or a subagent's transcript, is still being written 5 s after the last hook, the session is working (background agents or tasks). It goes back to break after a minute without writes.
   - `Stop` means the turn ended. If the last assistant message ends in a question, it needs you; otherwise it is on break.
   - `SessionEnd` removes the session.
+- **Chat from the app:** `POST /api/send` queues a message in the session's inbox.
+  - **Working session:** the next `PostToolUse` or `UserPromptSubmit` reply carries it as `additionalContext`.
+  - **Finished session:** the `Stop` reply returns `{"decision":"block","reason":…}`, so the session continues with it. When nothing is queued, `Stop` waits for a message (up to 20 minutes) if the away mode allows it. In `auto` mode, it waits while a phone or tablet has had the office open in the last 2 minutes; background watchers (`bg=1`) do not count.
+  - **Cancelled hook:** a message that could not be handed over goes back to the queue.
+  - **Feed:** `GET /api/convo` returns each session's prompts and replies.
 - **Session names** come from the transcript (`/rename` title or summary), otherwise the folder name. You can rename sessions in **Piliin ang team**. Use `ROLE: task` (for example `CODE FIXER: logic`) to get the role, and pick the leader there.
 - **Hooks setup:** the **I-set up ang hooks** button merges eight hooks into `%USERPROFILE%\.claude\settings.json`. It keeps your other settings and hooks, writes a backup first, and is safe to press again. Restart open Claude Code sessions afterwards. When a new version adds hook events, Dev Room adds them by itself at start-up if your setup already has its hooks.
 - **Phone:** **I-connect ang phone** shows a QR code with a pairing token. Without the token, other devices on the network get nothing. Hooks are accepted only from the PC itself.
