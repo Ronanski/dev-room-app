@@ -80,11 +80,26 @@ public class WatchService extends Service {
         return START_STICKY;
     }
 
+    // Last address that answered, last state version seen, and how long to wait after failures.
+    private String good = null;
+    private long version = -1;
+    private long backoff = INTERVAL_MS;
+
     private void loop() {
+        loadNotified();
         while (running) {
-            try { poll(); } catch (Exception e) { update("Hindi maabot ang Dev Room sa PC mo. Susubukan ulit."); }
-            try { Thread.sleep(INTERVAL_MS); } catch (InterruptedException e) { return; }
+            try { poll(); backoff = INTERVAL_MS; }
+            catch (Exception e) { update("Hindi maabot ang Dev Room sa PC mo. Susubukan ulit."); backoff = Math.min(backoff * 2, 120_000L); }
+            try { Thread.sleep(backoff); } catch (InterruptedException e) { return; }
         }
+    }
+
+    private void loadNotified() {
+        notified.addAll(getSharedPreferences(PREFS, MODE_PRIVATE).getStringSet("notified", new HashSet<>()));
+    }
+
+    private void saveNotified() {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putStringSet("notified", new HashSet<>(notified)).apply();
     }
 
     private void update(String text) {
@@ -92,7 +107,7 @@ public class WatchService extends Service {
     }
 
     private HttpURLConnection open(String base, String token) throws Exception {
-        URL url = new URL(base.replaceAll("/+$", "") + "/api/state?bg=1&t=" + URLEncoder.encode(token, "UTF-8"));
+        URL url = new URL(base.replaceAll("/+$", "") + "/api/state?bg=1&v=" + version + "&t=" + URLEncoder.encode(token, "UTF-8"));
         HttpURLConnection c = (HttpURLConnection) url.openConnection();
         c.setConnectTimeout(4000);
         c.setReadTimeout(8000);
@@ -107,11 +122,14 @@ public class WatchService extends Service {
         String token = p.getString("token", "");
         String alt = p.getString("alt", "");
         HttpURLConnection c;
-        // Home Wi-Fi first; away from home, the PC's Tailscale address.
-        try { c = open(base, token); }
-        catch (Exception e) { if (alt == null || alt.isEmpty()) throw e; c = open(alt, token); }
+        // The address that answered last time first; then home Wi-Fi, then the PC's Tailscale address.
+        String first = good != null ? good : base;
+        String second = first.equals(base) ? alt : base;
+        try { c = open(first, token); good = first; }
+        catch (Exception e) { if (second == null || second.isEmpty()) throw e; c = open(second, token); good = second; }
         int code = c.getResponseCode();
-        if (code == 401) { update("Kailangang i-pair ulit ang phone. I-scan ang QR code sa PC."); return; }
+        if (code == 204) return;   // nothing changed since the last poll
+        if (code == 401) { update("Kailangang i-pair ulit ang phone. I-scan ang QR code sa PC."); running = false; stopSelf(); return; }
         if (code != 200) { update("Hindi maabot ang Dev Room sa PC mo. Susubukan ulit."); return; }
         StringBuilder sb = new StringBuilder();
         try (BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"))) {
@@ -119,6 +137,7 @@ public class WatchService extends Service {
             while ((line = r.readLine()) != null) sb.append(line);
         }
         JSONObject j = new JSONObject(sb.toString());
+        version = j.optLong("version", -1);
         JSONArray sessions = j.optJSONArray("sessions");
         JSONObject team = j.optJSONObject("team");
         JSONArray ids = team == null ? null : team.optJSONArray("ids");
@@ -135,16 +154,18 @@ public class WatchService extends Service {
                 if (bucket.endsWith("WORKING")) working++;
                 if (!bucket.endsWith("BLOCKED")) continue;
                 waiting++;
-                String key = id + "@" + s.optLong("updated_at");
-                waitingNow.add(key);
-                if (notified.contains(key)) continue;
                 JSONObject pts = s.optJSONObject("post_turn_summary");
                 String ask = pts == null ? "" : pts.optString("needs_action");
+                // one alert per question, not per status update while it waits
+                String key = id + "@" + ask.hashCode();
+                waitingNow.add(key);
+                if (notified.contains(key)) continue;
                 alert(id.hashCode(), s.optString("title", "Isang session"), ask.isEmpty() ? "May tanong siya sa iyo." : ask);
             }
         }
         notified.retainAll(waitingNow);
         notified.addAll(waitingNow);
+        saveNotified();
         update(waiting > 0 ? waiting + " ang naghihintay sa iyo. " + working + " ang nagtatrabaho."
             : working > 0 ? working + " ang nagtatrabaho. Walang naghihintay sa iyo." : "Tahimik ang office. Walang naghihintay sa iyo.");
     }

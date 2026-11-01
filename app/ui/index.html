@@ -241,6 +241,7 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
   .pane,.dockwrap{display:none}
   .app[data-tab="office"] .pane[data-pane="office"],.app[data-tab="office"] .dockwrap,
   .app[data-tab="chat"] .pane[data-pane="chat"]{display:block}
+  .app[data-tab="chat"] .pane[data-pane="office"],.app[data-tab="chat"] .dockwrap,.app[data-tab="office"] .pane[data-pane="chat"]{display:none!important}
   .pane[data-pane="chat"]{min-height:0}
   .chatpanel{position:static;height:min(620px,72vh)}
   .feed,.rule{display:none}
@@ -584,7 +585,7 @@ function nextRound(s){
 function setStatus(s,st,why){
   const prev=s.status,wasAct=s.idle;s.status=st;s.since=s.at||now();
   if(st==='needs'||st==='failed'){s.acked=false;s.alarmAt=now();s.prio=/permission/i.test(s.ask||'')||st==='failed'?1:2;}
-  if(s.tl)s.tl.push({st,from:now()});
+  if(s.tl){s.tl.push({st,from:now()});const cut=now()-8*60*MIN;while(s.tl.length>2&&s.tl[1].from<cut)s.tl.shift();}
   if(st==='idle'&&prev!=='idle'){s.idleStart=s.since;s.lingerMs=rand(2,5)*MIN/SPEED();}
   s.talk=null;s.talkNext=now()+1500;
   log(s.short,why||statusLine(s),s);
@@ -986,10 +987,12 @@ function seedTimeline(s){
   // sample history for the morning, ending with the real current state
   s.tl=[{st:s.status==='idle'&&idleMins(s)>30?'sleep':s.status,from:Math.min(s.since,now())}];
 }
+// Replace an element's HTML only when it changed (a rewrite every second swallows taps and costs layout).
+function setHTML(el,html){if(el&&el._h!==html){el._h=html;el.innerHTML=html;}}
 function tlHTML(s){
   if(!s.tl)seedTimeline(s);
-  const start=now()-8*60*MIN,span=now()-start;
-  return'<span class="tl8" title="Huling 8 oras">'+s.tl.map((g,i)=>{const a=Math.max(g.from,start),b=i+1<s.tl.length?s.tl[i+1].from:now();if(b<=a)return'';return`<b style="width:${((b-a)/span*100).toFixed(2)}%;background:${TLC[g.st]||TLC.idle}"></b>`;}).join('')+'</span>';
+  const nw=Math.floor(now()/MIN)*MIN,start=nw-8*60*MIN,span=nw-start;
+  return'<span class="tl8" title="Huling 8 oras">'+s.tl.map((g,i)=>{const a=Math.max(g.from,start),b=Math.min(nw,i+1<s.tl.length?s.tl[i+1].from:nw);if(b<=a)return'';return`<b style="width:${((b-a)/span*100).toFixed(1)}%;background:${TLC[g.st]||TLC.idle}"></b>`;}).join('')+'</span>';
 }
 let TOKEN='';
 try{TOKEN=new URLSearchParams(location.search).get('t')||localStorage.getItem('devroom.token')||'';
@@ -1007,16 +1010,17 @@ function setConn(){
   else if(mode==='offline')msg=isLocal?'Hindi sumasagot ang Dev Room server. Isara at buksan ulit ang app.':'Hindi maabot ang Dev Room sa PC mo. Siguraduhing bukas ang app sa PC at nasa parehong Wi-Fi ka.';
   else msg='Kumokonekta sa Dev Room sa PC mo.';
   el.dataset.mode=mode==='live'&&!(isLocal&&hooksOk===false)?'live':mode==='connecting'?'connecting':'stale';
-  el.innerHTML=`<span class="dot"></span><span class="cm">${esc(msg)}${connMsg?' <span class="'+(/^OK/.test(connMsg)?'okmsg':'errmsg')+'">'+esc(connMsg.replace(/^OK /,''))+'</span>':''}</span>`+
+  const html=`<span class="dot"></span><span class="cm">${esc(msg)}${connMsg?' <span class="'+(/^OK/.test(connMsg)?'okmsg':'errmsg')+'">'+esc(connMsg.replace(/^OK /,''))+'</span>':''}</span>`+
     (mode==='live'?'<button type="button" class="btn" data-act="team">Piliin ang team</button>':'')+
     (isLocal&&hooksOk===false?'<button type="button" class="btn primary" data-act="hooks">I-set up ang hooks</button>':'')+
     (isLocal&&hooksOk?'<button type="button" class="btn" data-act="hooks">Hooks: OK</button>':'')+
     (isLocal&&mode==='live'?'<button type="button" class="btn" data-act="pair">I-connect ang phone</button>':'')+
     (!isLocal&&mode==='live'&&TOKEN&&window.top===window&&/Android/i.test(navigator.userAgent)?`<a class="btn primary" href="devroom://pair?u=${encodeURIComponent(location.origin)}&t=${encodeURIComponent(TOKEN)}">Buksan sa Dev Room app</a><a class="btn" href="https://github.com/Ronanski/dev-room-app/releases/latest/download/DevRoom.apk">I-download ang app</a>`:'');
+  if(el._h!==html){el._h=html;el.innerHTML=html;}
 }
 async function poll(){
   try{
-    const r=await fetch('/api/state?v='+version,{headers:hdr(),cache:'no-store'});
+    const r=await fetch('/api/state?v='+version+(document.hidden?'&bg=1':''),{headers:hdr(),cache:'no-store'});
     if(r.status===204){if(mode!=='live'){mode='live';}lastSync=Date.now();}
     else if(r.status===401){mode='auth';}
     else if(r.ok){
@@ -1030,7 +1034,7 @@ async function poll(){
       {const cn=(j.sessions||[]).map(r=>r.id+':'+(r.convo_n||0)).join(',');if(cn!==convoKey){convoKey=cn;loadConvo();}}
     }else mode='offline';
   }catch(e){mode='offline';}
-  setConn();setTimeout(poll,mode==='live'?1000:3000);
+  setConn();setTimeout(poll,document.hidden?5000:mode==='live'?1000:3000);
 }
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
@@ -1048,8 +1052,10 @@ function showWhatsNew(){
   el.innerHTML=`<div class="wn-card" role="dialog" aria-modal="true" aria-labelledby="wnT"><h2 id="wnT">Bago sa Dev Room v${NOTES_VER}</h2><ul>${n.news.map(x=>`<li>${x}</li>`).join('')}</ul><div class="todo"><h3>Gawin mo</h3><ol>${n.todo.map(x=>`<li>${x}</li>`).join('')}</ol></div><div class="row"><button type="button" class="btn primary" data-act="wn-ok">Sige, gets</button></div></div>`;
   el.hidden=false;
 }
-let convoKey='',CONVO={},awayMode='auto',chatFilter='all',chatTo=0;
-async function loadConvo(){try{const r=await fetch('/api/convo',{headers:hdr(),cache:'no-store'});if(r.ok){CONVO=await r.json();chatKey='';renderPanel();}}catch(e){}}
+// chatTo and the filter hold session ids from the PC (sid), which survive a team rebuild; PENDING keeps sends until the PC lists them
+let convoKey='',CONVO={},awayMode='auto',chatFilter='all',chatTo='',PENDING=[],forceScroll=false,convoBusy=false;
+const bySid=sid=>sessions.find(x=>x.sid===sid);
+async function loadConvo(){if(convoBusy){loadConvo.again=true;return;}convoBusy=true;try{const r=await fetch('/api/convo',{headers:hdr(),cache:'no-store'});if(r.ok){CONVO=await r.json();chatKey='';renderPanel();}}catch(e){}convoBusy=false;if(loadConvo.again){loadConvo.again=false;loadConvo();}}
 function updates(j){
   if(j.app_version){const v=$('ver');const t=`v${j.app_version} (build ${j.app_build}) · `;if(v.textContent!==t)v.textContent=t;}
   if(j.ui_build!=null){if(uiBuild===null)uiBuild=j.ui_build;else if(j.ui_build!==uiBuild){location.reload();return;}}
@@ -1074,7 +1080,7 @@ const autoRestart={ready:false,ver:'',left:0,timer:0,waitUntil:0,lastInput:Date.
 ['pointerdown','keydown','wheel','touchstart'].forEach(ev=>addEventListener(ev,()=>{autoRestart.lastInput=Date.now();},{passive:true,capture:true}));
 document.addEventListener('visibilitychange',()=>autoRestart.tick());
 setInterval(()=>autoRestart.tick(),5000);
-async function restartApp(hidden){if(restartApp.going)return;restartApp.going=true;try{await fetch('/api/restart'+(hidden?'?hidden=1':''),{method:'POST'});}catch(e){}$('updbar').hidden=false;$('updbar').innerHTML='<span>Nagre-restart ang Dev Room. Babalik ito sa loob ng ilang segundo.</span>';}
+async function restartApp(hidden){if(restartApp.going)return;restartApp.going=true;setTimeout(()=>{restartApp.going=false;},30000);try{await fetch('/api/restart'+(hidden?'?hidden=1':''),{method:'POST'});}catch(e){}$('updbar').hidden=false;$('updbar').innerHTML='<span>Nagre-restart ang Dev Room. Babalik ito sa loob ng ilang segundo.</span>';}
 async function installHooks(){
   if(!confirm(`Idadagdag ng Dev Room ang hooks sa ${settingsPath||'settings.json ng Claude'}. Gagawa muna ito ng backup. Ituloy?`))return;
   try{const r=await fetch('/api/install-hooks',{method:'POST'});const j=await r.json();
@@ -1461,12 +1467,15 @@ const COARSE=matchMedia('(pointer:coarse)').matches;
 const Q={cap:COARSE?1.5:2,max:COARSE?1.5:2,acc:0,n:0,good:0,
   tick(ms,budget){if(document.hidden||ms>250||budget>40)return;this.acc+=ms;if(++this.n<90)return;const avg=this.acc/this.n;this.acc=this.n=0;
     const slow=Math.max(21,budget*1.25),fast=Math.max(13,budget+4);
-    if(avg>slow&&this.cap>1&&Date.now()-(this.last||0)>20000){this.last=Date.now();this.cap=Math.max(1,this.cap-.5);resizeMap();}
+    if(avg>slow&&this.cap>1&&Date.now()-(this.last||0)>20000){this.last=Date.now();this.cap=Math.max(1,this.cap-.5);needResize=true;}
+    else if(avg<fast&&this.cap<this.max&&Date.now()-(this.last||0)>60000){this.last=Date.now();this.cap=Math.min(this.max,this.cap+.5);needResize=true;}
   }};
 const kc=()=>BASE*cam.z;
 const viewW=()=>VW/kc(),viewH=()=>VH/kc();
 function resizeMap(){
   const r=cv.parentElement.getBoundingClientRect();if(!r.width||!r.height)return;
+  const w=Math.round(r.width*Math.min(Q.cap,window.devicePixelRatio||1)),hh=Math.round(r.height*Math.min(Q.cap,window.devicePixelRatio||1));
+  if(w===cv.width&&hh===cv.height&&r.width===VW&&r.height===VH)return;
   DPR=Math.min(Q.cap,window.devicePixelRatio||1);VW=r.width;VH=r.height;
   cv.width=Math.round(VW*DPR);cv.height=Math.round(VH*DPR);
   BASE=Math.min(VW/SW,VH/SH);
@@ -1486,9 +1495,10 @@ function setZoom(z,ax,ay){
   cam.tx=ax-fx*viewW();cam.ty=ay-fy*viewH();clampCam();
 }
 resizeMap();{const p=iso(14,9);centerOn(p.x,p.y);cam.x=cam.tx;cam.y=cam.ty;}
-if(window.ResizeObserver)new ResizeObserver(()=>resizeMap()).observe(cv.parentElement);else window.addEventListener('resize',resizeMap);
+let needResize=false;
+if(window.ResizeObserver)new ResizeObserver(()=>{needResize=true;}).observe(cv.parentElement);else window.addEventListener('resize',()=>{needResize=true;});
 
-/* ---------- static furniture: baked into the background once ----------
+/* ---------- static furniture: each piece pre-rendered once into its own bitmap ----------
    Each frame draws the background, the animated pieces and the characters. A baked piece is drawn again
    only when it stands in front of something that moves, so depth stays right at a fraction of the cost. */
 const bounds=(()=>{const Q=.25,sc=document.createElement('canvas');sc.width=Math.ceil(SW*Q);sc.height=Math.ceil(SH*Q);
@@ -1506,24 +1516,21 @@ const STAT=[],DYN=[];
     const bb=bounds(o.draw,6,[0]);if(!bb)continue;
     const c=document.createElement('canvas');c.width=bb.bw*R;c.height=bb.bh*R;const cg=c.getContext('2d');cg.setTransform(R,0,0,R,-bb.bx*R,-bb.by*R);o.draw(cg);
     Object.assign(o,bb,{img:c,draw:g2=>g2.drawImage(c,bb.bx,bb.by,bb.bw,bb.bh)});
-    g.drawImage(c,bb.bx,bb.by,bb.bw,bb.bh);STAT.push(o);
+    STAT.push(o);
   }
-  // pieces that must be redrawn when the one under them is redrawn, and pieces that always cover an animated one
-  for(const s of STAT){s.over=STAT.filter(o=>o!==s&&o.d>s.d&&hit(s,o));s.always=DYN.some(d=>d.d<s.d&&hit(s,d));}
-  objs.length=0;objs.push(...DYN);
+  // every piece is drawn exactly once per frame, in depth order (drawing a piece twice made glass and edges flicker)
+  objs.length=0;objs.push(...STAT,...DYN);
 })();
-function redrawSet(people){
-  const out=new Set(),stack=[];
-  for(const s of STAT){if(s.always||people.some(p=>p.d<s.d&&hit(p,s))){out.add(s);stack.push(s);}}
-  while(stack.length){for(const o of stack.pop().over)if(!out.has(o)){out.add(o);stack.push(o);}}
-  return out;
-}
 
 /* ---------- loop ---------- */
 let last=performance.now();
-// 60 fps; the browser pauses this loop by itself when the page is not on screen.
+// At most 60 fps (120 Hz phones would otherwise draw twice as often); the browser pauses the loop when hidden.
+let lastDraw=0;
 function frame(ts){
-  const budget=0;
+  if(ts-lastDraw<12){requestAnimationFrame(frame);return;}
+  lastDraw=ts;
+  if(needResize){needResize=false;resizeMap();}
+  const budget=16.7;
   Q.tick(ts-last,budget);const dt=Math.min(.05,(ts-last)/1000);last=ts;const t=ts/1000;
   if(!paused){
     for(const e of PEOPLE()){
@@ -1536,9 +1543,8 @@ function frame(ts){
   if(cam.x<0||cam.y<0||cam.x+viewW()>SW||cam.y+viewH()>SH){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#1c140f';ctx.fillRect(0,0,cv.width,cv.height);}
   const k=kc()*DPR;ctx.setTransform(k,0,0,k,-cam.x*k,-cam.y*k);ctx.imageSmoothingEnabled=false;
   ctx.drawImage(bg,0,0,SW,SH);
-  const items=objs.slice(),ppl=[];
-  for(const e of PEOPLE()){const p=isoP(e),it={d:e.x/T+e.y/T+.05,e,bx:p.x-24,by:p.y-62,bw:48,bh:70};items.push(it);ppl.push(it);}
-  for(const s of redrawSet(ppl))items.push(s);
+  const items=objs.slice();
+  for(const e of PEOPLE())items.push({d:e.x/T+e.y/T+.05,e});
   items.sort((a,b)=>a.d-b.d);
   const vx0=cam.x,vy0=cam.y,vx1=cam.x+viewW(),vy1=cam.y+viewH();
   for(const it of items){
@@ -1634,29 +1640,33 @@ function addChatFor(s,st,why){
   else say2(s,'agent',statusLine(s));
 }
 async function answer(s,text){
-  if(!s||!text.trim())return;
-  s.inbox=(s.inbox||[]).concat([{id:Date.now(),text,at:Date.now(),state:'sending'}]);chatKey='';renderPanel();
-  try{const r=await fetch('/api/send',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({sid:s.sid,text})});if(!r.ok)throw 0;}
-  catch(e){s.inbox[s.inbox.length-1].state='failed';chatKey='';renderPanel();return;}
-  log('Boss',`Mensahe kay ${s.short}: ${text.length>60?text.slice(0,60)+'…':text}`,s);
+  if(!s||!text.trim())return false;
+  const p={sid:s.sid,text,at:Date.now(),state:'sending',id:0};PENDING.push(p);forceScroll=true;chatKey='';renderPanel();
+  try{const r=await fetch('/api/send',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({sid:s.sid,text})});if(!r.ok)throw 0;
+    const j=await r.json();p.id=j.id;p.state='queued';}
+  catch(e){p.state='failed';chatKey='';renderPanel();return false;}
+  chatKey='';renderPanel();
+  log('Boss',`Mensahe kay ${s.short}: ${text.length>60?text.slice(0,60)+'…':text}`,s);return true;
 }
 async function setAway(m){awayMode=m;chatKey='';renderPanel();try{await fetch('/api/away',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({mode:m})});}catch(e){}}
 // One feed for the whole team: your prompts, the sessions' replies and messages sent from this app.
 function chatFeed(){
-  const list=chatFilter==='all'?sessions:sessions.filter(s=>s.id===chatFilter);
+  const list=chatFilter==='all'?sessions:sessions.filter(s=>s.sid===chatFilter);
+  PENDING=PENDING.filter(p=>!(p.id&&(bySid(p.sid)?.inbox||[]).some(m=>m.id===p.id)));
   const items=[];
   for(const s of list){
     for(const m of (CONVO[s.sid]||[]))items.push({s,t:m.at,you:m.role==='user',text:m.text});
     for(const m of (s.inbox||[]))items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true});
+    for(const m of PENDING)if(m.sid===s.sid)items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true});
   }
   items.sort((a,b)=>a.t-b.t);
   const out=items.slice(-120).map(it=>{
     const who=it.you?`<b>Boss</b> → ${esc(it.s.short)}`:`<i style="background:${it.s.pal.shirt}"></i><b>${esc(it.s.short)}</b>`;
-    const st=it.app?`<span class="st">${{sending:'Ipinapadala…',queued:'Naghihintay maipasa',delivered:'Naipasa ✓',failed:'Hindi naipadala'}[it.st]||''}${it.app?' · mula sa app':''}</span>`:'';
-    return `<div class="cmsg ${it.you?'you':''}" data-chatto="${it.s.id}"><span class="who">${who} · ${simLabel(it.t)}</span><div class="msg ${it.you?'you':'agent'}">${esc(it.text)}</div>${st}</div>`;
+    const st=it.app?`<span class="st">${{sending:'Ipinapadala…',queued:'Naghihintay maipasa',sent:'Ipinasa na, hinihintay ang session',delivered:'Naipasa ✓',failed:'Hindi naipadala. Subukan ulit.'}[it.st]||''}${it.app?' · mula sa app':''}</span>`:'';
+    return `<div class="cmsg ${it.you?'you':''}" data-chatto="${esc(it.s.sid)}"><span class="who">${who} · ${simLabel(it.t)}</span><div class="msg ${it.you?'you':'agent'}">${esc(it.text)}</div>${st}</div>`;
   });
   const listening=list.filter(s=>s.listening).map(s=>`<div class="listen">📱 Naka-abang si <b>${esc(s.short)}</b> sa utos mo. Mag-type sa ibaba para ituloy niya.</div>`);
-  const asks=list.filter(s=>s.status==='needs'&&s.ask).map(s=>`<div class="cmsg" data-chatto="${s.id}"><span class="who"><i style="background:${s.pal.shirt}"></i><b>${esc(s.short)}</b> · tanong</span><div class="msg agent asking"><b>Tanong:</b> ${esc(s.ask)}</div></div>`);
+  const asks=list.filter(s=>s.status==='needs'&&s.ask).map(s=>`<div class="cmsg" data-chatto="${esc(s.sid)}"><span class="who"><i style="background:${s.pal.shirt}"></i><b>${esc(s.short)}</b> · tanong</span><div class="msg agent asking"><b>Tanong:</b> ${esc(s.ask)}</div></div>`);
   return (out.length?out.join(''):'<div class="msg sys">Wala pang usapan. Lalabas dito ang mga utos mo at ang sagot ng bawat session.</div>')+asks.join('')+listening.join('');
 }
 function msgHTML(s,m){
@@ -1669,7 +1679,7 @@ function msgHTML(s,m){
 function renderPanel(){
   const s=sel();if(!s)return;
   const place=s.status==='needs'?'Sa harap ng opisina mo':s.status==='idle'?(IDLE_PLACE[s.idle]||'Hallway'):s.lead?'Opisina ng Lead':'Desk '+(s.desk.i+1);
-  $('cpHead').innerHTML=`${av(s,38)}<div class="who"><div class="nm">${esc(s.role)}${s.lead?' (leader)':''}</div><div class="raw">${esc(s.name)}</div></div><div class="side">${pill(s)}<span class="src">${s.source} · ${esc(s.host)}</span></div>`;
+  setHTML($('cpHead'),`${av(s,38)}<div class="who"><div class="nm">${esc(s.role)}${s.lead?' (leader)':''}</div><div class="raw">${esc(s.name)}</div></div><div class="side">${pill(s)}<span class="src">${s.source} · ${esc(s.host)}</span></div>`);
   document.querySelectorAll('.cp-tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.ptab===ptab));
   $('composer').hidden=ptab!=='chat';
 
@@ -1679,21 +1689,22 @@ function renderPanel(){
     const key='a'+al.map(x=>x.id+':'+x.status+':'+(x.acked?1:0)).join('|');
     if(key!==chatKey){chatKey=key;body.innerHTML=al.length?`<ul class="alist">${al.map(x=>`<li class="alrow ${x.status==='failed'||x.prio===1?'p1':'p2'} ${x.acked?'':'unack'}" data-pick="${x.id}"><i></i><span class="m"><b>${esc(x.short)} · ${x.status==='failed'?'TRIP':'NEEDS INPUT'} · ${x.status==='failed'||x.prio===1?'HIGH':'MEDIUM'}</b><span>${esc(x.status==='failed'?(x.detail||'May pumalyang command.'):(x.ask||'May tanong sa iyo.'))}</span></span>${x.acked?'<span class="ackd">ACK</span>':`<button type="button" class="btn" data-ack="${x.id}">ACK</button>`}</li>`).join('')}</ul>`:'<p class="sub2">Walang alarm. Normal ang lahat ng operator.</p>';}
   }else if(ptab==='chat'){
-    if(renderPanel.sel!==s.id){renderPanel.sel=s.id;chatTo=s.id;}
-    if(!sessions.some(x=>x.id===chatTo))chatTo=s.id;
-    const key='c'+chatFilter+'|'+convoKey+'|'+sessions.map(x=>x.id+':'+x.status+':'+(x.listening?1:0)+':'+(x.inbox||[]).map(m=>m.state).join('')).join(',');
+    if(renderPanel.sel!==s.sid){renderPanel.sel=s.sid;chatTo=s.sid;}
+    if(!bySid(chatTo))chatTo=s.sid;
+    if(chatFilter!=='all'&&!bySid(chatFilter))chatFilter='all';
+    const key='c'+chatFilter+'|'+convoKey+'|'+PENDING.map(p=>p.state).join('')+'|'+sessions.map(x=>x.sid+':'+(x.listening?1:0)+':'+(x.status==='needs'?x.ask:'')+':'+(x.inbox||[]).map(m=>m.state).join('')).join(',');
     if(key!==chatKey){chatKey=key;
-      const near=body.scrollHeight-body.scrollTop-body.clientHeight<60;
-      body.innerHTML=`<div class="cfilter"><button type="button" data-cf="all" aria-pressed="${chatFilter==='all'}">Lahat</button>${sessions.map(x=>`<button type="button" data-cf="${x.id}" aria-pressed="${chatFilter===x.id}"><i style="background:${x.pal.shirt}"></i>${esc(x.short)}</button>`).join('')}</div><div class="msgs">${chatFeed()}</div>`;
-      if(near||chatKey.startsWith('c'))body.scrollTop=body.scrollHeight;}
-    const sel2=$('chatTo');const opts=sessions.map(x=>`<option value="${x.id}">${esc(x.role)}${x.listening?' · naka-abang':x.status==='working'?' · nagtatrabaho':''}</option>`).join('');
-    if(sel2.dataset.k!==opts){sel2.dataset.k=opts;sel2.innerHTML=opts;}sel2.value=String(chatTo);
+      const near=body.scrollHeight-body.scrollTop-body.clientHeight<80,top=body.scrollTop;
+      body.innerHTML=`<div class="cfilter"><button type="button" data-cf="all" aria-pressed="${chatFilter==='all'}">Lahat</button>${sessions.map(x=>`<button type="button" data-cf="${esc(x.sid)}" aria-pressed="${chatFilter===x.sid}"><i style="background:${x.pal.shirt}"></i>${esc(x.short)}</button>`).join('')}</div><div class="msgs">${chatFeed()}</div>`;
+      if(near||forceScroll){forceScroll=false;body.scrollTop=body.scrollHeight;}else body.scrollTop=top;}
+    const sel2=$('chatTo');const opts=sessions.map(x=>`<option value="${esc(x.sid)}">${esc(x.role)}${x.listening?' · naka-abang':x.status==='working'?' · nagtatrabaho':''}</option>`).join('');
+    if(sel2.dataset.k!==opts){sel2.dataset.k=opts;sel2.innerHTML=opts;}if(sel2.value!==chatTo)sel2.value=chatTo;
     const aw=$('awaySel');if(aw.value!==awayMode)aw.value=awayMode;
   }else if(ptab==='info'){
-    chatKey='';
     loadDetail(s);
-    body.innerHTML=`<div class="info"><dl><dt>Ginagawa</dt><dd>${esc(actText(s))}</dd><dt>Gaano katagal</dt><dd>${dur(now()-s.since)}</dd><dt>Nasaan</dt><dd>${esc(place)}</dd><dt>Source</dt><dd>${s.source} · ${esc(s.host)}</dd><dt>Session name</dt><dd class="raw">${esc(s.name)}</dd><dt>Role</dt><dd>${esc(s.role)}${s.lead?' (leader ng team)':' (galing sa session name)'}</dd>${liveRows(s)}</dl>
+    const ih=`<div class="info"><dl><dt>Ginagawa</dt><dd>${esc(actText(s))}</dd><dt>Gaano katagal</dt><dd>${dur(now()-s.since)}</dd><dt>Nasaan</dt><dd>${esc(place)}</dd><dt>Source</dt><dd>${s.source} · ${esc(s.host)}</dd><dt>Session name</dt><dd class="raw">${esc(s.name)}</dd><dt>Role</dt><dd>${esc(s.role)}${s.lead?' (leader ng team)':' (galing sa session name)'}</dd>${liveRows(s)}</dl>
       <p class="sub2">Mga huling ginawa</p><ul class="tl">${s.history.map(h=>`<li><time>${simLabel(h.t)}</time><span>${esc(h.text)}</span></li>`).join('')||'<li><time>Ngayon</time><span>Wala pang activity.</span></li>'}</ul></div>`;
+    if(chatKey!=='i'+ih){chatKey='i'+ih;body.innerHTML=ih;}
   }else{
     const key=`l${logs.length}:${logs[0]&&logs[0].t}`;
     if(key!==chatKey){chatKey=key;body.innerHTML=`<ul class="tl">${logs.map(l=>`<li><time>${simLabel(l.t)}</time><span><span class="w">${esc(l.who)}:</span> ${esc(l.text)}</span></li>`).join('')}</ul>`;}
@@ -1701,7 +1712,7 @@ function renderPanel(){
 }
 function liveRows(s){
   const pct=s.ctx&&s.ctx.max_tokens?Math.round(s.ctx.used_tokens/s.ctx.max_tokens*100):null;
-  const arts=(s.artifacts||[]).slice(0,3).map(a=>`<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title||'Artifact')}</a>`).join(', ');
+  const arts=(s.artifacts||[]).filter(a=>/^https?:\/\//i.test(a.url||'')).slice(0,3).map(a=>`<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title||'Artifact')}</a>`).join(', ');
   return `${s.detail?`<dt>Huling status</dt><dd>${esc(sent(s.detail))}</dd>`:''}${s.recent?`<dt>Huling ginawa</dt><dd>${esc(sent(s.recent))}</dd>`:''}
     <dt>Huling update</dt><dd>${esc(dayLabel(s.at))}, ${esc(simLabel(s.at))}</dd>
     ${s.cwd?`<dt>Folder</dt><dd class="raw">${esc(s.cwd)}</dd>`:''}
@@ -1734,12 +1745,12 @@ function render(){
   const by=st=>sessions.filter(s=>s.status===st).length;
   const sleepN=sessions.filter(s=>s.status==='idle'&&(s.idle==='sleep'||s.idle==='doze')).length;
   const needN=by('needs');
-  $('counts').innerHTML=`
+  setHTML($('counts'),`
     <span class="count"><i class="dot" style="background:var(--work)"></i><b>${by('working')}</b> nagtatrabaho</span>
     <span class="count need ${needN+by('failed')?'on':''}"><i class="dot" style="background:${needN?'#fff':'var(--need)'}"></i><b>${needN+by('failed')}</b> alarm</span>
     <span class="count"><i class="dot" style="background:var(--idle)"></i><b>${by('idle')-sleepN}</b> naka-break</span>
     <span class="count"><i class="dot" style="background:var(--sleep)"></i><b>${sleepN}</b> tulog</span>
-    <span class="count"><i class="dot" style="background:var(--done)"></i><b>${by('done')+by('failed')}</b> tapos o may error</span>`;
+    <span class="count"><i class="dot" style="background:var(--done)"></i><b>${by('done')+by('failed')}</b> tapos o may error</span>`);
   {const dh=sessions.map(dockCard).join('')+`<button type="button" class="addcard" data-act="add">+ Magdagdag ng session</button>`;if(dh!==render.dock){render.dock=dh;$('dock').innerHTML=dh;}}
   renderPanel();
   const tb=$('tabBadge');tb.hidden=!needN;tb.textContent=needN;
@@ -1795,12 +1806,14 @@ document.addEventListener('click',e=>{
   const tab=e.target.closest('.tabs button');if(tab){$('app').dataset.tab=tab.dataset.tab;chatKey='';document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b===tab));render();return;}
   const dv=e.target.closest('.seg button');if(dv){$('stage').dataset.device=dv.dataset.device;document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',b===dv));chatKey='';render();return;}
 });
-$('composer').addEventListener('submit',e=>{e.preventDefault();const s=sessions.find(x=>x.id===chatTo)||sel();const v=$('msgInput').value;if(!v.trim())return;$('msgInput').value='';answer(s,v);});
-$('chatTo').addEventListener('change',e=>{chatTo=+e.target.value;});
+$('composer').addEventListener('submit',async e=>{e.preventDefault();const s=bySid(chatTo);const v=$('msgInput').value;if(!v.trim())return;
+  if(!s){connMsg='Wala na sa office ang napiling session. Pumili ulit sa Para kay.';setConn();return;}
+  $('msgInput').value='';if(!await answer(s,v)&&!$('msgInput').value)$('msgInput').value=v;});
+$('chatTo').addEventListener('change',e=>{chatTo=e.target.value;});
 $('awaySel').addEventListener('change',e=>setAway(e.target.value));
 $('cpBody').addEventListener('click',e=>{
-  const f=e.target.closest('[data-cf]');if(f){chatFilter=f.dataset.cf==='all'?'all':+f.dataset.cf;if(chatFilter!=='all')chatTo=chatFilter;chatKey='';renderPanel();return;}
-  const m=e.target.closest('[data-chatto]');if(m){chatTo=+m.dataset.chatto;$('chatTo').value=String(chatTo);$('msgInput').focus();}
+  const f=e.target.closest('[data-cf]');if(f){chatFilter=f.dataset.cf;if(chatFilter!=='all')chatTo=chatFilter;forceScroll=true;chatKey='';renderPanel();return;}
+  const m=e.target.closest('[data-chatto]');if(m){chatTo=m.dataset.chatto;$('chatTo').value=chatTo;$('msgInput').focus();}
 });
 $('msgInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('composer').requestSubmit();}});
 let drag=null;
