@@ -11,31 +11,43 @@ Dev Room shows them all in one place instead. Each session is a character in a s
 - who needs the user's input,
 - what each session is doing right now, and how far along it is.
 
-## Current state (v0.8.0, 2026-11-01)
+## Current state (v0.10.0, 2026-11-01)
 
 Shipped and auto-updating:
-- **Windows tray app:** hooks give live status, the map is an isometric power plant, there is a chat feed, and the real claude.ai chat is embedded in the panel.
-- **Android app:** shows the office and sends alerts.
-- **Chat (0.8.0):** Dev Room's own chatbox, in real time.
-  - Live transcript reading shows replies as they are written.
-  - Instant sending continues an idle session with `claude -p --resume`; a working session gets the message on its next tool call.
-  - The user rejected the embedded claude.ai approach ("parang nilagay mo lng claude app"). Do not bring it back.
-- **Update status:** a pill in the header says whether the PC app and the phone app are up to date.
-- **How the phone connects:** Dev Room runs in the PC's tray (window closed is fine) and the PC must be on and awake.
-  - At home, the phone uses Wi-Fi.
-  - Away, it uses **Malayo mode** (0.7.0): a Cloudflare quick tunnel, whose address is found through a private ntfy.sh topic. No extra app, no account.
-  - Tailscale still works but is not needed. The user rejected needing extra apps.
-  - The Claude chat on the phone goes straight to claude.ai and does not need the PC.
+- **Windows tray app:** hooks give live status in an isometric world.
+  - **Updates:** checks every 30 s. It installs at once when the window is in the tray or minimized, and otherwise after 15 s idle with a 5 s countdown, never while typing.
+  - The user confirmed that the 0.8.0 → 0.9.0 step needed one manual close and reopen, because the old updater was slow. 0.10.0 is the first release that should arrive with no manual step. Check with the user that it did.
+- **Playrooms (units):**
+  - Built with the **Mga Playroom** editor: name, Office or Beach Resort, members, ★ leader. Unplaced sessions go to "Bagong dating".
+  - Each playroom is a scene (`setScene`). Both scenes share the floor plan.
+  - The user asked for different kinds of places, "wag puro office". More scene ideas offered: space station, farm, school campus.
+- **People walk around things:** furniture is recorded while baking, then A* on a half-tile grid with line-of-sight smoothing.
+- **Free drag** of the playroom.
+- **Chat:** Dev Room's own chatbox, in real time. The Chat tab is NOT claude.ai; the user rejected that.
+  - Live transcript reading, about 1 s.
+  - Instant send: `claude -p --resume` for an idle session; PostToolUse for a working one.
+  - Messages are never left stuck. The 10-minute quiet rule covers a turn stopped with Esc.
+  - Markdown replies.
+  - Pictures (tool-result images) and Artifact or SendUserFile pages show in the chat, sandboxed.
+  - Composer: a growing box, a round send button, and recipient chips. There is no away option.
+- **Android app:**
+  - Office in an iframe, background alerts, and the update status pill.
+  - **In-app APK download and installer** (0.10.0). The phone still needed one last manual install to get it.
+- **Malayo mode:** a Cloudflare quick tunnel plus a private ntfy topic, so the phone works on mobile data with no extra app.
 
-A full UI/UX, functional and code audit was done, and its fixes went into 0.6.5.
+### Lessons from this project
+- Say plainly when a change is not released yet. The user waited for an update that had not been merged.
+- Never use `pkill -f` in this sandbox: it kills the tool's own shell. Kill by PID instead.
+- The page script is wrapped, so tests reach internals through `?debug=1` (`window.__dr`).
+- The user wants everything real time, with no extra apps and no manual steps, and polished. Test on phone, tablet (800×1280) and PC, in dark mode.
 
 ### Not yet verified on real devices
-- The embedded Claude view and its sign-in inside the Windows window (Tauri multiwebview).
-- The Android Claude view on the Chat tab (position, keyboard, Back), its sign-in, and the pairing confirmation.
-- The update status pill on the real PC and phone.
-- Real-time chat on the real PC: that Claude Code is found and logged in for `-p --resume`, and how a turn continued from Dev Room looks in the Claude desktop app (it shows after reopening the session).
-- Malayo mode end to end. The sandbox may not open a tunnel, so this was tested with a simulated tunnel and relay: cloudflared download and start on Windows, ntfy publish, and the phone switching over on mobile data.
-- The auto-restart from the tray on Windows.
+- PC auto-update with no manual step: the first real test is 0.10.0.
+- Android in-app update: the download, Android's installer, and the "allow installs" setting.
+- Real-time chat on the real PC: that `claude -p --resume` finds the Claude Code binary and is logged in, and how the Claude desktop app shows a turn continued from Dev Room.
+- Pictures and artifacts from real sessions (the Artifact tool's `file_path`).
+- Malayo mode end to end: the cloudflared download on Windows, the ntfy publish, and mobile data.
+- The Playrooms editor with the user's real team.
 
 ### Backlog (ask the user before starting; they pick the order)
 1. Sound or vibration when a session needs you, with an on/off switch.
@@ -43,7 +55,9 @@ A full UI/UX, functional and code audit was done, and its fixes went into 0.6.5.
 3. A status count in the window title or tray icon, for example "2 naghihintay".
 4. A daily report of what each session did today.
 5. Search and filter in the chat feed and the activity log.
-6. A Settings panel: bubble size, animation speed, NPCs on or off, away mode.
+6. A Settings panel: bubble size, animation speed, NPCs on or off.
+11. More playroom scenes (space station, farm, school campus), keeping the same desk and spot coordinates.
+12. Pick the playroom right on a session card (drag a card onto a unit tab).
 7. Signed updates. This needs a signing key in the repo secrets, so ask the user first.
 8. Approve or deny permission prompts from the app. This needs Claude Code's PermissionRequest hook; check the docs first.
 9. Phone: show at most one toast plus a "+N" count, and a compact header everywhere.

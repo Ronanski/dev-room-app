@@ -39,13 +39,79 @@ fn set_autostart(on: bool) {
 /// The window is created on demand and destroyed when closed, so a closed Dev Room costs almost nothing:
 /// only the small server keeps running in the tray for phones, tablets and the hooks.
 /// Its URL carries a per-launch key, so only this window can drive the embedded Claude view.
-fn make_window(app: &AppHandle, port: u16) {
+/// It opens where you left it: same place, same size, maximized if it was. `minimized` brings it back
+/// minimized on the taskbar (after an update restart), without flashing on screen first.
+fn make_window(app: &AppHandle, port: u16, minimized: bool) {
     let url = format!("http://127.0.0.1:{port}/?app={}", server::app_key()).parse().expect("valid url");
-    let _ = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::External(url))
+    let g = updater::geom();
+    let mut b = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::External(url))
         .title("Dev Room")
-        .inner_size(1440.0, 900.0)
+        .inner_size(g.map(|g| g.w).unwrap_or(1440.0), g.map(|g| g.h).unwrap_or(900.0))
         .min_inner_size(820.0, 560.0)
-        .build();
+        // a minimized start gets its maximized state from show_minimized (a hidden window cannot maximize)
+        .maximized(!minimized && g.map(|g| g.max).unwrap_or(false))
+        .visible(!minimized);
+    // only a place that is still on one of the screens (a monitor may have been unplugged)
+    if let Some(g) = g.filter(|g| g.x.is_finite() && g.y.is_finite() && on_screen(app, g)) { b = b.position(g.x, g.y); } else { b = b.center(); }
+    let Ok(w) = b.build() else { return };
+    if minimized {
+        show_minimized(&w, g.map(|g| g.max).unwrap_or(false));
+        updater::set_minimized(true);
+    }
+}
+
+/// Put the (still hidden) window on the taskbar, minimized, without taking focus; opening it from the
+/// taskbar brings it back maximized when it was maximized before.
+#[cfg(windows)]
+fn show_minimized(w: &tauri::WebviewWindow, max: bool) {
+    #[repr(C)] struct Pt { x: i32, y: i32 }
+    #[repr(C)] struct Rc { l: i32, t: i32, r: i32, b: i32 }
+    #[repr(C)] struct Placement { length: u32, flags: u32, show: u32, min: Pt, max: Pt, normal: Rc }
+    #[link(name = "user32")]
+    extern "system" {
+        fn GetWindowPlacement(hwnd: isize, p: *mut Placement) -> i32;
+        fn SetWindowPlacement(hwnd: isize, p: *const Placement) -> i32;
+    }
+    const SW_SHOWMINNOACTIVE: u32 = 7;
+    const WPF_RESTORETOMAXIMIZED: u32 = 2;
+    let Ok(h) = w.hwnd() else { let _ = w.minimize(); return };
+    let hwnd = h.0 as isize;
+    let mut p = Placement { length: std::mem::size_of::<Placement>() as u32, flags: 0, show: 0, min: Pt { x: 0, y: 0 }, max: Pt { x: 0, y: 0 }, normal: Rc { l: 0, t: 0, r: 0, b: 0 } };
+    unsafe {
+        if GetWindowPlacement(hwnd, &mut p) == 0 { let _ = w.minimize(); return; }
+        p.length = std::mem::size_of::<Placement>() as u32;
+        p.show = SW_SHOWMINNOACTIVE;
+        if max { p.flags |= WPF_RESTORETOMAXIMIZED; }
+        if SetWindowPlacement(hwnd, &p) == 0 { let _ = w.minimize(); }
+    }
+}
+#[cfg(not(windows))]
+fn show_minimized(w: &tauri::WebviewWindow, _max: bool) { let _ = w.show(); let _ = w.minimize(); }
+
+/// Whether the top-left part of the remembered window (its title bar) would be on a screen.
+fn on_screen(app: &AppHandle, g: &updater::Geom) -> bool {
+    let Ok(mons) = app.available_monitors() else { return false };
+    mons.iter().any(|m| {
+        let s = m.scale_factor();
+        let (mx, my) = (m.position().x as f64 / s, m.position().y as f64 / s);
+        let (mw, mh) = (m.size().width as f64 / s, m.size().height as f64 / s);
+        g.x + 60.0 > mx && g.x + 60.0 < mx + mw && g.y + 10.0 >= my && g.y + 10.0 < my + mh
+    })
+}
+
+/// Remember the window's place as it moves and resizes (the normal size is kept while it is maximized).
+fn track_geom(w: &tauri::Window) {
+    if w.is_minimized().unwrap_or(false) { return; }
+    let max = w.is_maximized().unwrap_or(false);
+    let s = w.scale_factor().unwrap_or(1.0);
+    let pos = w.outer_position().ok();
+    let size = w.inner_size().ok();
+    updater::note_geom(|g| {
+        g.max = max;
+        if max { return; }
+        if let Some(p) = pos { g.x = p.x as f64 / s; g.y = p.y as f64 / s; }
+        if let Some(z) = size { if z.width > 0 && z.height > 0 { g.w = z.width as f64 / s; g.h = z.height as f64 / s; } }
+    });
 }
 
 /// Pages the embedded Claude view may show: Claude itself and the sign-in providers it uses.
@@ -126,7 +192,7 @@ fn show_main(app: &AppHandle, port: u16) {
         let _ = w.unminimize();
         let _ = w.set_focus();
     } else {
-        make_window(app, port);
+        make_window(app, port, false);
     }
 }
 
@@ -157,12 +223,8 @@ fn main() {
     let app = tauri::Builder::default()
         .setup(move |app| {
             if !hidden {
-                make_window(app.handle(), port);
                 // restarted for an update while minimized: come back minimized
-                if std::env::args().any(|a| a == "--minimized") {
-                    if let Some(w) = app.get_window("main") { let _ = w.minimize(); }
-                    updater::set_minimized(true);
-                }
+                make_window(app.handle(), port, std::env::args().any(|a| a == "--minimized"));
             }
             let ch = app.handle().clone();
             let _ = server::ON_CLAUDE.set(Box::new(move |rect| claude_view(&ch, rect)));
@@ -202,9 +264,14 @@ fn main() {
         .on_window_event(|window, event| {
             if window.label() != "main" { return; }
             match event {
-                WindowEvent::Destroyed => { updater::set_hidden(true); updater::set_minimized(false); }
+                WindowEvent::CloseRequested { .. } => { track_geom(window); updater::save_geom(); }
+                WindowEvent::Destroyed => { updater::set_hidden(true); updater::set_minimized(false); updater::save_geom(); }
                 // minimizing and restoring show up as resizes and focus changes
-                WindowEvent::Resized(_) | WindowEvent::Focused(_) => updater::set_minimized(window.is_minimized().unwrap_or(false)),
+                WindowEvent::Resized(_) | WindowEvent::Focused(_) => {
+                    updater::set_minimized(window.is_minimized().unwrap_or(false));
+                    track_geom(window);
+                }
+                WindowEvent::Moved(_) => track_geom(window),
                 _ => {}
             }
         })
@@ -215,7 +282,7 @@ fn main() {
         match event {
             RunEvent::ExitRequested { api, code, .. } => { if code.is_none() { api.prevent_exit(); } }
             // never leave the tunnel helper running after Dev Room quits
-            RunEvent::Exit => tunnel::shutdown(),
+            RunEvent::Exit => { updater::save_geom(); tunnel::shutdown(); }
             _ => {}
         }
     });

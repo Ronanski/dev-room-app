@@ -222,13 +222,41 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .attcard .ic{width:34px;height:34px;flex:none;border-radius:8px;display:grid;place-items:center;background:var(--accent);color:var(--panel);font-weight:800}
 .attcard small{display:block;color:var(--muted);font-size:11.5px}
 .cmsg.you .attimg,.cmsg.you .attcard{margin-left:auto}
-.viewer{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column}
+/* Artifacts and pictures open in a pop-out, not full screen. One layout per device (set by viewerMode):
+   float = PC and tablet landscape: a window you drag by its bar and resize from the corner; the chat stays usable.
+   card  = tablet portrait: a centered card.   sheet = phone: a sheet from the bottom (swipe down to close).
+   full  = the ⤢ button, any device. */
+.viewer{position:fixed;inset:0;z-index:60;pointer-events:none}
 .viewer[hidden]{display:none}
-.viewer .vbar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
-.viewer .vbar b{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.viewer .vbody{flex:1;min-height:0;display:grid;place-items:center;overflow:auto}
-.viewer .vbody img{max-width:100%;max-height:100%;object-fit:contain}
-.viewer .vbody iframe{width:100%;height:100%;border:0;background:#fff}
+.vscrim{position:absolute;inset:0;background:rgba(20,14,10,.42);pointer-events:auto;display:none;animation:vfade .16s ease-out}
+.viewer[data-mode="card"] .vscrim,.viewer[data-mode="sheet"] .vscrim{display:block}
+.vwin{position:absolute;box-sizing:border-box;pointer-events:auto;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 22px 60px rgba(0,0,0,.34),0 2px 8px rgba(0,0,0,.18);overflow:hidden;animation:vpop .18s ease-out}
+.viewer[data-mode="card"] .vwin{left:max(16px,4vw);right:max(16px,4vw);top:50%;transform:translateY(-50%);height:min(76dvh,1000px);animation:vfade .18s ease-out}
+.viewer[data-mode="sheet"] .vwin{left:0;right:0;bottom:0;height:min(88dvh,calc(100dvh - 40px));border-radius:18px 18px 0 0;border-bottom:0;padding-bottom:env(safe-area-inset-bottom);animation:vup .22s ease-out}
+.viewer[data-mode="full"] .vwin{inset:0;border-radius:0;border:0;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);animation:none}
+.vbar{display:flex;align-items:center;gap:6px;padding:6px 6px 6px 14px;border-bottom:1px solid var(--line);background:var(--chip);touch-action:none;user-select:none;-webkit-user-select:none}
+.viewer[data-mode="float"] .vbar{cursor:grab}
+.viewer.dragging .vbar{cursor:grabbing}
+.vbar b{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+.vgrip{display:none;position:absolute;top:6px;left:50%;width:40px;height:4px;margin-left:-20px;border-radius:2px;background:var(--line)}
+.viewer[data-mode="sheet"] .vbar{position:relative;padding-top:16px}
+.viewer[data-mode="sheet"] .vgrip{display:block}
+.vbtn{flex:none;width:34px;height:34px;display:grid;place-items:center;border:0;border-radius:9px;background:transparent;color:var(--ink);font:inherit;font-size:17px;line-height:1;cursor:pointer}
+.vbtn:hover{background:var(--line)}
+@media (pointer:coarse){.vbtn{width:44px;height:44px;font-size:19px}}
+.vbody{flex:1;min-height:0;display:grid;place-items:center;overflow:auto;background:var(--bg);overscroll-behavior:contain}
+.vbody img{max-width:100%;max-height:100%;object-fit:contain;cursor:zoom-in}
+.vbody.zoomed{place-items:start}
+.vbody.zoomed img{max-width:none;max-height:none;cursor:zoom-out}
+.vbody iframe{width:100%;height:100%;border:0;background:#fff}
+.viewer.dragging iframe{pointer-events:none}
+.vrs{display:none;position:absolute;right:0;bottom:0;width:22px;height:22px;cursor:nwse-resize;touch-action:none;
+  background:linear-gradient(135deg,transparent 52%,var(--muted) 52%,var(--muted) 58%,transparent 58%,transparent 70%,var(--muted) 70%,var(--muted) 76%,transparent 76%)}
+.viewer[data-mode="float"] .vrs{display:block}
+@keyframes vpop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+@keyframes vfade{from{opacity:0}to{opacity:1}}
+@keyframes vup{from{transform:translateY(40%);opacity:.4}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.vwin,.vscrim{animation:none!important}}
 .typing{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:4px 2px}
 .typing i{width:8px;height:8px;border-radius:50%;flex:none}
 .typing .dots{display:inline-flex;gap:3px;margin-left:2px}
@@ -520,7 +548,7 @@ body{margin:0}
 <div id="toast" hidden></div>
     <div class="teampanel" id="teamPanel" hidden></div>
     <div class="teampanel" id="whatsNew" hidden></div>
-    <div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-label="Tingnan"><div class="vbar"><b id="vTitle"></b><button type="button" class="btn" data-act="vclose">Isara</button></div><div class="vbody" id="vBody"></div></div>
+    <div class="viewer" id="viewer" hidden><div class="vscrim" data-act="vclose"></div><div class="vwin" id="vWin" role="dialog" aria-labelledby="vTitle"><div class="vbar" id="vBar"><span class="vgrip"></span><b id="vTitle"></b><button type="button" class="vbtn" data-act="vmax" id="vMax" title="Palakihin" aria-label="Palakihin">⤢</button><button type="button" class="vbtn" data-act="vclose" title="Isara" aria-label="Isara">✕</button></div><div class="vbody" id="vBody"></div><div class="vrs" id="vRs" title="Hilahin para palakihin o paliitin"></div></div></div>
   </div>
 </div>
 <p class="devnote">Galing ang data sa Claude Code hooks sa PC mo.</p>
@@ -1311,6 +1339,10 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.11.0':{news:['<b>Bumabalik ang window kung paano mo iniwan:</b> pagkatapos mag-update at mag-restart, babalik ang Dev Room sa dati nitong ayos: nasa tray, naka-minimize sa taskbar, naka-maximize, o sa dating pwesto at laki.',
+    '<b>Pop-out na ang artifact at larawan, hindi full screen:</b> sa PC at tablet na naka-landscape, lumulutang na window ito sa tabi ng chat. I-drag sa itaas na bar para ilipat, at hilahin ang kanto para palakihin o paliitin; tatandaan nito kung saan mo inilagay. Sa tablet na naka-portrait, card ito sa gitna. Sa phone, lumalabas ito mula sa ibaba; i-swipe pababa para isara.',
+    'Ang <b>⤢</b> ay para gawing full screen. Sa larawan, pindutin para makita sa totoong laki.'],
+    todo:['Wala kang gagawin sa PC: kusa itong mag-a-update at babalik sa dating ayos ng window.','Sa phone, pindutin ang I-update at ang Install.']},
   '0.10.0':{news:['<b>Mga Playroom:</b> ang dating "Piliin ang team" ay <b>Mga Playroom</b> na. Gumawa ng kahit ilang playroom, pangalanan, piliin kung <b>Office</b> o <b>Beach Resort</b>, at ilagay ang bawat session sa playroom niya (pindutin ang numero). Ang ★ ang leader. Ang bagong session na hindi pa nailalagay ay lalabas sa <b>Bagong dating</b>.',
     '<b>Android:</b> sa loob na ng app nagda-download ang update, at diretso nang lumalabas ang install screen ng Android. Wala nang browser at wala nang naiipong installer sa Downloads.'],
     todo:['Sa PC, wala kang gagawin: kusa na itong nag-a-update.','Sa phone, i-install ang update na ito sa huling pagkakataon gamit ang dating paraan. Simula sa susunod, pindutin lang ang I-update at ang Install. Sa unang beses, papayagan mo ang Dev Room na mag-install ng update (isang switch).','Para gumawa ng playroom: pindutin ang <b>Mga Playroom</b> sa itaas.']},
@@ -2281,12 +2313,54 @@ function attHTML(it){
   if(k==='image')return `<img class="attimg" src="${attUrl(it.att)}" alt="${esc(it.title||it.name)}" loading="lazy" data-view="${esc(it.att)}" data-vt="${esc(it.title||it.name)}">`;
   return `<button type="button" class="attcard" data-view="${esc(it.att)}" data-vt="${esc(it.title||it.name)}"><span class="ic">${k==='page'?'▣':'PDF'}</span><span><b>${esc(it.title||it.name)}</b><small>${k==='page'?'Artifact':'File'} · ${esc(it.name)} · pindutin para buksan</small></span></button>`;
 }
-function openViewer(id,title){
-  const v=$('viewer'),b=$('vBody');$('vTitle').textContent=title||id;
-  b.innerHTML=attKind(id)==='image'?`<img src="${attUrl(id)}" alt="${esc(title||'')}">`:`<iframe src="${attUrl(id)}" ${attKind(id)==='page'?'sandbox="allow-scripts allow-popups allow-forms"':''} title="${esc(title||'')}"></iframe>`;
-  v.hidden=false;v.querySelector('[data-act="vclose"]').focus();
+// The pop-out remembers where you put it and how big (PC and tablet landscape).
+const VWR={full:false,box:null,ret:null};
+try{VWR.box=JSON.parse(localStorage.getItem('devroom.viewer')||'null');}catch(e){}
+function viewerMode(){const w=innerWidth,h=innerHeight;if(VWR.full)return'full';if(w<=640||h<=520)return'sheet';if(h>w)return'card';return'float';}
+function viewerBox(){
+  const W=innerWidth,H=innerHeight,m=8;
+  let b=VWR.box&&VWR.box.w?{...VWR.box}:null;
+  if(!b){ // first time: beside the chat panel (left of it), so you can read and chat at once
+    const cp=document.querySelector('.chatpanel')?.getBoundingClientRect(),right=cp&&cp.width&&cp.left>W*.45?cp.left-12:W-m;
+    const w=Math.round(Math.min(1000,Math.max(420,right-2*m-8),W-2*m)),h=Math.round(Math.min(800,H*.84));
+    b={w,h,x:Math.round(Math.max(m,Math.min((right-w)/2,right-w))),y:Math.round(Math.max(m,(H-h)/2))};}
+  b.w=Math.max(320,Math.min(b.w,W-2*m));b.h=Math.max(240,Math.min(b.h,H-2*m));
+  b.x=Math.max(m,Math.min(b.x,W-b.w-m));b.y=Math.max(m,Math.min(b.y,H-b.h-m));return b;
 }
-function closeViewer(){const v=$('viewer');if(v.hidden)return;v.hidden=true;$('vBody').innerHTML='';}
+function layoutViewer(){
+  const v=$('viewer');if(v.hidden)return;const mode=viewerMode(),win=$('vWin');v.dataset.mode=mode;
+  const mx=$('vMax');mx.textContent=VWR.full?'⤡':'⤢';mx.title=mx.ariaLabel=VWR.full?'Paliitin':'Palakihin';
+  if(mode==='float'){const b=viewerBox();Object.assign(win.style,{left:b.x+'px',top:b.y+'px',width:b.w+'px',height:b.h+'px'});}
+  else win.style.left=win.style.top=win.style.width=win.style.height='';
+}
+function saveViewerBox(){const r=$('vWin').getBoundingClientRect();VWR.box={x:Math.round(r.left),y:Math.round(r.top),w:Math.round(r.width),h:Math.round(r.height)};try{localStorage.setItem('devroom.viewer',JSON.stringify(VWR.box));}catch(e){}}
+function openViewer(id,title){
+  const v=$('viewer'),b=$('vBody'),img=attKind(id)==='image';$('vTitle').textContent=title||id;b.classList.remove('zoomed');
+  b.innerHTML=img?`<img src="${attUrl(id)}" alt="${esc(title||'')}">`:`<iframe src="${attUrl(id)}" ${attKind(id)==='page'?'sandbox="allow-scripts allow-popups allow-forms"':''} title="${esc(title||'')}"></iframe>`;
+  if(v.hidden)VWR.ret=document.activeElement;
+  v.hidden=false;layoutViewer();$('vWin').querySelector('[data-act="vclose"]').focus({preventScroll:true});
+}
+function closeViewer(){const v=$('viewer');if(v.hidden)return;v.hidden=true;$('vBody').innerHTML='';VWR.full=false;$('vWin').style.transform='';
+  if(VWR.ret&&document.contains(VWR.ret))try{VWR.ret.focus({preventScroll:true});}catch(e){}VWR.ret=null;}
+// drag by the bar, resize from the corner (float); swipe the sheet down to close it (phone)
+(function(){
+  let d=null;
+  const start=(e,kind)=>{const mode=$('viewer').dataset.mode;if(e.button>0||e.target.closest('.vbtn'))return;
+    if(kind==='move'&&mode!=='float'&&mode!=='sheet')return;if(kind==='size'&&mode!=='float')return;
+    const r=$('vWin').getBoundingClientRect();d={kind,mode,x0:e.clientX,y0:e.clientY,r,id:e.pointerId,dy:0};
+    e.currentTarget.setPointerCapture(e.pointerId);$('viewer').classList.add('dragging');e.preventDefault();};
+  const move=e=>{if(!d||e.pointerId!==d.id)return;const dx=e.clientX-d.x0,dy=e.clientY-d.y0,w=$('vWin').style;
+    if(d.mode==='sheet'){d.dy=Math.max(0,dy);w.transform=d.dy?`translateY(${d.dy}px)`:'';return;}
+    if(d.kind==='move'){VWR.box={x:d.r.left+dx,y:d.r.top+dy,w:d.r.width,h:d.r.height};}
+    else VWR.box={x:d.r.left,y:d.r.top,w:d.r.width+dx,h:d.r.height+dy};
+    const b=viewerBox();Object.assign(w,{left:b.x+'px',top:b.y+'px',width:b.w+'px',height:b.h+'px'});};
+  const end=e=>{if(!d||e.pointerId!==d.id)return;$('viewer').classList.remove('dragging');
+    if(d.mode==='sheet'){const far=d.dy>Math.min(140,innerHeight*.18);$('vWin').style.transform='';if(far)closeViewer();}
+    else saveViewerBox();d=null;};
+  for(const [el,kind] of [[$('vBar'),'move'],[$('vRs'),'size']]){el.addEventListener('pointerdown',e=>start(e,kind));el.addEventListener('pointermove',move);el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);}
+  $('vBar').addEventListener('dblclick',e=>{if(!e.target.closest('.vbtn')){VWR.full=!VWR.full;layoutViewer();}});
+  addEventListener('resize',()=>layoutViewer());
+})();
 // One feed for the whole team: your prompts, the sessions' replies and messages sent from this app.
 function chatFeed(){
   const list=chatFilter==='all'?sessions:sessions.filter(s=>s.sid===chatFilter);
@@ -2508,7 +2582,13 @@ $('chatTo').addEventListener('change',e=>{chatTo=e.target.value;});
 $('rcpt').addEventListener('click',e=>{const b=e.target.closest('[data-rcpt]');if(!b)return;chatTo=b.dataset.rcpt;$('rcpt').dataset.k='';renderPanel();$('msgInput').focus();});
 // the message box grows with the text, like in the Claude app
 $('msgInput').addEventListener('input',e=>{const t=e.target;t.style.height='auto';t.style.height=Math.min(160,t.scrollHeight)+'px';});
-$('viewer').addEventListener('click',e=>{if(e.target.closest('[data-act="vclose"]'))closeViewer();});
+$('viewer').addEventListener('click',e=>{
+  if(e.target.closest('[data-act="vclose"]')){closeViewer();return;}
+  if(e.target.closest('[data-act="vmax"]')){VWR.full=!VWR.full;layoutViewer();return;}
+  // pictures: tap to see them at full size, tap again to fit
+  const im=e.target.closest('.vbody img');if(im){const b=$('vBody'),z=!b.classList.contains('zoomed');const r=im.getBoundingClientRect(),fx=(e.clientX-r.left)/r.width,fy=(e.clientY-r.top)/r.height;
+    b.classList.toggle('zoomed',z);if(z){b.scrollLeft=im.naturalWidth*fx-b.clientWidth/2;b.scrollTop=im.naturalHeight*fy-b.clientHeight/2;}}
+});
 $('composer').addEventListener('focusin',()=>{$('app').classList.add('typing');setTimeout(()=>{document.querySelector('.chatpanel').scrollIntoView({block:'start'});const b=$('cpBody');b.scrollTop=b.scrollHeight;},350);});
 $('composer').addEventListener('focusout',()=>setTimeout(()=>{if(!$('composer').contains(document.activeElement))$('app').classList.remove('typing');},200));
 $('awaySel').addEventListener('change',e=>setAway(e.target.value));
