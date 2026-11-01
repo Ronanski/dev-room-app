@@ -68,7 +68,8 @@ html,body{overflow-x:hidden}
   linear-gradient(var(--ink),var(--ink)) 3px 24px/20px 2px no-repeat}
 h1{font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1;margin:0;letter-spacing:.5px}
 .sub{margin:3px 0 0;color:var(--muted);font-size:12px}
-.units{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:8px 0 0;padding-bottom:2px}
+.ttl{min-width:0;flex:1 1 auto}
+.units{max-width:100%;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:8px 0 0;padding-bottom:2px}
 .units::-webkit-scrollbar{display:none}
 .units[hidden]{display:none}
 .units button{flex:none;font:inherit;font-size:12.5px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:5px 12px;cursor:pointer;display:inline-flex;gap:6px;align-items:center;min-height:32px}
@@ -322,6 +323,27 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .trow small{color:var(--muted);font-size:11.5px}
 .lead-pick{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted)}
 .tp-card .row{display:flex;gap:8px;flex-wrap:wrap}
+.rooms-card{max-width:680px;overflow-y:auto;overscroll-behavior:contain}
+.rooms-card .tlist{overflow:visible;max-height:none;flex:none}
+.rooms{display:flex;flex-direction:column;gap:6px}
+.room{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--bg)}
+.room .rn{width:24px;height:24px;border-radius:50%;background:var(--accent);color:var(--panel);display:grid;place-items:center;font-weight:800;font-size:12px;flex:none}
+.room .rname{flex:1;min-width:120px;font:inherit;font-size:13.5px;font-weight:700;border:1px solid var(--line);border-radius:6px;padding:5px 8px;background:var(--panel);color:var(--ink)}
+.room .rc{font-size:11.5px;color:var(--muted);white-space:nowrap}
+.room .rx{border:0;background:none;color:var(--muted);font-size:15px;cursor:pointer;min-width:32px;min-height:32px}
+.kind{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;flex:none}
+.kind button{font:inherit;font-size:12px;border:0;background:var(--panel);color:var(--ink);padding:5px 10px;cursor:pointer;min-height:32px}
+.kind button[aria-pressed="true"]{background:var(--accent);color:var(--panel);font-weight:700}
+.trow2{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+.trow2 .tname{width:100%;box-sizing:border-box;font:inherit;font-size:13px;font-weight:700;border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:var(--bg);color:var(--ink)}
+.trow2 small{color:var(--muted);font-size:11.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.where{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.where button{min-width:32px;min-height:32px;border-radius:50%;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;font-weight:700;font-size:12.5px;cursor:pointer}
+.where button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.trow2 .lead{min-width:34px;min-height:34px;border-radius:50%;border:1px solid var(--line);background:var(--bg);color:var(--muted);font-size:15px;cursor:pointer}
+.trow2 .lead.on{background:#e2b23a;border-color:#e2b23a;color:#3a2a10}
+.trow2 .lead:disabled{opacity:.35;cursor:default}
+@media (max-width:520px){.trow2{grid-template-columns:minmax(0,1fr) auto}.trow2 .where{grid-column:1/-1;justify-content:flex-start}}
 
 /* ---------- Phone layout ---------- */
 @container app (max-width: 640px){
@@ -440,7 +462,7 @@ body{margin:0}
     <header class="top">
       <div class="brand">
         <span class="logo" aria-hidden="true"></span>
-        <div><h1>Dev Room · Unit 1</h1><p class="sub"><span id="unitName">Unit 1</span> · live mula sa PC mo<span id="via"></span> · <button type="button" class="updpill" id="ver" data-act="updinfo" data-st="wait">Tinitingnan ang update…</button> · <span class="clock" id="clock"></span></p><div class="units" id="units" hidden role="tablist" aria-label="Mga office"></div></div>
+        <div class="ttl"><h1>Dev Room · Unit 1</h1><p class="sub"><span id="unitName">Unit 1</span> · live mula sa PC mo<span id="via"></span> · <button type="button" class="updpill" id="ver" data-act="updinfo" data-st="wait">Tinitingnan ang update…</button> · <span class="clock" id="clock"></span></p><div class="units" id="units" hidden role="tablist" aria-label="Mga office"></div></div>
       </div>
       <div class="counts" id="counts"></div>
       <div class="controls">
@@ -1108,13 +1130,24 @@ let UNITS=[];
 function computeUnits(records){
   const proj=r=>r.cwd?baseName(r.cwd):'Iba pa';
   const units=[];let rest=records;
+  if(TEAM.rooms&&TEAM.rooms.length){
+    const used=new Set();
+    TEAM.rooms.forEach(rm=>{const list=records.filter(r=>rm.ids.includes(r.id)&&!used.has(r.id));list.forEach(r=>used.add(r.id));
+      const lead=(rm.lead&&list.find(r=>r.id===rm.lead))||autoLead(list);const ordered=lead?[lead,...list.filter(r=>r!==lead)]:list;
+      units.push({key:'r:'+rm.id,label:rm.name,lead:lead?lead.id:null,list:ordered.slice(0,MAXN+1),all:ordered,scene:rm.scene,own:true});});
+    const left=records.filter(r=>!used.has(r.id));
+    // new sessions you have not placed yet still show up somewhere
+    if(left.length){const lead=autoLead(left);const all=lead?[lead,...left.filter(r=>r!==lead)]:left;units.push({key:'new',label:'Bagong dating',lead:lead?lead.id:null,list:all.slice(0,MAXN+1),all});}
+    units.forEach((u,i)=>{u.n=i+1;if(!u.scene)u.scene=['office','resort'][i%2];u.theme=THEMES[0];u.need=u.list.filter(r=>r.status_bucket==='SESSION_STATUS_BUCKET_BLOCKED'||r.status_bucket==='SESSION_STATUS_BUCKET_FAILED').length;});
+    return units;
+  }
   if(TEAM.ids&&TEAM.ids.length){const t=pickTeam(records);const counts={};t.list.forEach(r=>{const k=proj(r);counts[k]=(counts[k]||0)+1;});
     const name=Object.keys(counts).sort((a,b)=>counts[b]-counts[a])[0]||'Team';
-    units.push({key:'team',label:name,lead:t.lead,list:t.list});rest=records.filter(r=>!t.list.includes(r));}
+    const inTeam=records.filter(r=>TEAM.ids.includes(r.id));units.push({key:'team',label:name,lead:t.lead,list:t.list,all:inTeam});rest=records.filter(r=>!inTeam.includes(r));}
   const groups=new Map();for(const r of rest){const k=proj(r);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(r);}
   [...groups.entries()].sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0])).forEach(([k,list])=>{
     const lead=autoLead(list);const ordered=lead?[lead,...list.filter(r=>r!==lead)]:list;
-    units.push({key:'p:'+k,label:k,lead:lead?lead.id:null,list:ordered.slice(0,MAXN+1)});});
+    units.push({key:'p:'+k,label:k,lead:lead?lead.id:null,list:ordered.slice(0,MAXN+1),all:ordered});});
   if(!units.length)units.push({key:'team',label:'Team',lead:null,list:[]});
   units.forEach((u,i)=>{u.n=i+1;u.scene=['office','resort'][i%2];u.theme=THEMES[Math.floor(i/2)%THEMES.length];u.need=u.list.filter(r=>r.status_bucket==='SESSION_STATUS_BUCKET_BLOCKED'||r.status_bucket==='SESSION_STATUS_BUCKET_FAILED').length;});
   return units;
@@ -1132,7 +1165,7 @@ function applyTheme(f){
 function renderUnits(){
   const el=$('units');if(!el)return;const cur=UNITS.find(u=>u.key===UNIT)||UNITS[0];
   const h=UNITS.length<2?'':UNITS.map(u=>`<button type="button" data-unit="${esc(u.key)}" aria-pressed="${u===cur}"><b>Unit ${u.n}</b> · ${esc(u.label)} <span class="un">${u.list.length}</span>${u!==cur&&u.need?`<span class="ub">${u.need}</span>`:''}</button>`).join('');
-  if(el.dataset.h!==h){el.dataset.h=h;el.innerHTML=h;el.hidden=!h;}
+  if(el.dataset.h!==h){el.dataset.h=h;el.innerHTML=h;el.hidden=!h;const on=el.querySelector('[aria-pressed="true"]');if(on)el.scrollLeft=Math.max(0,on.offsetLeft-el.clientWidth/2+on.offsetWidth/2);}
   const t=`Dev Room · Unit ${cur?cur.n:1}`;const h1=document.querySelector('.top h1');if(h1&&h1.textContent!==t)h1.textContent=t;
   const u1=$('unitName');if(u1&&cur&&u1.textContent!==cur.label)u1.textContent=cur.label;
 }
@@ -1248,7 +1281,7 @@ function setConn(){
   else msg='Kumokonekta sa Dev Room sa PC mo.';
   el.dataset.mode=mode==='live'&&!(isLocal&&hooksOk===false)?'live':mode==='connecting'?'connecting':'stale';
   const html=`<span class="dot"></span><span class="cm">${esc(msg)}${connMsg?' <span class="'+(/^OK/.test(connMsg)?'okmsg':'errmsg')+'">'+esc(connMsg.replace(/^OK /,''))+'</span>':''}</span>`+
-    (mode==='live'?'<button type="button" class="btn" data-act="team">Piliin ang team</button>':'')+
+    (mode==='live'?'<button type="button" class="btn" data-act="team">Mga Playroom</button>':'')+
     (isLocal&&hooksOk===false?'<button type="button" class="btn primary" data-act="hooks">I-set up ang hooks</button>':'')+
     (isLocal&&hooksOk?'<span class="okchip" title="Naka-set up ang hooks sa Claude Code">✓ Hooks</span>':'')+
     (isLocal&&mode==='live'?'<button type="button" class="btn" data-act="pair">I-connect ang phone</button>':'')+
@@ -1278,6 +1311,9 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.10.0':{news:['<b>Mga Playroom:</b> ang dating "Piliin ang team" ay <b>Mga Playroom</b> na. Gumawa ng kahit ilang playroom, pangalanan, piliin kung <b>Office</b> o <b>Beach Resort</b>, at ilagay ang bawat session sa playroom niya (pindutin ang numero). Ang ★ ang leader. Ang bagong session na hindi pa nailalagay ay lalabas sa <b>Bagong dating</b>.',
+    '<b>Android:</b> sa loob na ng app nagda-download ang update, at diretso nang lumalabas ang install screen ng Android. Wala nang browser at wala nang naiipong installer sa Downloads.'],
+    todo:['Sa PC, wala kang gagawin: kusa na itong nag-a-update.','Sa phone, i-install ang update na ito sa huling pagkakataon gamit ang dating paraan. Simula sa susunod, pindutin lang ang I-update at ang Install. Sa unang beses, papayagan mo ang Dev Room na mag-install ng update (isang switch).','Para gumawa ng playroom: pindutin ang <b>Mga Playroom</b> sa itaas.']},
   '0.9.0':{news:['<b>Iba-ibang playroom sa iisang app (Units):</b> bawat project ay may sariling lugar. Ang Unit 1 ay ang office; ang Unit 2 ay <b>Beach Resort</b>: may co-working deck sa tabing-dagat, kubo, duyan, beach bar, videoke, pool at beach volleyball. Pareho ang art at ang mga tao. Pindutin ang Unit sa itaas para lumipat; may pulang bilang kapag may naghihintay sa ibang unit.',
     '<b>Malaya nang i-drag ang playroom</b>, kahit palabas sa ilalim ng panel.',
     '<b>Mabilis na ang update:</b> bawat 30 segundo nagche-check ang PC, at agad nai-install kapag nasa tray o naka-minimize. Kapag bukas ang window, mai-install ito pagkatapos ng 15 segundong hindi mo ginagalaw, pero hindi habang nagta-type ka.',
@@ -2339,11 +2375,47 @@ function liveRows(s){
     <dt>Session ID</dt><dd class="raw">${esc(s.sid)}</dd>`;
 }
 const BLABEL={SESSION_STATUS_BUCKET_WORKING:'Nagtatrabaho',SESSION_STATUS_BUCKET_BLOCKED:'Kailangan ka',SESSION_STATUS_BUCKET_REVIEW_READY:'Pa-review',SESSION_STATUS_BUCKET_COMPLETED:'Tapos ang turn',SESSION_STATUS_BUCKET_FAILED:'May error'};
+// Playrooms: make as many as you like, pick the kind of place, and put each session where you want it.
+let ROOMS_EDIT=null;
 function openTeam(){
-  const el=$('teamPanel');const {lead,list}=pickTeam(allRecords);const ids=new Set(list.map(r=>r.id));const names=TEAM.names||{};
-  const rows=allRecords.map(r=>`<div class="trow"><input type="checkbox" id="tm-${esc(r.id)}" name="tm" value="${esc(r.id)}" ${ids.has(r.id)?'checked':''} aria-label="Isama sa office"><label for="tm-${esc(r.id)}"><input type="text" class="tname" data-id="${esc(r.id)}" value="${esc(names[r.id]||r.title)}" aria-label="Pangalan ng session" style="width:100%;box-sizing:border-box;font:inherit;font-size:13px;font-weight:700;border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:var(--bg);color:var(--ink)"><small>${esc(BLABEL[r.status_bucket]||'')} · ${esc(r.cwd?baseName(r.cwd):'')} · ${esc(simLabel(r.updated_at))}</small></label><span class="lead-pick"><input type="radio" id="tl-${esc(r.id)}" name="tl" value="${esc(r.id)}" ${r.id===lead?'checked':''}><label for="tl-${esc(r.id)}">Leader</label></span></div>`).join('')||'<p class="empty">Wala pang session na nagpadala ng update.</p>';
-  el.innerHTML=`<div class="tp-card" role="dialog" aria-label="Piliin ang team"><h2>Piliin ang team</h2><p class="hint">I-check ang mga session na nasa office at piliin ang leader. Palitan ang pangalan sa format na <b>ROLE: task</b>, halimbawa <b>CODE FIXER: logic at engine</b>, para lumabas ang tamang role. Hanggang ${MAXN} na miyembro at isang leader ang kasya; ang sobra ay hindi lalabas sa office. Naka-save ito sa PC, kaya pareho ang makikita sa phone.</p><div class="tlist">${rows}</div><div class="row"><button type="button" class="btn" data-act="team-reset">Gamitin ang default</button><span style="flex:1"></span><button type="button" class="btn" data-act="team-cancel">Kanselahin</button><button type="button" class="btn primary" data-act="team-save">I-save</button></div></div>`;
-  el.hidden=false;
+  // start from what you see now (your saved playrooms, or the units made for you)
+  ROOMS_EDIT={rooms:UNITS.filter(u=>u.key!=='new').map((u,i)=>({id:(u.key.startsWith('r:')?u.key.slice(2):'p'+Date.now().toString(36)+i),name:u.label,scene:u.scene||'office',lead:u.lead,ids:(u.all||u.list).map(r=>r.id)})),names:Object.assign({},TEAM.names||{})};
+  if(!ROOMS_EDIT.rooms.length)ROOMS_EDIT.rooms.push({id:'p'+Date.now().toString(36),name:'Playroom 1',scene:'office',lead:null,ids:[]});
+  renderRooms();$('teamPanel').hidden=false;
+}
+function roomOfSid(id){return ROOMS_EDIT.rooms.find(r=>r.ids.includes(id))||null;}
+function renderRooms(){
+  const E=ROOMS_EDIT,el=$('teamPanel');
+  const rooms=E.rooms.map((r,i)=>`<div class="room"><span class="rn">${i+1}</span><input type="text" class="rname" data-room="${esc(r.id)}" value="${esc(r.name)}" aria-label="Pangalan ng playroom ${i+1}" maxlength="40">
+    <span class="kind" role="group" aria-label="Uri ng lugar">${[['office','Office'],['resort','Beach Resort']].map(([k,l])=>`<button type="button" data-rscene="${esc(r.id)}" data-v="${k}" aria-pressed="${r.scene===k}">${l}</button>`).join('')}</span>
+    <span class="rc" ${r.ids.length>MAXN+1?'style="color:var(--need);font-weight:700"':''}>${r.ids.length}/${MAXN+1}</span>${E.rooms.length>1?`<button type="button" class="rx" data-rdel="${esc(r.id)}" aria-label="Alisin ang playroom ${esc(r.name)}">✕</button>`:''}</div>`).join('');
+  const rows=allRecords.map(rec=>{const rm=roomOfSid(rec.id);const isLead=rm&&rm.lead===rec.id;
+    return `<div class="trow2"><div class="tw"><input type="text" class="tname" data-id="${esc(rec.id)}" value="${esc(E.names[rec.id]||rec.title)}" aria-label="Pangalan ng session"><small>${esc(BLABEL[rec.status_bucket]||'')} · ${esc(rec.cwd?baseName(rec.cwd):'')}</small></div>
+      <div class="where" role="group" aria-label="Saang playroom">${E.rooms.map((r,i)=>`<button type="button" data-put="${esc(rec.id)}" data-room="${esc(r.id)}" aria-pressed="${rm===r}" title="${esc(r.name)}">${i+1}</button>`).join('')}<button type="button" data-put="${esc(rec.id)}" data-room="" aria-pressed="${!rm}" title="Wala muna">–</button></div>
+      <button type="button" class="lead ${isLead?'on':''}" data-lead="${esc(rec.id)}" ${rm?'':'disabled'} aria-pressed="${!!isLead}" title="Leader ng playroom">★</button></div>`;}).join('')||'<p class="empty">Wala pang session na nagpadala ng update.</p>';
+  el.innerHTML=`<div class="tp-card rooms-card" role="dialog" aria-label="Mga Playroom"><h2>Mga Playroom</h2>
+    <p class="hint">Gumawa ng playroom, piliin kung Office o Beach Resort, at ilagay ang bawat session sa playroom niya (pindutin ang numero). Ang <b>★</b> ang leader ng playroom. Ang bagong session na hindi pa nailalagay ay lalabas sa <b>Bagong dating</b>. Hanggang ${MAXN+1} ang kasya sa bawat playroom (${MAXN} desk at ang leader). Naka-save ito sa PC, kaya pareho sa phone at tablet.</p>
+    <div class="rooms">${rooms}<button type="button" class="btn" data-act="room-add">+ Bagong playroom</button></div>
+    <div class="tlist">${rows}</div>
+    <div class="row"><button type="button" class="btn" data-act="team-reset">Ibalik sa awtomatiko</button><span style="flex:1"></span><button type="button" class="btn" data-act="team-cancel">Kanselahin</button><button type="button" class="btn primary" data-act="rooms-save">I-save</button></div></div>`;
+}
+function syncRoomInputs(){if(!ROOMS_EDIT)return;document.querySelectorAll('#teamPanel .rname').forEach(i=>{const r=ROOMS_EDIT.rooms.find(x=>x.id===i.dataset.room);if(r)r.name=i.value.trim()||r.name;});
+  document.querySelectorAll('#teamPanel .tname').forEach(i=>{const rec=allRecords.find(x=>x.id===i.dataset.id);const v=i.value.trim();if(!v||(rec&&v===rec.title))delete ROOMS_EDIT.names[i.dataset.id];else ROOMS_EDIT.names[i.dataset.id]=v;});}
+function roomsClick(e){
+  const E=ROOMS_EDIT;if(!E)return false;
+  const b=e.target.closest('[data-rscene],[data-rdel],[data-put],[data-lead],[data-act="room-add"],[data-act="rooms-save"]');if(!b)return false;
+  syncRoomInputs();
+  if(b.dataset.rscene){const r=E.rooms.find(x=>x.id===b.dataset.rscene);if(r)r.scene=b.dataset.v;}
+  else if(b.dataset.rdel){const r=E.rooms.find(x=>x.id===b.dataset.rdel);E.rooms=E.rooms.filter(x=>x!==r);}
+  else if(b.dataset.put){const id=b.dataset.put;E.rooms.forEach(r=>{r.ids=r.ids.filter(x=>x!==id);if(r.lead===id)r.lead=null;});const r=E.rooms.find(x=>x.id===b.dataset.room);if(r)r.ids.push(id);}
+  else if(b.dataset.lead){const r=roomOfSid(b.dataset.lead);if(r)r.lead=r.lead===b.dataset.lead?null:b.dataset.lead;}
+  else if(b.dataset.act==='room-add'){E.rooms.push({id:'p'+Date.now().toString(36),name:'Playroom '+(E.rooms.length+1),scene:E.rooms.length%2?'office':'resort',lead:null,ids:[]});}
+  else if(b.dataset.act==='rooms-save'){
+    const rooms=E.rooms.map(r=>({id:r.id,name:r.name,scene:r.scene,lead:r.lead,ids:r.ids}));
+    // the phone's background alerts follow everyone placed in a playroom
+    const ids=[...new Set(rooms.flatMap(r=>r.ids))];const lead=(rooms.find(r=>r.lead)||{}).lead||null;
+    saveTeam({lead,ids,names:E.names,rooms});$('teamPanel').hidden=true;ROOMS_EDIT=null;return true;}
+  const y=$('teamPanel').querySelector('.tlist')?.scrollTop||0;renderRooms();const tl=$('teamPanel').querySelector('.tlist');if(tl)tl.scrollTop=y;return true;
 }
 async function saveTeam(t){
   try{const r=await fetch('/api/team',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify(t)});if(!r.ok)throw 0;connMsg='';}
@@ -2401,6 +2473,7 @@ document.addEventListener('click',e=>{
   const ag=e.target.closest('.dcard');if(ag){openChat(+ag.dataset.id);return;}
   if(e.target.closest('[data-act="add"]')){addSession();return;}
   if(e.target.closest('[data-act="team"]')){openTeam();return;}
+  if(!$('teamPanel').hidden&&roomsClick(e))return;
   if(e.target.closest('[data-act="hooks"]')){installHooks();return;}
   if(e.target.closest('[data-act="restart"]')){restartApp(false);return;}
   if(e.target.closest('[data-act="remote-toggle"]')){toggleRemote();return;}
@@ -2413,7 +2486,7 @@ document.addEventListener('click',e=>{
   if(e.target.closest('[data-act="wn-ok"]')){$('whatsNew').hidden=true;try{localStorage.setItem('devroom.seenNotes',NOTES_VER);}catch(e){}return;}
   if(e.target.closest('[data-act="pair"]')){openPair();return;}
   if(e.target.closest('[data-act="team-cancel"]')){$('teamPanel').hidden=true;return;}
-  if(e.target.closest('[data-act="team-reset"]')){saveTeam({lead:null,ids:[],names:{}});$('teamPanel').hidden=true;return;}
+  if(e.target.closest('[data-act="team-reset"]')){saveTeam({lead:null,ids:[],names:TEAM.names||{},rooms:[]});ROOMS_EDIT=null;$('teamPanel').hidden=true;return;}
   if(e.target.closest('[data-act="team-save"]')){
     const ids=[...document.querySelectorAll('#teamPanel input[name="tm"]:checked')].map(i=>i.value);
     const l=document.querySelector('#teamPanel input[name="tl"]:checked');let lead=l?l.value:null;

@@ -150,6 +150,58 @@ public class DevRoomPlugin extends Plugin {
         claude.setLayoutParams(lp);
     }
 
+    /**
+     * Downloads the new app inside Dev Room (no browser, nothing left in Downloads) and opens Android's
+     * installer on it. Progress comes as "updateProgress" events. The first time, Android asks to allow
+     * installs from Dev Room; the call then resolves with needsPermission and opens that setting.
+     */
+    @PluginMethod
+    public void installUpdate(PluginCall call) {
+        String url = call.getString("url");
+        if (url == null || !url.startsWith("https://github.com/Ronanski/dev-room-app/releases/")) { call.reject("bad url"); return; }
+        Context ctx = getContext();
+        if (Build.VERSION.SDK_INT >= 26 && !ctx.getPackageManager().canRequestPackageInstalls()) {
+            Intent s = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + ctx.getPackageName()));
+            s.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try { ctx.startActivity(s); } catch (Exception ignored) { }
+            JSObject r = new JSObject(); r.put("needsPermission", true); call.resolve(r); return;
+        }
+        new Thread(() -> {
+            java.io.File dir = new java.io.File(ctx.getCacheDir(), "updates");
+            java.io.File apk = new java.io.File(dir, "DevRoom.apk");
+            try {
+                dir.mkdirs();
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                c.setInstanceFollowRedirects(true);
+                c.setConnectTimeout(15000);
+                c.setReadTimeout(30000);
+                int code = c.getResponseCode();
+                if (code != 200) throw new Exception("HTTP " + code);
+                long total = c.getContentLengthLong(), got = 0;
+                int last = -1;
+                try (java.io.InputStream in = c.getInputStream(); java.io.OutputStream out = new java.io.FileOutputStream(apk)) {
+                    byte[] buf = new byte[64 * 1024];
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        out.write(buf, 0, n);
+                        got += n;
+                        int pct = total > 0 ? (int) (got * 100 / total) : -1;
+                        if (pct != last) { last = pct; JSObject p = new JSObject(); p.put("pct", pct); notifyListeners("updateProgress", p); }
+                    }
+                } finally { c.disconnect(); }
+                if (apk.length() < 1024 * 1024) throw new Exception("download looks wrong");
+                Uri uri = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", apk);
+                Intent i = new Intent(Intent.ACTION_VIEW);
+                i.setDataAndType(uri, "application/vnd.android.package-archive");
+                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(i);
+                JSObject r = new JSObject(); r.put("ok", true); call.resolve(r);
+            } catch (Exception e) {
+                call.reject("Hindi na-download ang update: " + e.getMessage());
+            }
+        }).start();
+    }
+
     @PluginMethod
     public void info(PluginCall call) {
         JSObject r = new JSObject();

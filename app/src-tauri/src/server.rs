@@ -677,7 +677,17 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16, tun: bool) {
             let ids: Vec<Value> = v.get("ids").and_then(|x| x.as_array()).cloned().unwrap_or_default().into_iter().filter(|x| x.is_string()).collect();
             let names: Map<String, Value> = v.get("names").and_then(|x| x.as_object()).cloned().unwrap_or_default()
                 .into_iter().filter(|(_, n)| n.is_string()).map(|(k, n)| (k, json!(clip(n.as_str().unwrap(), 120)))).collect();
-            s.team = json!({"lead": lead, "ids": ids, "names": names});
+            // playrooms you made: name, kind of place, leader and members (at most 12, each checked)
+            let rooms: Vec<Value> = v.get("rooms").and_then(|x| x.as_array()).cloned().unwrap_or_default().into_iter().take(12).filter_map(|r| {
+                let o = r.as_object()?;
+                let id = o.get("id").and_then(|x| x.as_str()).filter(|x| !x.is_empty() && x.len() <= 40)?;
+                let name = clip(o.get("name").and_then(|x| x.as_str()).unwrap_or("Playroom").trim(), 40);
+                let scene = o.get("scene").and_then(|x| x.as_str()).filter(|x| ["office", "resort"].contains(x)).unwrap_or("office");
+                let lead = o.get("lead").cloned().filter(|x| x.is_string()).unwrap_or(Value::Null);
+                let ids: Vec<Value> = o.get("ids").and_then(|x| x.as_array()).cloned().unwrap_or_default().into_iter().filter(|x| x.is_string()).take(40).collect();
+                Some(json!({"id": id, "name": name, "scene": scene, "lead": lead, "ids": ids}))
+            }).collect();
+            s.team = json!({"lead": lead, "ids": ids, "names": names, "rooms": rooms});
             s.bump(); s.save();
             respond_json(req, 200, &json!({"ok": true}));
         }

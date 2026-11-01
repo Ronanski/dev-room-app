@@ -26,7 +26,7 @@ The user's real team is **LOGIC_SIM_PROJECT**: a leader plus subsessions (CODE F
 6. **The PC app updates itself:**
    - The UI is hot-swapped right away.
    - The exe is swapped in, then the app restarts by itself while it sits in the tray, or after a countdown when the window is open.
-7. **The phone app** shows an **I-update** banner; installing the APK is the only manual step.
+7. **The phone app** shows an **I-update** banner. It downloads inside the app; the user presses Android's Install, which is the only manual step.
 
 ## Architecture
 
@@ -56,17 +56,20 @@ The user's real team is **LOGIC_SIM_PROJECT**: a leader plus subsessions (CODE F
   - Starts with Windows by default.
   - Single instance through `/api/show`.
   - The embedded claude.ai chat is a child webview over the Chat panel. It uses the Tauri `unstable` feature, and its navigation is limited to an allowlist.
-- **`app/src-tauri/src/updater.rs`:** polls the Latest release every 3 minutes and does the UI hot swap and the exe swap.
+- **`app/src-tauri/src/updater.rs`:** polls the Latest release every 30 seconds and does the UI hot swap and the exe swap. It restarts at once in the tray or when minimized; with the window open, after 15 seconds idle.
 - **`app/ui/index.html`:** the whole UI in one file: canvas map, overlay, panel, chat feed and notes. Edit it directly; `tools/ui-build/` only reproduces older versions.
 - **Scenes and units (in `index.html`):**
   - `setScene('office'|'resort')` redraws the background (`drawOfficeBG` / `drawResortBG`), rebuilds the furniture (`buildOffice` / `buildResort`) and re-bakes it.
   - Both scenes share the floor plan: `DESKS`, `SPOTS` and the routes.
-  - `computeUnits` groups sessions by team or project folder. Units alternate scenes.
+  - `computeUnits` uses your playrooms (`TEAM.rooms`: id, name, scene, lead, ids), with unplaced sessions in "Bagong dating".
+  - With no playrooms saved, it groups sessions by team or project folder, and the units alternate scenes.
+  - The **Mga Playroom** editor is `openTeam` / `renderRooms` / `roomsClick`.
   - New scenes must keep the same desk and spot coordinates.
 - **`mobile/`:** the Capacitor Android shell.
   - It shows the office in an iframe, served by the PC.
   - `ClaudeActivity` is the in-app claude.ai screen.
   - `WatchService` sends background alerts.
+  - `DevRoom.installUpdate` downloads the APK in the app and opens the Android installer (REQUEST_INSTALL_PACKAGES).
   - It pairs with `devroom://pair?u&t&a`, with a Tailscale fallback.
 - **CI:** `.github/workflows/windows-app.yml`.
   - The APK is signed with the secrets `ANDROID_KEYSTORE_B64` and `ANDROID_KEYSTORE_PASSWORD`; never print them.

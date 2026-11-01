@@ -7,6 +7,21 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.10.0 (2026-11-01)
+
+- **Playrooms you make.** "Piliin ang team" is now **Mga Playroom**:
+  - Add as many playrooms as you like, name them, and pick **Office** or **Beach Resort** for each.
+  - Put each session in its playroom with the number buttons, and mark the leader with ★.
+  - Sessions not placed yet show in **Bagong dating**.
+  - Saved on the PC (`team.rooms`, validated: at most 12 playrooms, 40 members each), so every device sees the same.
+  - The phone's background alerts follow everyone placed in a playroom.
+  - With no playrooms saved, the automatic units stay as before, and the editor starts from them.
+- **Android updates inside the app.**
+  - The new APK downloads into the app's cache, with progress shown, and Android's installer opens on it (FileProvider). No browser, nothing left in Downloads.
+  - The first time, Android asks to allow installs from Dev Room. The app opens that setting and explains it.
+- The playroom tabs scroll to the one you are in, and the title never pushes them off screen.
+- The playroom editor scrolls as one page, and shows "7/9" so you can see how many fit.
+
 ## 0.9.0 (2026-11-01)
 
 - **Updates arrive in seconds, not minutes.**
