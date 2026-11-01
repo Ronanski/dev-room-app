@@ -9,6 +9,9 @@ The version lives in `VERSION`. Each build is published as release `v<VERSION>-b
 
 ## 0.9.0 (2026-11-01)
 
+- **The PC app installs updates while minimized.**
+  - Before, a minimized window waited for you forever. Only the UI updated; the exe (server features) did not.
+  - Now a minimized window counts like the tray: the update installs within about 3 minutes and the window comes back minimized.
 - **Units: several playrooms in one app.**
   - Unit 1 is your chosen team (or the biggest project). Every other project folder gets its own unit, shown as tabs under the title, with a red count when someone there needs you.
   - Units alternate between scenes:

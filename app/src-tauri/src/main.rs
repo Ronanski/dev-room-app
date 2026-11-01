@@ -119,6 +119,7 @@ fn claude_view(app: &AppHandle, rect: Option<(f64, f64, f64, f64)>) {
 
 fn show_main(app: &AppHandle, port: u16) {
     updater::set_hidden(false);
+    updater::set_minimized(false);
     // a plain Window: once the Claude view is added, the window is no longer a single-webview "WebviewWindow"
     if let Some(w) = app.get_window("main") {
         let _ = w.show();
@@ -155,7 +156,14 @@ fn main() {
     }
     let app = tauri::Builder::default()
         .setup(move |app| {
-            if !hidden { make_window(app.handle(), port); }
+            if !hidden {
+                make_window(app.handle(), port);
+                // restarted for an update while minimized: come back minimized
+                if std::env::args().any(|a| a == "--minimized") {
+                    if let Some(w) = app.get_window("main") { let _ = w.minimize(); }
+                    updater::set_minimized(true);
+                }
+            }
             let ch = app.handle().clone();
             let _ = server::ON_CLAUDE.set(Box::new(move |rect| claude_view(&ch, rect)));
             let handle = app.handle().clone();
@@ -192,7 +200,13 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let WindowEvent::Destroyed = event { if window.label() == "main" { updater::set_hidden(true); } }
+            if window.label() != "main" { return; }
+            match event {
+                WindowEvent::Destroyed => { updater::set_hidden(true); updater::set_minimized(false); }
+                // minimizing and restoring show up as resizes and focus changes
+                WindowEvent::Resized(_) | WindowEvent::Focused(_) => updater::set_minimized(window.is_minimized().unwrap_or(false)),
+                _ => {}
+            }
         })
         .build(tauri::generate_context!())
         .expect("error while building Dev Room");
