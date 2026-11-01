@@ -83,6 +83,6 @@ Every push to `main` (and, until `main` exists, to this PR's branch) builds and 
 
 The running app checks `version.json` every 3 minutes.
 - **UI update:** when the UI's API version (`api-version.txt`) is unchanged, the new `index.html` is cached in `%APPDATA%\DevRoom\ui` and served at once. Open windows and paired phones reload themselves.
-- **App update:** the new `DevRoom.exe` is downloaded next to the running one and swapped in, and the old copy becomes `DevRoom.old.exe`. A green bar then offers **I-restart ngayon**.
+- **App update:** the new `DevRoom.exe` is downloaded next to the running one and swapped in, and the old copy becomes `DevRoom.old.exe`. Dev Room then restarts by itself: right away while it sits in the tray, otherwise after a minute without input, with a 10-second countdown that has **Ngayon na** and **Mamaya** buttons.
 
 Bump `api-version.txt` whenever the UI starts depending on a server change. An older exe then waits for its own update instead of loading a UI it cannot serve.

@@ -4,12 +4,14 @@
 //! - A newer UI (`index.html`) with the same API version is cached in %APPDATA%\DevRoom\ui
 //!   and served right away; open windows and phones reload themselves.
 //! - A newer `DevRoom.exe` is downloaded next to the running one and swapped in
-//!   (running exe -> DevRoom.old.exe). The UI then offers a one-click restart.
+//!   (running exe -> DevRoom.old.exe). The app restarts by itself while it sits in the tray;
+//!   an open window counts down after a minute without input, with a button to wait.
 
 use serde_json::{json, Value};
 use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -46,6 +48,10 @@ pub fn ui_html() -> Option<String> { STATE.lock().ok()?.ui.as_ref().map(|(_, h)|
 pub fn ui_build() -> u64 { STATE.lock().ok().and_then(|s| s.ui.as_ref().map(|(b, _)| *b)).unwrap_or(BUILD) }
 pub fn exe_ready() -> bool { STATE.lock().map(|s| s.exe_ready.is_some()).unwrap_or(false) }
 pub fn note() -> String { STATE.lock().map(|s| s.note.clone()).unwrap_or_default() }
+
+/// Whether the window is hidden in the tray (set by main), so an update can restart without bothering anyone.
+pub static HIDDEN: AtomicBool = AtomicBool::new(false);
+pub fn set_hidden(h: bool) { HIDDEN.store(h, Ordering::Relaxed); }
 
 fn set_note(n: &str) { if let Ok(mut s) = STATE.lock() { s.note = n.to_string(); } }
 
@@ -110,17 +116,24 @@ pub fn start() {
         std::thread::sleep(Duration::from_secs(15));
         loop {
             match check_once() { Ok(()) => set_note(""), Err(e) => set_note(&format!("Hindi nakapag-check ng update: {e}")) }
-            std::thread::sleep(Duration::from_secs(180));
+            for _ in 0..18 {
+                if exe_ready() && HIDDEN.load(Ordering::Relaxed) { restart(true); return; }
+                std::thread::sleep(Duration::from_secs(10));
+            }
         }
     });
 }
 
 /// Start the (already swapped-in) exe and quit this one. The new copy waits for the port.
-pub fn restart() {
-    std::thread::spawn(|| {
+/// `hidden` keeps the new copy in the tray, like the one it replaces.
+pub fn restart(hidden: bool) {
+    let hidden = hidden || HIDDEN.load(Ordering::Relaxed);
+    std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(300));
         if let Ok(exe) = std::env::current_exe() {
-            let _ = std::process::Command::new(exe).spawn();
+            let mut cmd = std::process::Command::new(exe);
+            if hidden { cmd.arg("--tray"); }
+            let _ = cmd.spawn();
         }
         std::process::exit(0);
     });

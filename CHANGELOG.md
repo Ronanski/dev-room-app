@@ -7,6 +7,14 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.5.1 (2026-11-01)
+
+### Changed
+- **Updates install themselves on the PC.**
+  - With Dev Room in the tray, it restarts into the new version right away and stays in the tray.
+  - With the window open, it waits for a minute without input, then counts down 10 seconds. The countdown shows in fullscreen too, with **Ngayon na** and **Mamaya** (wait 20 minutes) buttons.
+  - Phones and tablets reconnect by themselves after a few seconds.
+
 ## 0.5.0 (2026-11-01)
 
 ### Added
