@@ -52,7 +52,8 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline
 .app.focus .dcard .pill{font-size:10.5px;padding:1px 7px;white-space:nowrap}
 .app.focus .pane[data-pane="office"]{display:flex!important;height:100%}
 .app.focus .mapwrap{height:100%;flex:1}
-.app{container-type:inline-size;container-name:app;position:relative;background:var(--bg)}
+.app{container-type:inline-size;container-name:app;position:relative;background:var(--bg);overflow-x:clip}
+html,body{overflow-x:hidden}
 .statusbar{display:none}
 
 .top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding-bottom:8px;border-bottom:1px solid var(--line);margin-bottom:8px;flex:none}
