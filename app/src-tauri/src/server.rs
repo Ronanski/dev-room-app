@@ -456,7 +456,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
         (Method::Post, "/api/restart") => {
             if !local { return respond_json(req, 403, &json!({"error": "loopback only"})); }
             respond_json(req, 200, &json!({"ok": true}));
-            crate::updater::restart();
+            crate::updater::restart(q.get("hidden").map(|v| v == "1").unwrap_or(false));
         }
         (Method::Get, "/pair.json") => {
             if !local { return respond_json(req, 403, &json!({"error": "loopback only"})); }

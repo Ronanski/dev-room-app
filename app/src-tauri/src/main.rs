@@ -38,6 +38,7 @@ fn set_autostart(on: bool) {
 fn show_main(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
+        updater::set_hidden(false);
         let _ = w.unminimize();
         let _ = w.set_focus();
     }
@@ -49,6 +50,7 @@ fn main() {
     updater::start();
     // Started with Windows: stay in the tray until the user opens the window.
     let hidden = std::env::args().any(|a| a == "--tray");
+    updater::set_hidden(hidden);
     tauri::Builder::default()
         .setup(move |app| {
             let url = format!("http://127.0.0.1:{port}/").parse().expect("valid url");
@@ -89,6 +91,7 @@ fn main() {
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let _ = window.hide();
+                updater::set_hidden(true);
                 api.prevent_close();
             }
         })

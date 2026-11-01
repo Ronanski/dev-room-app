@@ -36,7 +36,8 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline
 .stage{max-width:none;margin:0}
 .stage[data-device="desktop"] .app{height:calc(100dvh - 16px);display:flex;flex-direction:column}
 .app:fullscreen{height:100vh!important;padding:10px;box-sizing:border-box}
-.app.focus .top,.app.focus .conn,.app.focus .updbar,.app.focus .legend,.app.focus .rule,.app.focus .tabs,.app.focus .statusbar{display:none!important}
+.app.focus .top,.app.focus .conn,.app.focus .updbar:not(.counting),.app.focus .legend,.app.focus .rule,.app.focus .tabs,.app.focus .statusbar{display:none!important}
+.app.focus .updbar.counting{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:60;box-shadow:0 8px 24px rgba(42,32,26,.28)}
 .app.focus{position:fixed;inset:0;z-index:50;height:100%!important;padding:6px;box-sizing:border-box;background:var(--bg)}
 .app.focus .body{grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"office" "dock";height:100%;row-gap:6px}
 /* fullscreen keeps a one-line strip of session cards under the map */
@@ -1011,10 +1012,27 @@ function updates(j){
   if(j.app_version){const v=$('ver');const t=`v${j.app_version} (build ${j.app_build}) · `;if(v.textContent!==t)v.textContent=t;}
   if(j.ui_build!=null){if(uiBuild===null)uiBuild=j.ui_build;else if(j.ui_build!==uiBuild){location.reload();return;}}
   const el=$('updbar');if(!el)return;
-  if(j.update_ready&&j.local){el.hidden=false;el.innerHTML=`<span>Na-download na ang bagong bersyon ng Dev Room app${j.latest&&j.latest.version?' (v'+j.latest.version+')':''}.</span>`+'<button type="button" class="btn primary" data-act="restart">I-restart ngayon</button>';}
-  else el.hidden=true;
+  if(!(j.update_ready&&j.local)){el.hidden=true;return;}
+  autoRestart.ready=true;autoRestart.ver=j.latest&&j.latest.version||'';autoRestart.tick();
 }
-async function restartApp(){try{await fetch('/api/restart',{method:'POST'});}catch(e){}$('updbar').innerHTML='<span>Nagre-restart ang Dev Room. Bubukas ulit ito sa loob ng ilang segundo.</span>';}
+// A downloaded update installs itself: right away when the window is not on screen, otherwise after a
+// minute without input, with a 10 s countdown and a button to wait.
+const autoRestart={ready:false,ver:'',left:0,timer:0,waitUntil:0,lastInput:Date.now(),
+  tick(){
+    if(!this.ready||this.timer||restartApp.going)return;
+    if(document.hidden){restartApp(true);return;}
+    const el=$('updbar');el.hidden=false;
+    if(Date.now()<this.waitUntil||Date.now()-this.lastInput<60000){
+      el.innerHTML=`<span>May bagong bersyon ng Dev Room${this.ver?' (v'+this.ver+')':''}. Kusa itong magre-restart kapag hindi mo ginagamit.</span><button type="button" class="btn primary" data-act="restart">I-restart ngayon</button>`;return;}
+    this.left=10;this.show();
+    this.timer=setInterval(()=>{if(--this.left<=0){clearInterval(this.timer);this.timer=0;restartApp(false);}else this.show();},1000);
+  },
+  show(){const el=$('updbar');el.hidden=false;el.classList.add('counting');el.innerHTML=`<span>Magre-restart ang Dev Room sa loob ng ${this.left} segundo para sa update.</span><button type="button" class="btn" data-act="restart-wait">Mamaya</button><button type="button" class="btn primary" data-act="restart">Ngayon na</button>`;},
+  wait(){clearInterval(this.timer);this.timer=0;$('updbar').classList.remove('counting');this.waitUntil=Date.now()+20*60000;this.tick();}};
+['pointerdown','keydown','wheel','touchstart'].forEach(ev=>addEventListener(ev,()=>{autoRestart.lastInput=Date.now();},{passive:true,capture:true}));
+document.addEventListener('visibilitychange',()=>autoRestart.tick());
+setInterval(()=>autoRestart.tick(),5000);
+async function restartApp(hidden){if(restartApp.going)return;restartApp.going=true;try{await fetch('/api/restart'+(hidden?'?hidden=1':''),{method:'POST'});}catch(e){}$('updbar').hidden=false;$('updbar').innerHTML='<span>Nagre-restart ang Dev Room. Babalik ito sa loob ng ilang segundo.</span>';}
 async function installHooks(){
   if(!confirm(`Idadagdag ng Dev Room ang hooks sa ${settingsPath||'settings.json ng Claude'}. Gagawa muna ito ng backup. Ituloy?`))return;
   try{const r=await fetch('/api/install-hooks',{method:'POST'});const j=await r.json();
@@ -1678,7 +1696,8 @@ document.addEventListener('click',e=>{
   if(e.target.closest('[data-act="add"]')){addSession();return;}
   if(e.target.closest('[data-act="team"]')){openTeam();return;}
   if(e.target.closest('[data-act="hooks"]')){installHooks();return;}
-  if(e.target.closest('[data-act="restart"]')){restartApp();return;}
+  if(e.target.closest('[data-act="restart"]')){restartApp(false);return;}
+  if(e.target.closest('[data-act="restart-wait"]')){autoRestart.wait();return;}
   if(e.target.closest('[data-act="pair"]')){openPair();return;}
   if(e.target.closest('[data-act="team-cancel"]')){$('teamPanel').hidden=true;return;}
   if(e.target.closest('[data-act="team-reset"]')){saveTeam({lead:null,ids:[],names:TEAM.names||{}});$('teamPanel').hidden=true;return;}
