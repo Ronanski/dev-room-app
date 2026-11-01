@@ -9,14 +9,14 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::net::{IpAddr, SocketAddr};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
 pub const DEFAULT_PORT: u16 = 4317;
 const INDEX_HTML: &str = include_str!("../../ui/index.html");
-const HOOK_EVENTS: [&str; 6] = ["SessionStart", "UserPromptSubmit", "PreToolUse", "Notification", "Stop", "SessionEnd"];
+const HOOK_EVENTS: [&str; 8] = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "SubagentStop", "Notification", "Stop", "SessionEnd"];
 const MAX_BODY: usize = 4 * 1024 * 1024;
 
 fn now_ms() -> u64 {
@@ -97,6 +97,13 @@ fn is_ours(entry: &Value) -> bool {
     )).unwrap_or(false)
 }
 
+/// True when settings.json already holds at least one Dev Room hook.
+fn has_any_ours() -> bool {
+    let Ok(text) = fs::read_to_string(claude_settings_path()) else { return false };
+    let Ok(v) = serde_json::from_str::<Value>(&text) else { return false };
+    v.get("hooks").and_then(|h| h.as_object()).map(|m| m.values().any(|a| a.as_array().map(|a| a.iter().any(is_ours)).unwrap_or(false))).unwrap_or(false)
+}
+
 pub fn hooks_installed(port: u16) -> bool {
     let Ok(text) = fs::read_to_string(claude_settings_path()) else { return false };
     let Ok(v) = serde_json::from_str::<Value>(&text) else { return false };
@@ -129,7 +136,7 @@ pub fn install_hooks(port: u16) -> Result<Value, String> {
         let arr = list.as_array_mut().unwrap();
         arr.retain(|e| !is_ours(e));
         let mut entry = json!({"hooks": [{"type": "command", "command": cmd, "timeout": 3}]});
-        if ev == "PreToolUse" { entry["matcher"] = json!("*"); }
+        if ev == "PreToolUse" || ev == "PostToolUse" { entry["matcher"] = json!("*"); }
         arr.push(entry);
     }
     if let Some(dir) = path.parent() { fs::create_dir_all(dir).map_err(|e| e.to_string())?; }
@@ -230,6 +237,7 @@ fn apply_hook(st: &mut State, v: &Value) {
     }
     s.insert("updated_at".into(), json!(now));
     s.insert("last_event".into(), json!(ev));
+    s.remove("live_guess");
     let mut persist = true;
     match ev {
         "SessionStart" => {
@@ -253,6 +261,20 @@ fn apply_hook(st: &mut State, v: &Value) {
             s.insert("ask".into(), json!(""));
             s.insert("short".into(), json!(short));
             s.insert("detail".into(), json!(detail));
+            persist = false;
+        }
+        "PostToolUse" => {
+            // The tool ran, so any permission prompt for it has been answered.
+            s.insert("status".into(), json!("working"));
+            s.insert("ask".into(), json!(""));
+            persist = false;
+        }
+        "SubagentStop" => {
+            if s.get("status").and_then(|x| x.as_str()) == Some("idle") {
+                s.insert("status".into(), json!("working"));
+                s.insert("short".into(), json!("Binabasa ang resulta ng agent."));
+                s.insert("detail".into(), json!("Tapos na ang isang agent; binabasa ang resulta."));
+            }
             persist = false;
         }
         "Notification" => {
@@ -447,6 +469,56 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16) {
 
 /// Start the server on a background thread. Returns the port, or None if it is already taken
 /// (for example a second copy of Dev Room is running; the window then shows that one).
+/// Newest write to a session's transcript or to its subagents' transcripts.
+fn latest_write(t: &Path) -> u64 {
+    let ms = |p: &Path| fs::metadata(p).and_then(|m| m.modified()).ok()
+        .and_then(|m| m.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_millis() as u64).unwrap_or(0);
+    let mut best = ms(t);
+    if let (Some(dir), Some(stem)) = (t.parent(), t.file_stem()) {
+        if let Ok(rd) = fs::read_dir(dir.join(stem).join("subagents")) {
+            for e in rd.flatten() { best = best.max(ms(&e.path())); }
+        }
+    }
+    best
+}
+
+/// A session can keep working after its turn ends (background agents and tasks, or a turn the
+/// session resumes on its own) without sending a prompt hook. If its transcript is still being written
+/// well after the last hook, it is working; once the writes stop for a while, it is idle again.
+fn liveness(st: &Mutex<State>) {
+    let now = now_ms();
+    let mut s = st.lock().unwrap();
+    let mut changed = false;
+    for v in s.sessions.values_mut() {
+        let Some(o) = v.as_object_mut() else { continue };
+        let Some(t) = o.get("transcript").and_then(|x| x.as_str()).map(String::from) else { continue };
+        let status = o.get("status").and_then(|x| x.as_str()).unwrap_or("idle").to_string();
+        let hook_at = o.get("updated_at").and_then(|x| x.as_u64()).unwrap_or(0);
+        let guess = o.get("live_guess").and_then(|x| x.as_bool()).unwrap_or(false);
+        if status == "idle" {
+            let w = latest_write(Path::new(&t));
+            if w > hook_at + 5000 && now.saturating_sub(w) < 15_000 {
+                o.insert("status".into(), json!("working"));
+                o.insert("short".into(), json!("Tuloy ang trabaho."));
+                o.insert("detail".into(), json!("May ginagawa pa sa background."));
+                o.insert("live_guess".into(), json!(true));
+                o.insert("live_at".into(), json!(now));
+                changed = true;
+            }
+        } else if guess && status == "working" {
+            let w = latest_write(Path::new(&t)).max(hook_at);
+            if now.saturating_sub(w) > 60_000 {
+                o.insert("status".into(), json!("idle"));
+                o.insert("short".into(), json!(""));
+                o.insert("detail".into(), json!(""));
+                o.remove("live_guess");
+                changed = true;
+            }
+        }
+    }
+    if changed { s.bump(); }
+}
+
 pub fn start(port: u16) -> Option<u16> {
     let mut server = None;
     for _ in 0..40 {
@@ -454,6 +526,10 @@ pub fn start(port: u16) -> Option<u16> {
     }
     let server = server?;
     let st = Arc::new(Mutex::new(State::load(data_dir())));
+    // Hooks set up by an older version get the newer events too (same consent, same command).
+    if !hooks_installed(port) && has_any_ours() { let _ = install_hooks(port); }
+    let live = st.clone();
+    std::thread::spawn(move || loop { std::thread::sleep(std::time::Duration::from_secs(3)); liveness(&live); });
     std::thread::spawn(move || {
         for req in server.incoming_requests() { handle(req, &st, port); }
     });

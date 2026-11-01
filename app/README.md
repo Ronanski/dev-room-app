@@ -6,7 +6,7 @@ A portable Windows app that shows your Claude Code sessions as characters in the
 
 ```
 Claude Code sessions on your PC
-   │  hooks (SessionStart, UserPromptSubmit, PreToolUse, Notification, Stop, SessionEnd)
+   │  hooks (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, SubagentStop, Notification, Stop, SessionEnd)
    │  curl POST → http://127.0.0.1:4317/hook
    ▼
 DevRoom.exe  (Tauri window + local server on port 4317)
@@ -17,11 +17,13 @@ Phone on the same Wi-Fi  (http://<PC IP>:4317/?t=<pairing token>, from the QR co
 
 - **Status from hooks:**
   - `UserPromptSubmit` and `PreToolUse` mean working; the tool decides the bubble ("Ine-edit ang trip.ts.").
-  - A `Notification` (permission prompt) means the session needs you.
+  - A `Notification` (permission prompt) means the session needs you. `PostToolUse` clears it once the tool runs.
+  - `SubagentStop` while on break means the session is reading an agent's result.
+  - **Work after the turn:** if the transcript, or a subagent's transcript, is still being written 5 s after the last hook, the session is working (background agents or tasks). It goes back to break after a minute without writes.
   - `Stop` means the turn ended. If the last assistant message ends in a question, it needs you; otherwise it is on break.
   - `SessionEnd` removes the session.
 - **Session names** come from the transcript (`/rename` title or summary), otherwise the folder name. You can rename sessions in **Piliin ang team**. Use `ROLE: task` (for example `CODE FIXER: logic`) to get the role, and pick the leader there.
-- **Hooks setup:** the **I-set up ang hooks** button merges six hooks into `%USERPROFILE%\.claude\settings.json`. It keeps your other settings and hooks, writes a backup first, and is safe to press again. Restart open Claude Code sessions afterwards.
+- **Hooks setup:** the **I-set up ang hooks** button merges eight hooks into `%USERPROFILE%\.claude\settings.json`. It keeps your other settings and hooks, writes a backup first, and is safe to press again. Restart open Claude Code sessions afterwards. When a new version adds hook events, Dev Room adds them by itself at start-up if your setup already has its hooks.
 - **Phone:** **I-connect ang phone** shows a QR code with a pairing token. Without the token, other devices on the network get nothing. Hooks are accepted only from the PC itself.
 - **State** (team, names, last known sessions, token) lives in `%APPDATA%\DevRoom\state.json`.
 
