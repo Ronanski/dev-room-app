@@ -60,6 +60,8 @@ struct State {
     remote_seen: u64,
     /// "Malayo mode": the paired phone can reach Dev Room from anywhere through a tunnel (on by default).
     remote_off: bool,
+    /// Sessions that really ended (SessionEnd), so the transcript scan does not bring them back: id -> when.
+    gone: Map<String, Value>,
 }
 
 impl State {
@@ -67,7 +69,7 @@ impl State {
 
     fn save(&self) {
         let _ = fs::create_dir_all(&self.dir);
-        let data = json!({"sessions": self.sessions, "team": self.team, "token": self.token, "away": self.away, "away_v": 2, "remote_off": self.remote_off});
+        let data = json!({"sessions": self.sessions, "team": self.team, "token": self.token, "away": self.away, "away_v": 2, "remote_off": self.remote_off, "gone": self.gone});
         // write then rename, so a crash never leaves a half-written file (which would unpair every phone)
         let tmp = self.dir.join("state.json.tmp");
         if fs::write(&tmp, serde_json::to_vec(&data).unwrap_or_default()).is_ok() { let _ = fs::rename(&tmp, self.dir.join("state.json")); }
@@ -80,12 +82,16 @@ impl State {
                 if let Some(m) = v.get("sessions").and_then(|s| s.as_object()) {
                     let cutoff = now_ms().saturating_sub(3 * 24 * 3600 * 1000);
                     for (k, s) in m {
-                        if s.get("updated_at").and_then(|t| t.as_u64()).unwrap_or(0) > cutoff {
+                        if s.get("updated_at").and_then(|t| t.as_u64()).unwrap_or(0) > cutoff || s.get("keep_until").and_then(|t| t.as_u64()).unwrap_or(0) > now_ms() {
                             st.sessions.insert(k.clone(), s.clone());
                         }
                     }
                 }
                 if let Some(t) = v.get("team") { if t.is_object() { st.team = t.clone(); } }
+                if let Some(g) = v.get("gone").and_then(|g| g.as_object()) {
+                    let cutoff = now_ms().saturating_sub(3 * 24 * 3600 * 1000);
+                    for (k, at) in g { if at.as_u64().unwrap_or(0) > cutoff { st.gone.insert(k.clone(), at.clone()); } }
+                }
                 if let Some(t) = v.get("token").and_then(|t| t.as_str()) { st.token = t.to_string(); }
                 st.remote_off = v.get("remote_off").and_then(|x| x.as_bool()).unwrap_or(false);
                 // 0.6.0-0.6.2 defaulted to "auto"; a held Stop hook looks like a session that never answers, so start from "off"
@@ -227,6 +233,13 @@ fn read_transcript(path: &str, full_title_scan: bool) -> (Option<String>, Titles
             },
         }
     }
+    // a rename kept in the sidecar file wins when it is newer than the transcript's last write
+    if let Some(sid) = Path::new(path).file_stem().and_then(|x| x.to_str()) {
+        if let Some((t, at)) = sidecar_title(path, sid) {
+            let tr = fs::metadata(path).and_then(|m| m.modified()).ok().and_then(|x| x.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_millis()).unwrap_or(0);
+            if custom.is_none() || at >= tr { custom = Some(t); }
+        }
+    }
     // the first time: a name given long ago is further back than the last part
     if (custom.is_none() || auto.is_none()) && full_title_scan && len < 64 * 1024 * 1024 {
         if let Ok(f) = fs::File::open(path) {
@@ -307,6 +320,7 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Titles)>)
         return;
     }
     let now = now_ms();
+    st.gone.remove(&sid);
     let entry = st.sessions.entry(sid.clone()).or_insert_with(|| json!({
         "id": sid, "status": "idle", "detail": "", "ask": "", "recent": "", "short": "", "auto_title": "", "title_scanned": false, "started_at": now
     }));
@@ -869,6 +883,13 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16, tun: bool) {
             drop(s);
             respond_json(req, 200, &body);
         }
+        (Method::Post, "/api/scan") => {
+            if !token_ok { return respond_json(req, 401, &json!({"error": "pairing"})); }
+            let days = read_body(&mut req).and_then(|v| v.get("days").and_then(|d| d.as_u64())).unwrap_or(14).clamp(1, 30);
+            let added = scan_sessions(st, days * 24 * 3600 * 1000, true);
+            let total = lk(st).sessions.len();
+            respond_json(req, 200, &json!({"added": added, "total": total, "dirs": claude_dirs().iter().map(|d| d.display().to_string()).collect::<Vec<_>>()}));
+        }
         (Method::Post, "/api/team") => {
             if !token_ok { return respond_json(req, 401, &json!({"error": "pairing"})); }
             let Some(v) = read_body(&mut req) else { return respond_json(req, 400, &json!({"error": "bad json"})) };
@@ -1020,6 +1041,90 @@ fn latest_write(t: &Path) -> u64 {
 /// A session can keep working after its turn ends (background agents and tasks, or a turn the
 /// session resumes on its own) without sending a prompt hook. If its transcript is still being written
 /// well after the last hook, it is working; once the writes stop for a while, it is idle again.
+/// Claude Code folders on this PC: ~/.claude, CLAUDE_CONFIG_DIR, and other ~/.claude-* folders (one per account).
+fn claude_dirs() -> Vec<PathBuf> {
+    let mut v: Vec<PathBuf> = Vec::new();
+    if let Some(c) = std::env::var_os("CLAUDE_CONFIG_DIR") { v.push(PathBuf::from(c)); }
+    if let Some(h) = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")).map(PathBuf::from) {
+        v.push(h.join(".claude"));
+        if let Ok(rd) = fs::read_dir(&h) {
+            for e in rd.flatten() {
+                let n = e.file_name().to_string_lossy().to_string();
+                if n.starts_with(".claude") && n != ".claude" && e.path().join("projects").is_dir() { v.push(e.path()); }
+            }
+        }
+    }
+    let mut out: Vec<PathBuf> = Vec::new();
+    for d in v { let c = fs::canonicalize(&d).unwrap_or(d); if c.join("projects").is_dir() && !out.contains(&c) { out.push(c); } }
+    out
+}
+
+/// The folder a session ran in and its first prompt, from the first lines of its transcript.
+fn transcript_head(path: &Path) -> (String, Option<String>) {
+    let Ok(f) = fs::File::open(path) else { return (String::new(), None) };
+    let (mut cwd, mut first) = (String::new(), None);
+    for line in BufReader::new(f).lines().map_while(Result::ok).take(400) {
+        let Ok(v) = serde_json::from_str::<Value>(&line) else { continue };
+        if cwd.is_empty() { if let Some(c) = v.get("cwd").and_then(|x| x.as_str()) { cwd = c.to_string(); } }
+        if first.is_none() && v.get("type").and_then(|x| x.as_str()) == Some("user") {
+            let c = v.pointer("/message/content");
+            let t = c.and_then(|x| x.as_str()).map(String::from).or_else(|| c.and_then(|x| x.as_array()).and_then(|a| a.iter()
+                .find_map(|p| (p.get("type").and_then(|x| x.as_str()) == Some("text")).then(|| p.get("text").and_then(|x| x.as_str()).unwrap_or("").to_string()))));
+            if let Some(t) = t.filter(|t| !t.trim().is_empty()) { first = Some(t); }
+        }
+        if !cwd.is_empty() && first.is_some() { break; }
+    }
+    (cwd, first)
+}
+
+/// Finds sessions on this PC from their transcripts, also the ones that never sent a hook (another account's
+/// Claude folder, a session started before the hooks, a quiet thread). Transcripts written in the last
+/// `max_age_ms` are added as idle sessions; the liveness check then sees from their writes whether they work.
+fn scan_sessions(st: &Mutex<State>, max_age_ms: u64, keep: bool) -> usize {
+    let now = now_ms();
+    let known: std::collections::HashSet<String> = { let g = lk(st); g.sessions.keys().chain(g.gone.keys()).cloned().collect() };
+    let ignore: Vec<String> = IGNORE.lock().map(|i| i.clone()).unwrap_or_default();
+    let mut found: Vec<(String, Value)> = Vec::new();
+    for dir in claude_dirs() {
+        let Ok(projects) = fs::read_dir(dir.join("projects")) else { continue };
+        for p in projects.flatten() {
+            let Ok(files) = fs::read_dir(p.path()) else { continue };
+            for f in files.flatten() {
+                let path = f.path();
+                if path.extension().and_then(|x| x.to_str()) != Some("jsonl") { continue; }
+                let Some(sid) = path.file_stem().and_then(|x| x.to_str()).map(String::from) else { continue };
+                if sid.len() < 8 || known.contains(&sid) || ignore.contains(&sid) || found.iter().any(|(k, _)| k == &sid) { continue; }
+                let Some(at) = f.metadata().ok().and_then(|m| m.modified().ok()).and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_millis() as u64) else { continue };
+                if now.saturating_sub(at) > max_age_ms { continue; }
+                let ps = path.to_string_lossy().to_string();
+                let (cwd, first) = transcript_head(&path);
+                // Dev Room's own quick-answer copies are not sessions
+                if first.as_deref().map(|t| t.starts_with(QUICK_MARK)).unwrap_or(false) { continue; }
+                let (text, titles) = read_transcript(&ps, true);
+                let mut o = json!({"id": sid, "status": "idle", "detail": "", "ask": "", "recent": text.map(|t| clip(&t, 300)).unwrap_or_default(),
+                    "short": "", "auto_title": "", "title_scanned": true, "started_at": at, "updated_at": at, "transcript": ps, "cwd": cwd, "scanned": true});
+                // found by "I-scan ulit": stays a day even when older than the 3-day cleanup, so it can be placed
+                if keep { o["keep_until"] = json!(now + 24 * 3600 * 1000); }
+                if let Some(m) = o.as_object_mut() {
+                    set_titles(m, &titles);
+                    if let Some(t) = first {
+                        if let Some(r) = relay_text(&t) { m.insert("relay_title".into(), json!(clip(&r, 48))); }
+                        else if !system_prompt(&t) && !t.trim_start().starts_with('<') { m.insert("first_prompt".into(), json!(clip(t.trim(), 48))); }
+                    }
+                }
+                found.push((sid, o));
+            }
+        }
+    }
+    if found.is_empty() { return 0; }
+    let n = found.len();
+    let mut g = lk(st);
+    for (sid, o) in found { g.sessions.entry(sid).or_insert(o); }
+    g.bump();
+    g.save();
+    n
+}
+
 fn liveness(st: &Mutex<State>) {
     // 1. which transcripts to look at (under the lock), 2. look at them (without it), 3. apply.
     let todo: Vec<(String, String)> = lk(st).sessions.iter().filter_map(|(k, v)| {
@@ -1107,12 +1212,15 @@ fn liveness(st: &Mutex<State>) {
         // (the end was already judged when it came: only a run of ours going on right now keeps her)
         e > 0 && now.saturating_sub(e) > wait && !RUNS.lock().map(|r| r.iter().any(|x| x == *k)).unwrap_or(false)
     }).map(|(k, _)| k.clone()).collect();
-    for k in &ended { s.sessions.remove(k); }
+    for k in &ended { s.sessions.remove(k); s.gone.insert(k.clone(), json!(now)); }
     if !ended.is_empty() { changed = true; save = true; }
     // forget sessions that ended without SessionEnd (3 days quiet)
     let cutoff = now.saturating_sub(3 * 24 * 3600 * 1000);
     let before = s.sessions.len();
-    s.sessions.retain(|_, v| v.get("updated_at").and_then(|t| t.as_u64()).unwrap_or(0) > cutoff);
+    s.sessions.retain(|k, v| v.get("updated_at").and_then(|t| t.as_u64()).unwrap_or(0) > cutoff
+        || v.get("keep_until").and_then(|t| t.as_u64()).unwrap_or(0) > now || placed.iter().any(|p| p == k));
+    let gone_cut = now.saturating_sub(3 * 24 * 3600 * 1000);
+    s.gone.retain(|_, at| at.as_u64().unwrap_or(0) > gone_cut);
     if s.sessions.len() != before { changed = true; save = true; }
     if changed { s.bump(); }
     if save { s.save(); }
@@ -1134,6 +1242,9 @@ pub fn start(port: u16) -> Option<u16> {
     std::thread::spawn(move || loop { std::thread::sleep(std::time::Duration::from_millis(900)); tail_transcripts(&tail); });
     let live = st.clone();
     std::thread::spawn(move || loop { std::thread::sleep(std::time::Duration::from_secs(3)); liveness(&live); });
+    // every session on this PC shows up, also the ones that send no hooks (scanned each minute: the last 48 hours)
+    let scan = st.clone();
+    std::thread::spawn(move || loop { scan_sessions(&scan, 48 * 3600 * 1000, false); std::thread::sleep(std::time::Duration::from_secs(60)); });
     // Malayo mode: a loopback-only port for the tunnel, where every request counts as a phone
     if let Ok(ts) = Server::http(("127.0.0.1", crate::tunnel::PORT)) {
         let st2 = st.clone();
@@ -1289,7 +1400,54 @@ fn transcript_line(v: &Value) -> Option<(&'static str, String)> {
     }
 }
 
+/// Claude Code 2.1.3xx can keep a rename only in a sidecar file next to the transcript:
+/// `<transcript folder>/<session id>/custom-title.json` = `{"customTitle": "..."}` (renames from the Claude app or a
+/// Claude Projects thread). Claude Code itself reads it after the transcript's last lines. Returns the name and the
+/// file's change time.
+fn sidecar_title(transcript: &str, sid: &str) -> Option<(String, u128)> {
+    let p = Path::new(transcript).parent()?.join(sid).join("custom-title.json");
+    let at = fs::metadata(&p).and_then(|m| m.modified()).ok()?.duration_since(UNIX_EPOCH).ok()?.as_millis();
+    let v: Value = serde_json::from_str(&fs::read_to_string(&p).ok()?).ok()?;
+    let t = v.get("customTitle").and_then(|x| x.as_str())?.trim();
+    (!t.is_empty()).then(|| (clip(t, 120), at))
+}
+
+/// Picks up renames kept in the sidecar (checked by its change time, so it is read only when it changes).
+fn sidecar_titles(st: &Mutex<State>, list: &[(String, String, bool)]) {
+    static SEEN: Mutex<Option<HashMap<String, u128>>> = Mutex::new(None);
+    let mut changed: Vec<(String, String)> = Vec::new();
+    {
+        let mut g = SEEN.lock().unwrap_or_else(|e| e.into_inner());
+        let seen = g.get_or_insert_with(HashMap::new);
+        seen.retain(|k, _| list.iter().any(|(s, _, _)| s == k));
+        for (sid, path, _) in list {
+            let Some(p) = Path::new(path).parent().map(|d| d.join(sid).join("custom-title.json")) else { continue };
+            let Some(at) = fs::metadata(&p).and_then(|m| m.modified()).ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_millis()) else { continue };
+            if seen.get(sid) == Some(&at) { continue; }
+            seen.insert(sid.clone(), at);
+            if let Some((t, _)) = sidecar_title(path, sid) { changed.push((sid.clone(), t)); }
+        }
+    }
+    if changed.is_empty() { return; }
+    let mut g = lk(st);
+    let mut any = false;
+    for (sid, t) in changed {
+        if let Some(s) = g.sessions.get_mut(&sid).and_then(|v| v.as_object_mut()) {
+            if s.get("custom_title").and_then(|x| x.as_str()) != Some(t.as_str()) { s.insert("custom_title".into(), json!(t)); any = true; }
+        }
+    }
+    if any { g.bump(); g.save(); }
+}
+
 fn tail_transcripts(st: &Mutex<State>) {
+    tail_lines(st);
+    // after the transcript lines, so an old name in a session's history never covers a newer sidecar rename
+    let list: Vec<(String, String, bool)> = lk(st).sessions.iter()
+        .filter_map(|(k, v)| v.get("transcript").and_then(|x| x.as_str()).map(|t| (k.clone(), t.to_string(), false))).collect();
+    sidecar_titles(st, &list);
+}
+
+fn tail_lines(st: &Mutex<State>) {
     let now = now_ms();
     // (session, transcript, whether it was active in the last 2 minutes)
     let list: Vec<(String, String, bool)> = lk(st).sessions.iter()
