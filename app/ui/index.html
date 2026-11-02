@@ -265,7 +265,7 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 @keyframes tdot{0%,60%,100%{opacity:.25}30%{opacity:1}}
 @media (prefers-reduced-motion:reduce){.typing .dots span{animation:none}}
 .zoom .claudebtn{background:var(--accent);color:var(--panel);border-color:var(--accent);font-weight:700}
-.app.typing .claudebar{display:none}
+.app.kbopen .claudebar{display:none}
 /* team chat: every session's conversation in one feed */
 .cfilter{position:sticky;top:-12px;z-index:1;background:var(--panel);display:flex;gap:6px;overflow-x:auto;padding:8px 0;margin:-8px 0 4px;border-bottom:1px solid var(--line);scrollbar-width:thin}
 .cfilter button{flex:none;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:3px 10px;font-size:12px;display:flex;align-items:center;gap:5px}
@@ -406,8 +406,8 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
   .app[data-tab="chat"] .top,.app[data-tab="chat"] .conn{display:none}
   .app[data-tab="chat"] .chatpanel{height:calc(100dvh - 90px - env(safe-area-inset-bottom,0px))}
   .toasts .toast:not(:last-child){display:none}
-  .app.typing .tabs,.app.typing .cp-head,.app.typing .cp-tabs,.app.typing .cfilter{display:none}
-  .app.typing .chatpanel{height:calc(100dvh - 16px)}
+  .app.kbopen .tabs,.app.kbopen .cp-head,.app.kbopen .cp-tabs,.app.kbopen .cfilter{display:none}
+  .app.kbopen .chatpanel{height:calc(100dvh - 16px)}
   .app[data-tab="chat"] .pane[data-pane="office"],.app[data-tab="chat"] .dockwrap,.app[data-tab="office"] .pane[data-pane="chat"]{display:none!important}
   .pane[data-pane="chat"]{min-height:0}
   .chatpanel{position:static;height:min(620px,72vh)}
@@ -482,19 +482,19 @@ body{margin:0}
 @media (prefers-reduced-motion:reduce){.pane[data-pane="chat"]{transition:none}}
 /* Tablet portrait (and any tall window wider than a phone): the panel docks under the office instead of covering
    half of it. Office on top, session cards, then the chat across the full width. */
-@media (orientation:portrait){@container app (min-width: 641px){
-  .app.drawer .body{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(220px,1fr) auto minmax(0,1.35fr);grid-template-areas:"office" "dock" "chat";row-gap:8px}
-  .app.drawer .pane[data-pane="chat"]{grid-area:chat;position:relative;inset:auto;width:auto;min-height:0;transform:none;transition:none}
-  .app.drawer .chatpanel{box-shadow:none}
-  .app.drawer .toasts{right:10px}
-  .app.drawer .zoom{right:8px}
-  .app.drawer .mapwrap{min-height:0}
-  .app.focus.drawer .body{row-gap:6px}
-  .app.drawer .mlegend{display:none}
+@container app (min-width: 641px){
+  .app.port.drawer .body{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(220px,1fr) auto minmax(0,1.35fr);grid-template-areas:"office" "dock" "chat";row-gap:8px}
+  .app.port.drawer .pane[data-pane="chat"]{grid-area:chat;position:relative;inset:auto;width:auto;min-height:0;transform:none;transition:none}
+  .app.port.drawer .chatpanel{box-shadow:none}
+  .app.port.drawer .toasts{right:10px}
+  .app.port.drawer .zoom{right:8px}
+  .app.port.drawer .mapwrap{min-height:0}
+  .app.port.focus.drawer .body{row-gap:6px}
+  .app.port.drawer .mlegend{display:none}
   /* the panel's height follows the bar you drag (remembered) */
-  .app.drawer .body{grid-template-rows:minmax(160px,1fr) auto minmax(200px,var(--chath,56%))}
-  .app.drawer .psplit{display:block}
-}}
+  .app.port.drawer .body{grid-template-rows:minmax(160px,1fr) auto minmax(200px,var(--chath,56%))}
+  .app.port.drawer .psplit{display:block}
+}
 /* Session tiles: equal width, filling the row; up to 4 a row (dockCols), the rest wrap below. Face, one name, status. */
 .app .dock{display:grid;grid-template-columns:repeat(var(--cols,4),minmax(0,1fr));gap:8px;overflow:visible;mask-image:none;padding-bottom:0}
 .app .dock .dcard{width:auto;max-width:none;min-width:0;min-height:0;display:grid;grid-template-columns:38px minmax(0,1fr);grid-template-rows:auto auto;align-items:center;gap:3px 9px;padding:6px 9px 6px 6px;border-radius:10px}
@@ -513,16 +513,15 @@ body{margin:0}
 .face b{font-family:var(--f-mono);font-size:10px;color:var(--ink)}
 .face .sdot{position:absolute;right:-3px;bottom:-3px;width:11px;height:11px;border-radius:50%;background:var(--st);box-shadow:0 0 0 2px var(--panel)}
 /* lower tiles in portrait and on phones: one line (face, name; the dot on the face shows the status) */
-@media (orientation:portrait){
-  .app .dock .dcard{grid-template-columns:30px minmax(0,1fr);grid-template-rows:auto;padding:5px 8px 5px 5px;gap:0 8px}
-  .app .dock .dcard .face{grid-row:auto;width:30px;height:30px}
-  .app .dock .dcard .face img{border-radius:7px}
-  .app .dock .dcard .nm{align-self:center}
-  .app .dock .dcard .ft{display:none}
-  .app .dock .addcard{padding:4px 6px}
-  .app .dock .dcard .tl8{display:none}
-  .app .dock>*{min-height:42px}
-}
+.app.port .dock .dcard{grid-template-columns:30px minmax(0,1fr);grid-template-rows:auto;padding:5px 8px 5px 5px;gap:0 8px}
+.app.port .dock .dcard .face{grid-row:auto;width:30px;height:30px}
+.app.port .dock .dcard .face img{border-radius:7px}
+.app.port .dock .dcard .nm{align-self:center}
+.app.port .dock .dcard .ft{display:none}
+.app.port .dock .addcard{padding:4px 6px}
+.app.port .dock .dcard .tl8{display:none}
+.app.port .dock>*{min-height:42px}
+
 /* fullscreen: the same tiles, a bit smaller */
 .app.focus .dock .dcard{grid-template-columns:28px minmax(0,1fr);grid-template-rows:auto;padding:4px 8px 4px 4px;gap:0 8px}
 .app.focus .dock .dcard .face{grid-row:auto;width:28px;height:28px}
@@ -1443,6 +1442,10 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.14.1':{news:['<b>Tablet na naka-portrait:</b> hindi na lumiliit ang app kapag nagta-type ka, at portrait pa rin ang ayos kahit bukas ang keyboard.',
+    '<b>Hindi na pabaligtad</b> ang mga letrang tina-type mo.',
+    '<b>Hindi na nawawala ang session</b> pagkatapos mo siyang i-chat.'],
+    todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
   '0.14.0':{news:['<b>Real-time na sagot kahit abala siya:</b> kapag nasa gitna ng mahabang hakbang ang session (hal. naghihintay sa agent o sa test), sasagot agad ang isang kopya niya na alam ang lahat ng ginagawa niya. Makikita ito sa chat bilang <b>⚡ Agarang sagot habang abala</b>. Matatanggap pa rin ng session mismo ang mensahe mo, at gagawin niya ito pagkatapos ng kasalukuyang hakbang.',
     '<b>Fullscreen sa tablet at phone:</b> hindi na lumiliit ang buong app sa makitid na hanay.'],
     todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
@@ -2017,7 +2020,7 @@ function resizeMap(){
   BASE=Math.min(VW/SW,VH/SH);
   // phone: close up; tall view (tablet portrait): zoom so the office fills the height instead of a thin strip
   const narrow=VW<560,tall=!narrow&&VH>VW*.75,key=narrow?'n':tall?'t'+Math.round(VH/VW*8):'w';
-  if(key!==resizeMap.key){resizeMap.key=key;cam.z=narrow?2.6:tall?Math.max(1.25,Math.min(2.6,.92*VH*SW/(SH*VW))):1.25;const p=cam.follow?isoP(cam.follow):iso(14,9);centerOn(p.x,p.y);}
+  if(key!==resizeMap.key&&!$('app').classList.contains('kbopen')){resizeMap.key=key;cam.z=narrow?2.6:tall?Math.max(1.25,Math.min(2.6,.92*VH*SW/(SH*VW))):1.25;const p=cam.follow?isoP(cam.follow):iso(14,9);centerOn(p.x,p.y);}
   clampCam();cam.x=cam.tx;cam.y=cam.ty;
 }
 // The office can be dragged anywhere, up to most of the view past its edges (for example out from under the
@@ -2571,7 +2574,8 @@ function renderPanel(){
     {const one=chatFilter!=='all'&&bySid(chatFilter);if(one)chatTo=one.sid;
      const rk=(one?'1':'*')+chatTo+'|'+sessions.map(x=>x.sid+x.short).join(',');const rc=$('rcpt');
      if(rc.dataset.k!==rk){rc.dataset.k=rk;rc.innerHTML=one?`<span>Para kay <b>${esc(one.role)}</b></span>`:`<span>Para kay</span>`+sessions.map(x=>`<button type="button" data-rcpt="${esc(x.sid)}" aria-pressed="${x.sid===chatTo}"><i style="background:${x.pal.shirt}"></i>${esc(x.short)}</button>`).join('');}
-     const tgt=bySid(chatTo);$('msgInput').placeholder=tgt?`Mensahe kay ${tgt.short}…`:'Mensahe…';}
+     // only when it changes: touching the box while you type breaks the phone keyboard (letters came out reversed)
+     const tgt=bySid(chatTo),ph=tgt?`Mensahe kay ${tgt.short}…`:'Mensahe…';const mi=$('msgInput');if(mi.placeholder!==ph)mi.placeholder=ph;}
     const sel2=$('chatTo');const opts=sessions.map(x=>`<option value="${esc(x.sid)}">${esc(x.role)}${x.listening?' · naka-abang':x.status==='working'?' · nagtatrabaho':''}</option>`).join('');
     if(sel2.dataset.k!==opts){sel2.dataset.k=opts;sel2.innerHTML=opts;}if(sel2.value!==chatTo)sel2.value=chatTo;
     const aw=$('awaySel');if(aw.value!==awayMode)aw.value=awayMode;
@@ -2749,7 +2753,7 @@ $('composer').addEventListener('submit',async e=>{e.preventDefault();const s=byS
 $('chatTo').addEventListener('change',e=>{chatTo=e.target.value;});
 $('rcpt').addEventListener('click',e=>{const b=e.target.closest('[data-rcpt]');if(!b)return;chatTo=b.dataset.rcpt;$('rcpt').dataset.k='';renderPanel();$('msgInput').focus();});
 // the message box grows with the text, like in the Claude app
-$('msgInput').addEventListener('input',e=>{const t=e.target;t.style.height='auto';t.style.height=Math.min(160,t.scrollHeight)+'px';});
+$('msgInput').addEventListener('input',e=>{const t=e.target,h0=t.style.height;t.style.height='auto';const h=Math.min(160,t.scrollHeight)+'px';t.style.height=h0===h?h0:h;});
 $('viewer').addEventListener('click',e=>{
   if(e.target.closest('[data-act="vclose"]')){closeViewer();return;}
   if(e.target.closest('[data-act="vmax"]')){VWR.full=!VWR.full;layoutViewer();return;}
@@ -2757,8 +2761,8 @@ $('viewer').addEventListener('click',e=>{
   const im=e.target.closest('.vbody img');if(im){const b=$('vBody'),z=!b.classList.contains('zoomed');const r=im.getBoundingClientRect(),fx=(e.clientX-r.left)/r.width,fy=(e.clientY-r.top)/r.height;
     b.classList.toggle('zoomed',z);if(z){b.scrollLeft=im.naturalWidth*fx-b.clientWidth/2;b.scrollTop=im.naturalHeight*fy-b.clientHeight/2;}}
 });
-$('composer').addEventListener('focusin',()=>{$('app').classList.add('typing');setTimeout(()=>{document.querySelector('.chatpanel').scrollIntoView({block:'start'});const b=$('cpBody');b.scrollTop=b.scrollHeight;},350);});
-$('composer').addEventListener('focusout',()=>setTimeout(()=>{if(!$('composer').contains(document.activeElement))$('app').classList.remove('typing');},200));
+$('composer').addEventListener('focusin',()=>{$('app').classList.add('kbopen');setTimeout(()=>{document.querySelector('.chatpanel').scrollIntoView({block:'start'});const b=$('cpBody');b.scrollTop=b.scrollHeight;},350);});
+$('composer').addEventListener('focusout',()=>setTimeout(()=>{if(!$('composer').contains(document.activeElement))$('app').classList.remove('kbopen');},200));
 $('awaySel').addEventListener('change',e=>setAway(e.target.value));
 $('cpBody').addEventListener('click',e=>{
   const rt=e.target.closest('[data-retry]');if(rt){const m=PENDING[+rt.dataset.retry];if(m){PENDING.splice(+rt.dataset.retry,1);const s=bySid(m.sid);if(s)answer(s,m.text);else{connMsg='Wala na sa office ang session na iyon.';setConn();}}chatKey='';renderPanel();return;}
@@ -2838,6 +2842,12 @@ document.addEventListener('keydown',e=>{
  d.addEventListener('wheel',e=>{if(Math.abs(e.deltaY)>Math.abs(e.deltaX)&&d.scrollWidth>d.clientWidth){d.scrollLeft+=e.deltaY;e.preventDefault();}},{passive:false});
  d.addEventListener('scroll',edge,{passive:true});new ResizeObserver(()=>{edge();dockCols();}).observe(d);new MutationObserver(()=>requestAnimationFrame(dockCols)).observe($('app'),{attributes:true,attributeFilter:['class']});setInterval(edge,2000);}
 ['teamPanel','whatsNew'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target===e.currentTarget){if(id==='whatsNew')$(id).querySelector('[data-act="wn-ok"]')?.click();else $(id).hidden=true;}}));
+// Portrait or landscape comes from the device (screen orientation), so the on-screen keyboard, which leaves a
+// short, wide space, does not flip a portrait tablet into the landscape layout while you type.
+{const app=$('app');const upd=()=>{const so=screen.orientation&&screen.orientation.type;const kb=app.classList.contains('kbopen');
+   const port=so?so.startsWith('portrait')||(!kb&&innerHeight>innerWidth):(kb?app.classList.contains('port'):innerHeight>innerWidth);
+   if(port!==app.classList.contains('port')){app.classList.toggle('port',port);needResize=true;}};
+ upd();addEventListener('resize',upd);screen.orientation&&screen.orientation.addEventListener('change',upd);}
 // tablet portrait: drag the bar above the panel to make the panel taller or shorter (remembered; double tap resets)
 {const sp=$('pSplit'),app=$('app');let d=null;
  try{const f=parseFloat(localStorage.getItem('devroom.chath'));if(f>.15&&f<.85)app.style.setProperty('--chath',(f*100).toFixed(1)+'%');}catch(e){}
