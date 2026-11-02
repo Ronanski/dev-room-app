@@ -572,16 +572,6 @@ body{margin:0}
 .pg{width:calc(30px * var(--bs,1.3));height:4px;border-radius:2px;background:rgba(43,33,27,.55);overflow:hidden;margin-top:1px;box-shadow:0 0 0 1px rgba(247,240,227,.35)}
 .pg i{display:block;height:100%;background:#7fbf5f}
 .pg.ok i{background:#e0b25a}
-.usage{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.um{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--chip);font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
-.um b{font-weight:700}
-.um small{color:var(--muted);font-size:10.5px}
-.um .ub{display:inline-block;width:46px;height:6px;border-radius:3px;background:color-mix(in srgb,var(--muted) 25%,transparent);overflow:hidden}
-.um .ub i{display:block;height:100%;background:var(--work)}
-.um.warm .ub i{background:var(--idle)}
-.um.hot .ub i{background:var(--need)}
-.um.hot span{color:var(--need);font-weight:700}
-.um.err{color:var(--muted)}
 .qtag{display:block;font-size:10.5px;font-weight:700;color:var(--accent);margin-bottom:3px;letter-spacing:.02em}
 .app:fullscreen{width:100vw;height:100vh;max-width:none}
 .psplit{display:none;position:absolute;left:0;right:0;top:-9px;height:14px;z-index:3;cursor:row-resize;touch-action:none}
@@ -601,7 +591,6 @@ body{margin:0}
         <div class="ttl"><h1>Dev Room · Unit 1</h1><p class="sub"><span id="unitName">Unit 1</span> · live mula sa PC mo<span id="via"></span> · <button type="button" class="updpill" id="ver" data-act="updinfo" data-st="wait">Tinitingnan ang update…</button> · <span class="clock" id="clock"></span></p><div class="units" id="units" hidden role="tablist" aria-label="Mga office"></div></div>
       </div>
       <div class="counts" id="counts"></div>
-      <div class="usage" id="usage" hidden></div>
       <div class="controls">
         <div class="seg" role="group" aria-label="Preview">
           <button type="button" id="devDesktop" data-device="desktop" aria-pressed="true">Desktop</button>
@@ -1467,7 +1456,7 @@ async function poll(){
       const j=await r.json();
       const teamChanged=JSON.stringify(j.team)!==JSON.stringify(TEAM);
       updates(j);
-      version=j.version;TEAM=j.team||TEAM;isLocal=!!j.local;hooksOk=j.hooks_installed;embedClaude=false;instantChat=!!j.instant_chat;renderUsage(j.usage);$('app').classList.add('hasclaude');REMOTE=j.remote||null;if(!$('teamPanel').hidden&&$('remoteBox'))remoteBox();settingsPath=j.settings_path||'';lanUrl=j.lan_url||'';tsUrl=j.ts_url||'';
+      version=j.version;TEAM=j.team||TEAM;isLocal=!!j.local;hooksOk=j.hooks_installed;embedClaude=false;instantChat=!!j.instant_chat;$('app').classList.add('hasclaude');REMOTE=j.remote||null;if(!$('teamPanel').hidden&&$('remoteBox'))remoteBox();settingsPath=j.settings_path||'';lanUrl=j.lan_url||'';tsUrl=j.ts_url||'';
       mode='live';lastSync=Date.now();
       if(teamChanged&&!firstLoad){allRecords=j.sessions;rebuildTeam();}else applyRecords(j.sessions);
       awayMode=j.away||awayMode;
@@ -1481,6 +1470,8 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.15.2':{news:['<b>Wala na ang Limit (5 oras at Linggo) sa itaas.</b> Para mabasa iyon, ginagamit ng Dev Room ang sign-in mo sa Claude, at bawal iyon sa terms ng Claude. Tinanggal namin para hindi ma-ban ang account mo. Hindi na ginagalaw ng Dev Room ang sign-in mo kahit kailan.'],
+    todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
   '0.15.1':{news:['<b>Kusa nang nag-a-update ang PC app.</b> Dati, pagkatapos ma-download ang update, ang lumang kopya ang binubuksan ulit ng app, kaya naiipit ito sa v0.11.0 hangga\'t hindi mo isinasara nang mano-mano.','Kapag hindi mailagay ang update, makikita mo na sa itaas kung bakit.'],
     todo:['<b>Huling beses na lang ito:</b> sa PC, i-right-click ang Dev Room sa tray, piliin ang <b>Isara nang tuluyan</b>, tapos buksan ulit ang DevRoom.exe. Pagkatapos nito, kusa na ang lahat ng update.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
   '0.15.0':{news:['<b>Nababasa na ang pangalan ng session</b>, pati ang pangalang ginawa ng Claude Code. Kapag pinalitan mo ang pangalan sa Claude (/rename o sa Claude app), lalabas agad dito.','<b>Hindi na bumabalik sa dati ang pinalitan mong pangalan</b> kapag nag-save ka ulit sa Mga Playroom.','<b>Mas madaling mag-rename at maglipat:</b> buksan ang session, pindutin ang ✎ sa tabi ng pangalan niya, o piliin ang Playroom sa ilalim nito. Hindi na kailangang buksan ang Mga Playroom.'],
@@ -1498,7 +1489,6 @@ const NOTES={
     todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
   '0.13.0':{news:['<b>Kita na ang progress:</b> may progress bar at bilang (hal. 2/4) sa tile ng bawat session, at maliit na bar sa ilalim ng pangalan niya sa office. Sa <b>Detalye</b>, nandoon ang yugto (Sinimulan, Ginagawa, Tapos na) at ang listahan ng mga task niya.',
     '<b>Pagkatapos ng trabaho,</b> pupunta siya sa opisina mo para mag-report bago bumalik sa desk.',
-    '<b>Limit ng Claude mo:</b> nasa itaas na ang <b>5 oras</b> at <b>Linggo</b>, kung ilang porsyento na ang nagamit at kailan magre-reset.',
     '<b>Kapag naka-pila ang mensahe mo,</b> nakasulat na kung bakit: halimbawa, nasa gitna pa siya ng isang hakbang (at kung gaano na katagal).'],
     todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
   '0.12.0':{news:['<b>Bagong session tiles:</b> pantay-pantay na ang laki at sakop ang buong lapad ng screen. Hanggang 4 kada row, at nasa ibaba ang iba. May <b>mukha</b> na ang bawat isa (galing sa mismong character niya), at <b>isang pangalan</b> lang. Ang tuldok sa mukha ang nagsasabi ng status.',
@@ -2560,18 +2550,6 @@ function queueText(s){
     default:return s.status==='working'?'Nakapila: papasok ito sa susunod niyang hakbang.':'Ipinapasa…';}
 }
 const TOOLNAME=t=>({Agent:'pagpapagawa sa isang agent',Task:'pagpapagawa sa isang agent',Bash:'isang command',Edit:'pag-edit ng file',Write:'pagsulat ng file',Read:'pagbasa ng file',WebFetch:'pagbukas ng web page',WebSearch:'pag-search',Monitor:'paghihintay sa isang proseso',TaskOutput:'paghihintay sa resulta ng agent'})[t]||(/^mcp__/.test(t)?'isang tool':t);
-// Your Claude plan limits (read on the PC): the 5-hour window and the week, with when each resets.
-function renderUsage(u){
-  const el=$('usage');if(!el)return;if(!u){el.hidden=true;return;}el.hidden=false;
-  if(u.err){const why={nosignin:'Hindi makita ang sign-in ng Claude Code sa PC na ito.',expired:'Expired ang sign-in; buksan ang Claude Code sa PC para ma-refresh.',offline:'Walang internet sa PC.',format:'Nagbago ang sagot ng usage service.'}[u.err]||'';
-    const h=`<span class="um err" title="${esc(why)}">Limit: —</span>`;if(el.innerHTML!==h)el.innerHTML=h;return;}
-  const tm=r=>{const d=r?new Date(r):null;return d&&!isNaN(d)?d.toLocaleTimeString('fil-PH',{hour:'numeric',minute:'2-digit'}):'';};
-  const dy=r=>{const d=r?new Date(r):null;return d&&!isNaN(d)?d.toLocaleDateString('fil-PH',{weekday:'short'})+' '+tm(r):'';};
-  const m=(lab,p,when,full)=>{if(!p||p.pct==null)return'';const v=Math.max(0,Math.min(100,p.pct)),c=v>=90?'hot':v>=70?'warm':'';
-    return `<span class="um ${c}" title="${esc(full)}: ${v}% nagamit${when?` · magre-reset ${when}`:''}"><b>${lab}</b><i class="ub"><i style="width:${v}%"></i></i><span>${Math.round(v)}%</span>${when?`<small>${esc(when)}</small>`:''}</span>`;};
-  const h=m('5 oras',u.five,tm(u.five&&u.five.reset),'Limit sa loob ng 5 oras')+m('Linggo',u.week,dy(u.week&&u.week.reset),'Lingguhang limit');
-  if(el.innerHTML!==h)el.innerHTML=h;
-}
 function chatFeed(){
   const list=chatFilter==='all'?sessions:sessions.filter(s=>s.sid===chatFilter);
   PENDING=PENDING.filter(p=>!(p.id&&(bySid(p.sid)?.inbox||[]).some(m=>m.id===p.id)));

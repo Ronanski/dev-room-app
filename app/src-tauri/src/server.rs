@@ -827,7 +827,7 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16, tun: bool) {
                 "lan_url": lan, "ts_url": tailscale_ip().map(|ip| format!("http://{ip}:{port}/")),
                 "app_build": crate::updater::BUILD, "app_version": crate::updater::VERSION, "ui_build": crate::updater::ui_build(),
                 "remote": if local { crate::tunnel::info() } else { Value::Null },
-                "instant_chat": claude_bin().is_some(), "usage": usage(),
+                "instant_chat": claude_bin().is_some(),
                 "update_ready": crate::updater::exe_ready(), "update_note": crate::updater::note(),
                 "latest": crate::updater::latest()});
             drop(s);
@@ -1098,14 +1098,6 @@ pub fn start(port: u16) -> Option<u16> {
     std::thread::spawn(move || loop { std::thread::sleep(std::time::Duration::from_millis(900)); tail_transcripts(&tail); });
     let live = st.clone();
     std::thread::spawn(move || loop { std::thread::sleep(std::time::Duration::from_secs(3)); liveness(&live); });
-    // plan limits: now, then every 2 minutes (shown in the header on every device)
-    let us = st.clone();
-    std::thread::spawn(move || loop {
-        let u = fetch_usage();
-        let changed = USAGE.lock().map(|mut g| { let ch = g.as_ref().map(|o| o.get("five") != u.get("five") || o.get("week") != u.get("week") || o.get("err") != u.get("err")).unwrap_or(true); *g = Some(u); ch }).unwrap_or(false);
-        if changed { lk(&us).bump(); }
-        std::thread::sleep(std::time::Duration::from_secs(120));
-    });
     // Malayo mode: a loopback-only port for the tunnel, where every request counts as a phone
     if let Ok(ts) = Server::http(("127.0.0.1", crate::tunnel::PORT)) {
         let st2 = st.clone();
@@ -1375,43 +1367,6 @@ pub fn claude_bin() -> Option<PathBuf> {
     }
     if let Ok(mut c) = CACHE.lock() { *c = Some((found.clone().unwrap_or_default(), now_ms())); }
     found
-}
-
-/* ---------- your Claude plan limits (5-hour window and weekly) ----------
-   Read with the sign-in Claude Code keeps on this PC (~/.claude/.credentials.json), from the same usage service
-   the Claude apps use. Only the percentages and reset times leave this module; the sign-in never does. */
-static USAGE: Mutex<Option<Value>> = Mutex::new(None);
-pub fn usage() -> Value { USAGE.lock().ok().and_then(|u| u.clone()).unwrap_or(Value::Null) }
-
-fn claude_token() -> Result<String, &'static str> {
-    let dir = std::env::var_os("CLAUDE_CONFIG_DIR").map(PathBuf::from)
-        .or_else(|| std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")).map(|h| PathBuf::from(h).join(".claude")))
-        .ok_or("nohome")?;
-    let raw = fs::read_to_string(dir.join(".credentials.json")).map_err(|_| "nosignin")?;
-    let v: Value = serde_json::from_str(&raw).map_err(|_| "nosignin")?;
-    v.pointer("/claudeAiOauth/accessToken").and_then(|x| x.as_str()).filter(|t| !t.is_empty()).map(String::from).ok_or("nosignin")
-}
-
-fn fetch_usage() -> Value {
-    let tok = match claude_token() { Ok(t) => t, Err(e) => return json!({"err": e, "at": now_ms()}) };
-    let agent = ureq::AgentBuilder::new().timeout(std::time::Duration::from_secs(15)).build();
-    // DEVROOM_USAGE_URL: a stand-in service for tests
-    let url = std::env::var("DEVROOM_USAGE_URL").unwrap_or_else(|_| "https://api.anthropic.com/api/oauth/usage".into());
-    let resp = agent.get(&url)
-        .set("Authorization", &format!("Bearer {tok}")).set("anthropic-beta", "oauth-2025-04-20").set("Accept", "application/json").call();
-    let body = match resp {
-        Ok(r) => r.into_string().unwrap_or_default(),
-        Err(ureq::Error::Status(401, _)) | Err(ureq::Error::Status(403, _)) => return json!({"err": "expired", "at": now_ms()}),
-        Err(_) => return json!({"err": "offline", "at": now_ms()}),
-    };
-    let v: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
-    let part = |k: &str| v.get(k).filter(|x| x.is_object()).map(|x| json!({
-        "pct": x.get("utilization").and_then(|u| u.as_f64()).map(|u| (u * 10.0).round() / 10.0),
-        "reset": x.get("resets_at").cloned().unwrap_or(Value::Null)}));
-    match (part("five_hour"), part("seven_day")) {
-        (None, None) => json!({"err": "format", "at": now_ms()}),
-        (f, w) => json!({"five": f, "week": w, "at": now_ms()}),
-    }
 }
 
 /// A session can be continued from here when its turn is over (not working, not waiting on a permission prompt).

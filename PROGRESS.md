@@ -21,8 +21,14 @@ The work moves to a new Claude Code session that runs **on the user's Windows PC
 - **Multiple accounts** on the one PC: one Claude config folder per account (`CLAUDE_CONFIG_DIR`).
 - **Lite UI, portrait only**, for phone and tablet, from `docs/lite-mockup.html`: a small live office, then the session list, then the chatroom, with alerts, progress, rename, playroom and two-way chat. The user picked "small office + list", "small office", all four features, and "phone and tablet".
 
+### Where it stands now (2026-11-02, PC session)
+- **0.15.2 is in draft PR #31** (branch `claude/remove-usage-meter`, base `main`). It is **not merged and not released**: the PC still runs the old meter until it is.
+- **CI on release branches:** `windows-app.yml` used to run on `main` and the old cloud branch only, so PR #31 had no checks. The user chose to add `claude/**` to the push trigger. Builds from those branches are prereleases (never Latest), so they never reach the PC or the phone before the merge.
+- Each release gets its own branch and PR from `origin/main`; never push to `main` directly (the user's rule).
+- Next: merge 0.15.2 once CI is green, then step 2 below.
+
 ### Next steps, in order (report after each one)
-1. **Remove the plan-limits meter.** `fetch_usage` / `USAGE` / `claude_token` in `server.rs`, `usage` in `/api/state`, `renderUsage` and `#usage` in `index.html`, plus the CLAUDE.md and NOTES text. It sends the user's OAuth token to the usage service, which is not allowed.
+1. ~~**Remove the plan-limits meter.**~~ Done in 0.15.2: the server no longer reads `.credentials.json` or calls the usage service. Also tested here (Playwright on this PC): the six 0.14.3 fixes (phone tap, map surround colour, pairing card scroll, Sagutin focus, Mga Playroom on touch, safe areas); all pass.
 2. **Check the real PC install:**
    - the running version and that `DevRoom.exe` sits where the user keeps it;
    - the autostart entry (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run\DevRoom`) points at `DevRoom.exe`;
@@ -49,8 +55,9 @@ The work moves to a new Claude Code session that runs **on the user's Windows PC
   - the cloud session "DEV-ROOM-APP" (this one).
 - **The PC's Remote Control folders:** icms-master-tool, aio-icms-tool, smc-salary-calculator, gmail-organizer.
 - **Claude Code transcript title lines:** `ai-title` (`aiTitle`) and `custom-title` (`customTitle`). 0.15.0 reads both.
+- **Testing on the user's PC (since 0.15.2):** Rust is the GNU toolchain (`~/.cargo/bin`, no MSVC) plus WinLibs MinGW from winget for `dlltool` and `ring`. Build the scratch server with `--target-dir C:/drt` (long Temp paths break build scripts). Run it on port 4417 with `APPDATA`, `LOCALAPPDATA`, `USERPROFILE`, `HOME` and `CLAUDE_CONFIG_DIR` set to a scratch folder: `start()` installs hooks for its own port, and it must never touch the real `~/.claude/settings.json` or `%APPDATA%DevRoom`. The real Dev Room keeps 4317 and 4318. Playwright 1.64 matches the cached Chromium; launching it needs the shell sandbox off. Stop the test server with `taskkill /IM drsrv.exe`.
 
-## Current state (v0.15.1, 2026-11-02)
+## Current state (v0.15.2, 2026-11-02)
 
 Shipped and auto-updating (releases v0.10.0 → v0.15.1 were all merged and published):
 - **PC self-update fixed (0.15.1):** restarts used the renamed old image (`current_exe`), so the PC stayed on v0.11.0. Now `app_exe()`. The user must close and reopen once; confirm the PC then shows the newest version after the next release.
@@ -69,7 +76,7 @@ Shipped and auto-updating (releases v0.10.0 → v0.15.1 were all merged and publ
   - Claude Code's own prompts (task notifications) are hidden from the chat (0.11.1).
   - SessionEnd from Dev Room's own run is ignored for 2 minutes after it ends (`ran_recently`, 0.14.2); real ends remove a session after 1 quiet minute (10 if it is in a playroom).
 - **Progress** (0.13.0): task lists from TodoWrite / TaskCreate / TaskUpdate. Tile bar and n/m, map bar, Detalye checklist with phase. After real work the session walks to the Boss to report.
-- **Plan limits** (0.13.0): 5-hour and weekly meters in the header from `~/.claude/.credentials.json` and the usage service. Untested against the real service.
+- **Plan limits** (0.13.0) were removed in 0.15.2: they sent the Claude sign-in token to the usage service, which the Consumer Terms forbid.
 - **Layout:**
   - Artifact viewer is a pop-out (0.11.0): float, card, sheet or full.
   - Tablet portrait (0.11.1): the panel docks under the office, with a draggable height bar (0.12.0).
@@ -88,7 +95,6 @@ Shipped and auto-updating (releases v0.10.0 → v0.15.1 were all merged and publ
 - Ask the user whether, on the real devices:
   - the chatted session now stays (0.14.2);
   - ⚡ answers arrive;
-  - the limit meters show numbers;
   - typing on the portrait tablet is fine (the user confirmed the layout part).
 
 ### Lessons from this project
@@ -103,7 +109,6 @@ Shipped and auto-updating (releases v0.10.0 → v0.15.1 were all merged and publ
 
 ### Not yet verified on real devices
 - `claude -p --resume` and `--fork-session` on the real PC: binary found, logged in, timing of ⚡ answers (expected 5–15 s).
-- The usage service response and the credentials file on the PC.
 - Window restore after an update restart (maximized, minimized, tray).
 - Malayo mode end to end on mobile data.
 

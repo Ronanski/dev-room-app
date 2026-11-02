@@ -338,7 +338,7 @@ flowchart TD
   A([Bukas ang app]):::term --> B[/GET /api/state?v=version/]:::io
   B --> C{204: walang nagbago?}:::dec
   C -->|Oo| B
-  C -->|Hindi| D[Sessions, team, usage, update info]:::proc
+  C -->|Hindi| D[Sessions, team, update info]:::proc
   D --> E[[computeUnits<br/>Mga Playroom + Bagong dating]]:::proc
   E --> F{Ibang playroom<br/>ang napili?}:::dec
   F -->|Oo| F1[setScene: Office o Beach Resort<br/>bake ng background]:::proc

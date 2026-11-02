@@ -7,6 +7,11 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.15.2 (2026-11-02)
+
+- **The plan-limits meter is gone** (the **5 oras** and **Linggo** chips in the header, added in 0.13.0). It read the Claude sign-in token from `~/.claude/.credentials.json` and sent it to the usage service every 2 minutes. Using a Claude login token outside Claude Code breaks the Consumer Terms, so it could get the account banned. Removed: `fetch_usage`, `claude_token` and the usage thread in `server.rs`, `usage` in `/api/state`, and `renderUsage` / `#usage` in the UI. Dev Room never reads the sign-in file now.
+- Tested here (Windows PC, a scratch build of the server with Playwright): the header has no limits chip at 1366×768, 1920×1080, 800×1280 and 412×900, light and dark, with no page errors; `/api/state` has no `usage`. Also re-tested six 0.14.3 fixes that were never checked: tapping a character on a phone (also inside an iframe like the Android app), the colour around the map (office and resort, light and dark), the pairing card scroll, Sagutin putting the cursor in the message box, Mga Playroom on touch (no keyboard, Save bar in view) and safe areas (emulated Android bars). All pass. Not tested: the real phone and tablet.
+
 ## 0.15.1 (2026-11-02)
 
 - **The PC app updates itself again.** After the exe swap the running image is renamed to `DevRoom.old-<build>.exe`, and the current-exe path then points at that renamed file. The restart started "the current exe", which was the old version again, so the PC stayed on v0.11.0 (re-downloading every check) until the user closed it and opened `DevRoom.exe` by hand. The updater now fixes the install path once at start (`app_exe`: always `DevRoom.exe`, also when running from an old copy) and uses it for the swap, the restart and the start-with-Windows entry (rewritten at each start).
