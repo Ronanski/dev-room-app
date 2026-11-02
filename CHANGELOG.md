@@ -7,6 +7,12 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.18.2 (2026-11-02)
+
+- **Thread names from the Claude app and Claude Projects, for real.** The user's screenshots showed names such as `SANA : PIXEL OFFICE` and `GISELLE : KATULONG NG FIXER` in the Claude app's project overview while Dev Room showed folder names. Claude Code 2.1.3xx sends the session's current name as `session_title` in its hook input (SessionStart, UserPromptSubmit), including renames made in the Claude app or by a project's coordinator (`rename_session` from the host). With its newer storage that name may never reach the transcript file, which is why reading the transcript and the sidecar was not enough. `server.rs` now keeps it as `hook_title`, which comes first after a Dev Room rename; Detalye shows "Pangalan sa Claude app (galing sa hook)".
+- A thread that is already running gets its name with its next hook (the next message from you or the coordinator).
+- Tested here (scratch server build): no `session_title` keeps the old behaviour; SessionStart with it shows the name; a later UserPromptSubmit with a new name renames the session; a Stop hook without it keeps the name. Not tested: the real PC.
+
 ## 0.18.1 (2026-11-02)
 
 - **The phone's tabs stay clear of the navigation keys even before the new phone app is installed.** An Android app older than 0.18.0 sends no bar sizes; the office (inside the app, on Android) now keeps 28 px at the top and 48 px at the bottom until real sizes arrive, instead of 0.
