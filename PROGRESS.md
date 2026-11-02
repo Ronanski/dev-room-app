@@ -11,43 +11,58 @@ Dev Room shows them all in one place instead. Each session is a character in a s
 - who needs the user's input,
 - what each session is doing right now, and how far along it is.
 
-## Current state (v0.10.0, 2026-11-01)
+## Current state (v0.14.2, 2026-11-02)
 
-Shipped and auto-updating:
+Shipped and auto-updating (releases v0.10.0 → v0.14.2 were all merged and published):
 - **Windows tray app:** hooks give live status in an isometric world.
-  - **Updates:** checks every 30 s. It installs at once when the window is in the tray or minimized, and otherwise after 15 s idle with a 5 s countdown, never while typing.
-  - The user confirmed that the 0.8.0 → 0.9.0 step needed one manual close and reopen, because the old updater was slow. 0.10.0 is the first release that should arrive with no manual step. Check with the user that it did.
-- **Playrooms (units):**
-  - Built with the **Mga Playroom** editor: name, Office or Beach Resort, members, ★ leader. Unplaced sessions go to "Bagong dating".
-  - Each playroom is a scene (`setScene`). Both scenes share the floor plan.
-  - The user asked for different kinds of places, "wag puro office". More scene ideas offered: space station, farm, school campus.
-- **People walk around things:** furniture is recorded while baking, then A* on a half-tile grid with line-of-sight smoothing.
-- **Free drag** of the playroom.
-- **Chat:** Dev Room's own chatbox, in real time. The Chat tab is NOT claude.ai; the user rejected that.
-  - Live transcript reading, about 1 s.
-  - Instant send: `claude -p --resume` for an idle session; PostToolUse for a working one.
-  - Messages are never left stuck. The 10-minute quiet rule covers a turn stopped with Esc.
-  - Markdown replies.
-  - Pictures (tool-result images) and Artifact or SendUserFile pages show in the chat, sandboxed.
-  - Composer: a growing box, a round send button, and recipient chips. There is no away option.
-- **Android app:**
-  - Office in an iframe, background alerts, and the update status pill.
-  - **In-app APK download and installer** (0.10.0). The phone still needed one last manual install to get it.
-- **Malayo mode:** a Cloudflare quick tunnel plus a private ntfy topic, so the phone works on mobile data with no extra app.
+  - **Updates:** checks every 30 s. It installs at once in the tray or minimized; with the window open, after 15 s idle with a countdown.
+  - **Window state** (0.11.0): place, size and maximized are saved in `window.json` and restored after an update restart. A restart while minimized comes back minimized via `SetWindowPlacement`. The user confirmed that auto-update itself works with no manual step.
+- **Playrooms (units):** the **Mga Playroom** editor (name, Office or Beach Resort, members, ★ leader). Unplaced sessions go to "Bagong dating". A* pathfinding; free drag.
+- **Chat (real time):** Dev Room's own chatbox; never claude.ai.
+  - Live transcript reading (0.9 s), with pictures and artifacts in the chat.
+  - Idle session: `claude -p --resume`. Working session: PostToolUse `additionalContext`.
+  - **⚡ Quick answer** (0.14.0): a message still queued after 2.5 s gets an answer from a fork (`--fork-session`, plan mode, `disableAllHooks`); the message stays queued for the real session.
+  - **Queue reason** under a waiting message (0.13.0): answering, step (which and how long), nocli, busy.
+  - Subagent hooks never change the lead's status (0.11.1), so a lead with background agents takes messages at once.
+  - Claude Code's own prompts (task notifications) are hidden from the chat (0.11.1).
+  - SessionEnd from Dev Room's own run is ignored for 2 minutes after it ends (`ran_recently`, 0.14.2); real ends remove a session after 1 quiet minute (10 if it is in a playroom).
+- **Progress** (0.13.0): task lists from TodoWrite / TaskCreate / TaskUpdate. Tile bar and n/m, map bar, Detalye checklist with phase. After real work the session walks to the Boss to report.
+- **Plan limits** (0.13.0): 5-hour and weekly meters in the header from `~/.claude/.credentials.json` and the usage service. Untested against the real service.
+- **Layout:**
+  - Artifact viewer is a pop-out (0.11.0): float, card, sheet or full.
+  - Tablet portrait (0.11.1): the panel docks under the office, with a draggable height bar (0.12.0).
+  - Session tiles (0.12.0): equal-width grid, up to 4 a row, with faces cut from the sprites and one name.
+  - Android app: the Fullscreen API is not used (0.14.0); portrait comes from `screen.orientation`; the typing class is `kbopen` (0.14.1).
+- **Android app:** office in an iframe, background alerts, in-app APK update. **Malayo mode** via cloudflared and ntfy.
+- **Docs:** `docs/flowcharts.html`, nine ISO 5807 flowcharts of the whole system, also published as the artifact "Dev Room System Flow" (private to the user; no links to the user).
+
+### Waiting on the user
+- **Quality plan, proposed 2026-11-02; waiting for the user's go.**
+  1. Automated tests in CI: the server with a stand-in `claude`, plus Playwright at PC, tablet portrait and landscape, and phone sizes. A failing test blocks the merge.
+  2. Android conditions: WebView user agent and iframe, the keyboard shrinking the viewport, rotation.
+  3. Real Claude Code behaviour: late SessionEnd, subagents, background agents, Esc, long steps. Every bug the user reports becomes a test.
+  4. An in-app health check (hooks, CLI found, connection, version) and a one-tap error report.
+- Ask the user whether, on the real devices:
+  - the chatted session now stays (0.14.2);
+  - ⚡ answers arrive;
+  - the limit meters show numbers;
+  - typing on the portrait tablet is fine (the user confirmed the layout part).
 
 ### Lessons from this project
-- Say plainly when a change is not released yet. The user waited for an update that had not been merged.
-- Never use `pkill -f` in this sandbox: it kills the tool's own shell. Kill by PID instead.
+- Say plainly when a change is not released yet. The user waited for updates that were not merged; check the Latest release before answering.
+- Never use `pkill -f` in this sandbox: it kills the tool's own shell (it happened twice). Kill by PID, or `pgrep -x`.
 - The page script is wrapped, so tests reach internals through `?debug=1` (`window.__dr`).
+- CSS class names collide: `.typing` (the chat line) broke the whole app when reused on `.app`. Check for an existing rule before adding a state class.
+- Test with the Android WebView user agent and a shrinking viewport (keyboard); desktop Playwright alone missed the tablet bugs.
+- Do not run `claude -p` here to experiment: it inherits this session's id.
+- Docs-only PRs get no CI (path filter). Merge them directly, or fold them into the next release.
 - The user wants everything real time, with no extra apps and no manual steps, and polished. Test on phone, tablet (800×1280) and PC, in dark mode.
 
 ### Not yet verified on real devices
-- PC auto-update with no manual step: the first real test is 0.10.0.
-- Android in-app update: the download, Android's installer, and the "allow installs" setting.
-- Real-time chat on the real PC: that `claude -p --resume` finds the Claude Code binary and is logged in, and how the Claude desktop app shows a turn continued from Dev Room.
-- Pictures and artifacts from real sessions (the Artifact tool's `file_path`).
-- Malayo mode end to end: the cloudflared download on Windows, the ntfy publish, and mobile data.
-- The Playrooms editor with the user's real team.
+- `claude -p --resume` and `--fork-session` on the real PC: binary found, logged in, timing of ⚡ answers (expected 5–15 s).
+- The usage service response and the credentials file on the PC.
+- Window restore after an update restart (maximized, minimized, tray).
+- Malayo mode end to end on mobile data.
 
 ### Backlog (ask the user before starting; they pick the order)
 1. Sound or vibration when a session needs you, with an on/off switch.
