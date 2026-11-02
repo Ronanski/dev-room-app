@@ -7,6 +7,13 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.14.1 (2026-11-02)
+
+- **Typing on a portrait tablet no longer squeezes the app into a narrow strip.** The class the app set while you type (`typing`) was also the chat's "working…" line class, which centers its content; on the whole app it shrank everything to the width of its content. It is now `kbopen`. Tested: with the keyboard open (800×620 on a portrait tablet) the page stays 800 px wide.
+- **Portrait stays portrait while the keyboard is open.** The keyboard leaves a short, wide space, which used to flip the tablet to the landscape layout. Portrait now comes from the device's orientation (`screen.orientation`, class `port`), and the map keeps its zoom while you type.
+- **Letters no longer come out reversed.** The message box's placeholder was set again on every refresh while you typed, which broke the phone keyboard's input; it is now set only when it changes, and the box's height only when it changes.
+- **A session no longer disappears after you chat with it.** The run that hands your message over (`claude -p --resume`) ends with a SessionEnd hook while the session is still open in Claude Code, and Dev Room removed the session. SessionEnd from Dev Room's own run is now ignored; a real end removes the session after a quiet minute (a newer hook cancels it). Tested with a stand-in `claude` that sends SessionEnd: the session stayed; a real SessionEnd removed its session after a minute.
+
 ## 0.14.0 (2026-11-01)
 
 - **Answers in real time, even while a session is busy.** Claude Code takes a new message only between steps. If yours is still waiting after 2.5 seconds (the session is in the middle of a long step, such as an agent or a test run), Dev Room asks a copy of that session right away (`quick_answer`: `claude -p --resume <id> --fork-session --permission-mode plan --settings {"disableAllHooks":true}`):

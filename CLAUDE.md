@@ -54,6 +54,7 @@ The user's real team is **LOGIC_SIM_PROJECT**: a leader plus subsessions (CODE F
   - **Progress:** `track_tasks` keeps each session's task list (`tasks`: id, t, a, st) from TodoWrite / TaskCreate / TaskUpdate; the UI's `prog()` drives tile bars, map bars, the Detalye checklist and the report walk to the Boss (`reportToBoss`).
   - **Queue reason:** `queue_why` (answering, step, nocli, busy, soon) is shown under a waiting message (`queueText`).
   - **Plan limits:** `fetch_usage` reads the 5-hour and weekly utilization every 2 minutes with the token in `~/.claude/.credentials.json` (never passed on); `usage` in `/api/state`, shown by `renderUsage`. `DEVROOM_USAGE_URL` points it at a stand-in for tests.
+  - **SessionEnd** from Dev Room's own `claude -p --resume` run (sid in `RUNS`) is ignored; a real one sets `ended_at`, and liveness removes the session after a quiet minute.
   - A liveness thread marks a session as working while its transcript keeps being written after Stop.
   - State lives in `%APPDATA%\DevRoom\state.json` and is written atomically.
 - **`app/src-tauri/src/main.rs`:**
@@ -73,6 +74,7 @@ The user's real team is **LOGIC_SIM_PROJECT**: a leader plus subsessions (CODE F
   - The **Mga Playroom** editor is `openTeam` / `renderRooms` / `roomsClick`.
   - New scenes must keep the same desk and spot coordinates.
 - **Fullscreen:** the Fullscreen API is not used inside the Android app (`FS_OK`); its WebView collapsed the page. CSS alone fills the screen there.
+- **Portrait:** the class `port` on `.app` comes from `screen.orientation` (not the space left by the keyboard). While typing the app has `kbopen` (never `typing`: that is the chat's working-line class).
 - **Tablet portrait:** with the panel open on a portrait screen ≥ 641 px wide, the panel docks under the office (grid `office / dock / chat`) instead of overlaying it. The bar above it (`#pSplit`) sets its height (`--chath`, remembered in localStorage `devroom.chath`).
 - **Session tiles (`#dock`):** an equal-width grid, up to 4 a row (`dockCols`), with the session's face (`faceURL`, cut from her sprite), one short name and a status dot; lower in portrait and fullscreen.
 - **`mobile/`:** the Capacitor Android shell.

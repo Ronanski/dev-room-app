@@ -260,7 +260,15 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<St
     let Some(sid) = v.get("session_id").and_then(|x| x.as_str()).map(String::from) else { return };
     if sid.is_empty() || sid.len() > 80 || !sid.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') { return; }
     if ev == "SessionEnd" {
-        if st.sessions.remove(&sid).is_some() { st.bump(); st.save(); }
+        // The run Dev Room starts to hand your message over (`claude -p --resume`) ends with SessionEnd too, while
+        // the session itself is still open in Claude Code: that one must not remove it (it made sessions vanish
+        // right after you chatted). A real end is only acted on after a quiet minute (see liveness).
+        let ours = RUNS.lock().map(|r| r.iter().any(|x| x == &sid)).unwrap_or(false);
+        if let Some(s) = st.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()) {
+            if !ours { s.insert("ended_at".into(), json!(now_ms())); }
+            if s.get("status").and_then(|x| x.as_str()) == Some("working") { s.insert("status".into(), json!("idle")); s.insert("short".into(), json!("")); }
+            st.bump(); st.save();
+        }
         return;
     }
     if !HOOK_EVENTS.contains(&ev) { return; }
@@ -308,6 +316,7 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<St
     s.insert("updated_at".into(), json!(now));
     s.insert("hook_at".into(), json!(now));
     s.insert("last_event".into(), json!(ev));
+    s.remove("ended_at");
     s.remove("live_guess");
     // a hook after a hand-over means Claude received it
     if let Some(inbox) = s.get_mut("inbox").and_then(|i| i.as_array_mut()) {
@@ -997,6 +1006,13 @@ fn liveness(st: &Mutex<State>) {
         let queued = o.get("inbox").and_then(|i| i.as_array()).map(|a| a.iter().any(|m| m.get("state").and_then(|x| x.as_str()) == Some("queued"))).unwrap_or(false);
         (queued && resumable(o)).then(|| k.clone())
     }).collect();
+    // a session that really ended (SessionEnd, then a quiet minute, and no run of ours) leaves the office
+    let ended: Vec<String> = s.sessions.iter().filter(|(k, v)| {
+        let e = v.get("ended_at").and_then(|x| x.as_u64()).unwrap_or(0);
+        e > 0 && now.saturating_sub(e) > 60_000 && !RUNS.lock().map(|r| r.iter().any(|x| x == *k)).unwrap_or(false)
+    }).map(|(k, _)| k.clone()).collect();
+    for k in &ended { s.sessions.remove(k); }
+    if !ended.is_empty() { changed = true; save = true; }
     // forget sessions that ended without SessionEnd (3 days quiet)
     let cutoff = now.saturating_sub(3 * 24 * 3600 * 1000);
     let before = s.sessions.len();
