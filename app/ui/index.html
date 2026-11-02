@@ -158,6 +158,13 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .cp-head{display:flex;gap:10px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
 .cp-head .who{min-width:0;flex:1}
 .cp-head .nm{font-weight:700;font-size:14px;line-height:1.2}
+.cp-head .hbtn{border:0;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:6px;vertical-align:middle;min-width:28px;min-height:28px}
+.cp-head .hbtn:hover{background:color-mix(in srgb,var(--ink) 8%,transparent);color:var(--ink)}
+.cp-head .hroom{display:inline-flex;align-items:center;gap:6px;margin-top:4px;font-size:12px;color:var(--muted)}
+.cp-head .hroom select{font:inherit;font-size:12px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:3px 6px;min-height:28px;max-width:190px}
+.cp-head .rn-edit input{width:100%;box-sizing:border-box;font:inherit;font-size:15px;font-weight:700;color:var(--ink);background:var(--bg);border:1px solid var(--accent);border-radius:8px;padding:6px 8px}
+.cp-head .rn-acts{display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap}
+@media (pointer:coarse){.cp-head .hbtn{min-width:40px;min-height:40px}.cp-head .hroom select{min-height:36px}}
 .cp-head .side{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .cp-tabs{display:flex;border-bottom:1px solid var(--line)}
 .cp-tabs button{flex:1;border:0;background:none;padding:9px 6px;font-size:12.5px;color:var(--muted);border-bottom:2px solid transparent}
@@ -1350,6 +1357,8 @@ function applyRecords(records){
     }
     const prev=s.status,prevAt=s.at,prevDetail=s.detail+'|'+s.recent+'|'+s.ask;
     const i=infoOf(r);Object.assign(s,i);
+    // a new name (renamed here, with /rename, or in the Claude app) shows at once; her looks stay
+    if(r.title&&r.title!==s.name){const p=parseTitle(r.title,s.lead);s.name=r.title;s.role=p.role;s.short=p.short;s.task=p.task;delete s.baseShort;delete s.baseRole;}
     s.activity=[i.act||'Nagtatrabaho.',sent(i.detail||i.recent||'Nagtatrabaho sa task niya')];
     if(i.status!==prev){s.status=prev;setStatus(s,i.status);}
     else if(s.status==='needs'&&prevDetail.split('|')[2]!==s.ask){s.acked=ackSeen(s);s.alarmAt=now();s.prio=/permission/i.test(s.ask||'')?1:2;if(!s.acked)toast(s);}
@@ -1401,6 +1410,21 @@ function seedTimeline(s){
   s.tl=[{st:s.status==='idle'&&idleMins(s)>30?'sleep':s.status,from:Math.min(s.since,now())}];
 }
 // Replace an element's HTML only when it changed (a rewrite every second swallows taps and costs layout).
+// Rename and move a session from her own panel (no need to open Mga Playroom)
+let RENAME=null;
+function liveRooms(){
+  if((TEAM.rooms||[]).length)return TEAM.rooms.map(r=>({id:r.id,name:r.name,scene:r.scene,lead:r.lead,ids:(r.ids||[]).slice()}));
+  return UNITS.filter(u=>u.key!=='new').map((u,i)=>({id:u.key.startsWith('r:')?u.key.slice(2):'auto'+(i+1),name:u.label,scene:u.scene||'office',lead:u.lead||null,ids:(u.all||u.list).map(r=>r.id)}));}
+function roomPicker(s){const rs=liveRooms();const cur=rs.find(r=>r.ids.includes(s.sid));
+  return `<label class="hroom">Playroom <select data-hd="room" aria-label="Ilipat sa playroom">${rs.map(r=>`<option value="${esc(r.id)}" ${cur===r?'selected':''}>${esc(r.name)} (${r.ids.length})</option>`).join('')}<option value="" ${cur?'':'selected'}>Bagong dating</option><option value="+">+ Bagong playroom…</option></select></label>`;}
+function saveName(sid,v){const rec=allRecords.find(r=>r.id===sid);const names=Object.assign({},TEAM.names||{});v=(v||'').trim();
+  if(!v||(rec&&v===rec.own_title))delete names[sid];else names[sid]=v;TEAM=Object.assign({},TEAM,{names});
+  if(rec)rec.title=names[sid]||rec.own_title||rec.title;saveTeam({names});RENAME=null;applyRecords(allRecords);chatKey='';render();}
+function moveRoom(sid,to){let rs=liveRooms();rs.forEach(r=>{r.ids=r.ids.filter(x=>x!==sid);if(r.lead===sid)r.lead=null;});
+  if(to==='+'){const n=prompt('Pangalan ng bagong playroom:','Playroom '+(rs.length+1));if(n===null){$('cpHead')._h='';chatKey='';render();return;}to='p'+Date.now().toString(36);rs.push({id:to,name:n.trim().slice(0,40)||'Playroom '+(rs.length+1),scene:rs.length%2?'resort':'office',lead:null,ids:[]});}
+  const r=rs.find(x=>x.id===to);if(r)r.ids.push(sid);
+  const ids=[...new Set(rs.flatMap(x=>x.ids))],lead=(rs.find(x=>x.lead)||{}).lead||null;
+  TEAM=Object.assign({},TEAM,{rooms:rs,ids,lead});saveTeam({rooms:rs,ids,lead});$('cpHead')._h='';applyRecords(allRecords);chatKey='';render();}
 function setHTML(el,html){if(el&&el._h!==html){el._h=html;el.innerHTML=html;}}
 function tlHTML(s){
   if(!s.tl)seedTimeline(s);
@@ -1457,6 +1481,8 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.15.0':{news:['<b>Nababasa na ang pangalan ng session</b>, pati ang pangalang ginawa ng Claude Code. Kapag pinalitan mo ang pangalan sa Claude (/rename o sa Claude app), lalabas agad dito.','<b>Hindi na bumabalik sa dati ang pinalitan mong pangalan</b> kapag nag-save ka ulit sa Mga Playroom.','<b>Mas madaling mag-rename at maglipat:</b> buksan ang session, pindutin ang ✎ sa tabi ng pangalan niya, o piliin ang Playroom sa ilalim nito. Hindi na kailangang buksan ang Mga Playroom.'],
+    todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
   '0.14.3':{news:['<b>Buong pagsusuri ng app:</b> 22 bug ang naayos sa PC, tablet at phone.','<b>Chat:</b> may ⚡ sagot na rin ang pangalawang mensahe habang abala siya; hindi na lumalabas ang lumang ⚡ pagkatapos ng tunay na sagot; hindi na nawawala ang paulit-ulit na mensahe (hal. dalawang "continue"); hindi na siya nagmumukhang tapos habang nagko-compact.','<b>Tablet na naka-portrait:</b> kita na ang sinusulat mo kapag bukas ang keyboard.','<b>Phone:</b> laging kita ang Office/Chat sa ibaba; ang pag-tap sa tao ay nagbubukas ng chat; ayos na kapag nakatagilid ang phone.','<b>PC:</b> buong office na talaga ang "Buong office"; may table na sa chat; kita lagi ang napiling "Para kay".'],
     todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
   '0.14.2':{news:['<b>Hindi na nawawala ang session na kinakausap mo</b>, sa chat man o sa playroom. Mas matagal na rin bago umalis ang session na nasa playroom mo kapag totoong isinara ito.'],
@@ -2582,7 +2608,9 @@ function msgHTML(s,m){
 function renderPanel(){
   const s=sel();if(!s)return;
   const place=s.status==='needs'?'Sa harap ng opisina mo':s.status==='idle'?(IDLE_PLACE[s.idle]||'Hallway'):s.lead?'Opisina ng Lead':'Desk '+(s.desk.i+1);
-  setHTML($('cpHead'),`${av(s,38)}<div class="who"><div class="nm">${esc(s.role)}${s.lead?' (leader)':''}</div><div class="raw">${esc(s.name)}</div></div><div class="side">${pill(s)}<span class="src">${s.source} · ${esc(s.host)}</span></div>`);
+  if(RENAME===s.sid&&$('rnInput')&&(document.activeElement===$('rnInput')||$('cpHead').querySelector('.rn-edit')?.contains(document.activeElement))){}
+  else if(RENAME===s.sid){const rec=allRecords.find(r=>r.id===s.sid);setHTML($('cpHead'),`${av(s,38)}<div class="who rn-edit"><input type="text" id="rnInput" maxlength="60" value="${esc((TEAM.names||{})[s.sid]||s.name)}" aria-label="Bagong pangalan" placeholder="${esc(rec&&rec.own_title||'')}"><div class="rn-acts"><button type="button" class="btn primary" data-hd="rn-save">I-save</button><button type="button" class="btn" data-hd="rn-cancel">Kanselahin</button>${(TEAM.names||{})[s.sid]?`<button type="button" class="linkbtn" data-hd="rn-reset">Ibalik sa pangalan sa Claude</button>`:''}</div></div>`);setTimeout(()=>{const i=$('rnInput');if(i&&document.activeElement!==i){i.focus();i.select();}},0);}
+  else setHTML($('cpHead'),`${av(s,38)}<div class="who"><div class="nm">${esc(s.role)}${s.lead?' (leader)':''} <button type="button" class="hbtn" data-hd="rn" aria-label="Palitan ang pangalan" title="Palitan ang pangalan">✎</button></div><div class="raw">${esc(s.name)}</div>${roomPicker(s)}</div><div class="side">${pill(s)}<span class="src">${s.source} · ${esc(s.host)}</span></div>`);
   document.querySelectorAll('.cp-tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.ptab===ptab));
   $('composer').hidden=ptab!=='chat';
 
@@ -2661,7 +2689,7 @@ function renderRooms(){
     <div class="row"><button type="button" class="btn" data-act="team-reset">Ibalik sa awtomatiko</button><span style="flex:1"></span><button type="button" class="btn" data-act="team-cancel">Kanselahin</button><button type="button" class="btn primary" data-act="rooms-save">I-save</button></div></div>`;
 }
 function syncRoomInputs(){if(!ROOMS_EDIT)return;document.querySelectorAll('#teamPanel .rname').forEach(i=>{const r=ROOMS_EDIT.rooms.find(x=>x.id===i.dataset.room);if(r)r.name=i.value.trim()||r.name;});
-  document.querySelectorAll('#teamPanel .tname').forEach(i=>{const rec=allRecords.find(x=>x.id===i.dataset.id);const v=i.value.trim();if(!v||(rec&&v===rec.title))delete ROOMS_EDIT.names[i.dataset.id];else ROOMS_EDIT.names[i.dataset.id]=v;});}
+  document.querySelectorAll('#teamPanel .tname').forEach(i=>{const rec=allRecords.find(x=>x.id===i.dataset.id);const v=i.value.trim();if(!v||(rec&&v===(rec.own_title||'')))delete ROOMS_EDIT.names[i.dataset.id];else if(!rec||v!==rec.title||ROOMS_EDIT.names[i.dataset.id])ROOMS_EDIT.names[i.dataset.id]=v;});}
 function roomsClick(e){
   const E=ROOMS_EDIT;if(!E)return false;
   const b=e.target.closest('[data-rscene],[data-rdel],[data-put],[data-lead],[data-act="room-add"],[data-act="rooms-save"]');if(!b)return false;
@@ -2685,7 +2713,7 @@ async function saveTeam(t){
 }
 function switchUnit(k){if(k===UNIT&&applyRecords.unit===k)return;UNIT=k;try{localStorage.setItem('devroom.unit',k);}catch(e){}applyRecords(allRecords);firstLoad=false;chatKey='';render();setConn();}
 function rebuildTeam(){for(const s of sessions.slice())dropSession(s,'');firstLoad=true;logs.length=0;applyRecords(allRecords);setConn();}
-function collectNames(){const n=Object.assign({},TEAM.names||{});document.querySelectorAll('#teamPanel .tname').forEach(i=>{const r=allRecords.find(x=>x.id===i.dataset.id);const v=i.value.trim();if(!v||(r&&v===r.title&&!n[i.dataset.id]))delete n[i.dataset.id];else n[i.dataset.id]=v;});return n;}
+function collectNames(){const n=Object.assign({},TEAM.names||{});document.querySelectorAll('#teamPanel .tname').forEach(i=>{const r=allRecords.find(x=>x.id===i.dataset.id);const v=i.value.trim();if(!v||(r&&v===(r.own_title||'')))delete n[i.dataset.id];else if(!r||v!==r.title||n[i.dataset.id])n[i.dataset.id]=v;});return n;}
 // Each session's face, cut from her own pixel sprite (same hair, skin and shirt as on the map); cached.
 const FACES=new Map();
 function faceURL(s){
@@ -2872,6 +2900,16 @@ for(const id of ['rcpt','units']){const r=$(id);if(r)r.addEventListener('wheel',
 {const d=$('dock');const edge=()=>d.classList.toggle('at-end',d.scrollLeft+d.clientWidth>=d.scrollWidth-4);
  d.addEventListener('wheel',e=>{if(Math.abs(e.deltaY)>Math.abs(e.deltaX)&&d.scrollWidth>d.clientWidth){d.scrollLeft+=e.deltaY;e.preventDefault();}},{passive:false});
  d.addEventListener('scroll',edge,{passive:true});new ResizeObserver(()=>{edge();dockCols();}).observe(d);new MutationObserver(()=>requestAnimationFrame(dockCols)).observe($('app'),{attributes:true,attributeFilter:['class']});setInterval(edge,2000);}
+{const h=$('cpHead');
+ h.addEventListener('click',e=>{const b=e.target.closest('[data-hd]');if(!b||b.tagName==='SELECT')return;const s=sel();if(!s)return;
+   if(b.dataset.hd==='rn'){RENAME=s.sid;chatKey='';render();}
+   else if(b.dataset.hd==='rn-save')saveName(s.sid,$('rnInput').value);
+   else if(b.dataset.hd==='rn-reset')saveName(s.sid,'');
+   else if(b.dataset.hd==='rn-cancel'){RENAME=null;$('rnInput')?.blur();chatKey='';render();}});
+ h.addEventListener('change',e=>{if(e.target.dataset.hd==='room'){const s=sel();if(s)moveRoom(s.sid,e.target.value);}});
+ h.addEventListener('keydown',e=>{if(e.target.id!=='rnInput')return;const s=sel();
+   if(e.key==='Enter'){e.preventDefault();if(s)saveName(s.sid,e.target.value);}
+   else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();RENAME=null;e.target.blur();chatKey='';render();}});}
 ['teamPanel','whatsNew'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target===e.currentTarget){if(id==='whatsNew')$(id).querySelector('[data-act="wn-ok"]')?.click();else $(id).hidden=true;}}));
 // Portrait or landscape comes from the device (screen orientation), so the on-screen keyboard, which leaves a
 // short, wide space, does not flip a portrait tablet into the landscape layout while you type.
