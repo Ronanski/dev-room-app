@@ -1481,6 +1481,8 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.15.1':{news:['<b>Kusa nang nag-a-update ang PC app.</b> Dati, pagkatapos ma-download ang update, ang lumang kopya ang binubuksan ulit ng app, kaya naiipit ito sa v0.11.0 hangga\'t hindi mo isinasara nang mano-mano.','Kapag hindi mailagay ang update, makikita mo na sa itaas kung bakit.'],
+    todo:['<b>Huling beses na lang ito:</b> sa PC, i-right-click ang Dev Room sa tray, piliin ang <b>Isara nang tuluyan</b>, tapos buksan ulit ang DevRoom.exe. Pagkatapos nito, kusa na ang lahat ng update.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
   '0.15.0':{news:['<b>Nababasa na ang pangalan ng session</b>, pati ang pangalang ginawa ng Claude Code. Kapag pinalitan mo ang pangalan sa Claude (/rename o sa Claude app), lalabas agad dito.','<b>Hindi na bumabalik sa dati ang pinalitan mong pangalan</b> kapag nag-save ka ulit sa Mga Playroom.','<b>Mas madaling mag-rename at maglipat:</b> buksan ang session, pindutin ang ✎ sa tabi ng pangalan niya, o piliin ang Playroom sa ilalim nito. Hindi na kailangang buksan ang Mga Playroom.'],
     todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
   '0.14.3':{news:['<b>Buong pagsusuri ng app:</b> 22 bug ang naayos sa PC, tablet at phone.','<b>Chat:</b> may ⚡ sagot na rin ang pangalawang mensahe habang abala siya; hindi na lumalabas ang lumang ⚡ pagkatapos ng tunay na sagot; hindi na nawawala ang paulit-ulit na mensahe (hal. dalawang "continue"); hindi na siya nagmumukhang tapos habang nagko-compact.','<b>Tablet na naka-portrait:</b> kita na ang sinusulat mo kapag bukas ang keyboard.','<b>Phone:</b> laging kita ang Office/Chat sa ibaba; ang pag-tap sa tao ay nagbubukas ng chat; ayos na kapag nakatagilid ang phone.','<b>PC:</b> buong office na talaga ang "Buong office"; may table na sa chat; kita lagi ang napiling "Para kay".'],
@@ -1600,6 +1602,7 @@ function pcUpd(){
   const j=UPD.pc;if(!j||!j.app_version)return null;
   const L=j.latest||null,lb=L&&L.build||0,cur=`v${j.app_version} (build ${j.app_build})`;
   if(j.update_ready)return{st:'busy',t:`Ini-install ang v${L&&L.version||''}…`,d:`Na-download na ang v${L&&L.version||''} (build ${lb}). Kusang magre-restart ang Dev Room sa PC para matapos ito.`};
+  if(j.update_note&&L&&lb>j.app_build)return{st:'warn',t:`${cur} · hindi ma-install`,d:`May bagong v${L.version} (build ${lb}) pero hindi ito mailagay: ${j.update_note} Susubukan ulit nang kusa. Kung tumagal, isara ang Dev Room (Isara nang tuluyan sa tray) at buksan ulit ang DevRoom.exe.`};
   if(L&&lb>j.app_build&&j.app_build>0)return{st:'busy',t:`Dina-download ang v${L.version}…`,d:`Ngayon: ${cur}. Dina-download ang v${L.version} (build ${lb}); kusa itong mai-install.`};
   if(j.update_note)return{st:'warn',t:`${cur} · hindi ma-check`,d:j.update_note+' Susubukan ulit nang kusa.'};
   if(!L)return{st:'wait',t:`${cur} · tinitingnan…`,d:'Tinitingnan pa kung may bagong bersyon.'};

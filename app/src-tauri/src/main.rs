@@ -27,7 +27,7 @@ fn autostart_enabled() -> bool { cfg!(windows) && reg(&["query", RUN_KEY, "/v", 
 fn set_autostart(on: bool) {
     if !cfg!(windows) { return; }
     if on {
-        if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe) = updater::app_exe() {
             let cmd = format!("\"{}\" --tray", exe.display());
             reg(&["add", RUN_KEY, "/v", "DevRoom", "/t", "REG_SZ", "/d", &cmd, "/f"]);
         }
@@ -215,6 +215,8 @@ fn main() {
     updater::set_hidden(hidden);
     // First run: start with Windows (hidden in the tray), so phones work without opening anything.
     let marker = server::data_dir().join("autostart-default");
+    // keep the start-with-Windows entry pointing at DevRoom.exe (an older copy could have saved another name)
+    if cfg!(windows) && marker.exists() && autostart_enabled() { set_autostart(true); }
     if cfg!(windows) && !marker.exists() {
         set_autostart(true);
         let _ = std::fs::create_dir_all(server::data_dir());

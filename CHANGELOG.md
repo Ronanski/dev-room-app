@@ -7,6 +7,13 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.15.1 (2026-11-02)
+
+- **The PC app updates itself again.** After the exe swap the running image is renamed to `DevRoom.old-<build>.exe`, and the current-exe path then points at that renamed file. The restart started "the current exe", which was the old version again, so the PC stayed on v0.11.0 (re-downloading every check) until the user closed it and opened `DevRoom.exe` by hand. The updater now fixes the install path once at start (`app_exe`: always `DevRoom.exe`, also when running from an old copy) and uses it for the swap, the restart and the start-with-Windows entry (rewritten at each start).
+- **Slow lines no longer fail the download:** a read timeout (60 s without data) replaces the 60 s limit on the whole 8 MB download.
+- **An update that cannot be installed says why** in the header (the error was hidden behind "Dina-download").
+- Tested here: a Linux build that renames itself shows the same path change, and `app_exe` stays `DevRoom.exe`. Not tested on Windows. The copy now running on the PC (v0.11.0) still has the old updater, so it needs one last manual close and reopen.
+
 ## 0.15.0 (2026-11-02)
 
 - **Session names come from Claude Code again.** Current Claude Code writes its own title as `ai-title` (`aiTitle`) and a rename as `custom-title`; Dev Room only knew `summary`, so it fell back to the first prompt. It now keeps both (`custom_title`, `auto_title`): a Dev Room rename first, then your `/rename`, then Claude Code's title, then the first prompt. The live transcript reader picks up a new name within a second, so a rename in Claude Code or the Claude app shows at once (when it is written to the session's transcript on the PC).

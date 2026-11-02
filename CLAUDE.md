@@ -67,6 +67,7 @@ The user's real team is **LOGIC_SIM_PROJECT**: a leader plus subsessions (CODE F
   - Single instance through `/api/show`.
   - The embedded claude.ai chat is a child webview over the Chat panel. It uses the Tauri `unstable` feature, and its navigation is limited to an allowlist.
 - **`app/src-tauri/src/updater.rs`:** polls the Latest release every 30 seconds and does the UI hot swap and the exe swap. It restarts at once in the tray or when minimized; with the window open, after 15 seconds idle.
+  - **Install path:** `app_exe()` is fixed at start and is always `DevRoom.exe` (never `current_exe()`, which follows the running image when it is renamed to `DevRoom.old-<build>.exe`). The swap, the restart and the autostart entry use it.
   - The window's place, size and maximized state are kept in `window.json` (`Geom`, `note_geom`, `save_geom`); `make_window` in `main.rs` restores them, and a restart while minimized comes back minimized through `SetWindowPlacement`.
 - **`app/ui/index.html`:** the whole UI in one file: canvas map, overlay, panel, chat feed and notes. Edit it directly; `tools/ui-build/` only reproduces older versions.
 - **Viewer (in `index.html`):** artifacts and pictures open in a pop-out. `viewerMode()` picks `float` (PC, tablet landscape: draggable, resizable, remembered in localStorage `devroom.viewer`), `card` (tablet portrait), `sheet` (phone or height ≤ 520: swipe down closes) or `full` (⤢).

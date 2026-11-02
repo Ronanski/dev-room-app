@@ -11,9 +11,10 @@ Dev Room shows them all in one place instead. Each session is a character in a s
 - who needs the user's input,
 - what each session is doing right now, and how far along it is.
 
-## Current state (v0.15.0, 2026-11-02)
+## Current state (v0.15.1, 2026-11-02)
 
-Shipped and auto-updating (releases v0.10.0 → v0.15.0 were all merged and published):
+Shipped and auto-updating (releases v0.10.0 → v0.15.1 were all merged and published):
+- **PC self-update fixed (0.15.1):** restarts used the renamed old image (`current_exe`), so the PC stayed on v0.11.0. Now `app_exe()`. The user must close and reopen once; confirm the PC then shows the newest version after the next release.
 - **Names (0.15.0):** read from `ai-title` / `custom-title`, live; rename and move from the session panel; the editor no longer wipes renames.
 - **Full test pass (0.14.3):** three testers (server and hooks, every PC button, tablet and phone) found 22 bugs; all fixed and re-tested here (see CHANGELOG). Harness notes: `PORT` env picks the scratch server port; stop a test server by the PID whose environ has that port (never `pkill -f` / `pgrep -f`).
 - **Windows tray app:** hooks give live status in an isometric world.
