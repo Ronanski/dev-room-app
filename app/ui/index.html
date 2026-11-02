@@ -581,6 +581,17 @@ body{margin:0}
 
 /* ---------- Lite (0.16.0): portrait phone and tablet. A small live office, the session list, then the chat. ---------- */
 .lite,.lback,.litebtn,.lcol{display:none}
+/* Mga Playroom: sessions grouped by project, with "put all" buttons; the scan row */
+.tgrp{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 2px 4px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:1}
+.tgrp b{font-size:13.5px}.tgrp small{color:var(--muted)}.tgrp .sp{flex:1}.tgrp .pa{font-size:12px;color:var(--muted)}
+.tgrp button{min-width:30px;min-height:30px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;font-size:12.5px}
+.scanrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 4px}.scanrow span{font-size:12.5px;color:var(--muted);flex:1;min-width:180px}
+/* the bar under the small office: drag it up or down to give the list and the chat more or less room */
+.lrow{flex:none;height:18px;position:relative;cursor:row-resize;touch-action:none;margin:0 0 -4px}
+.lrow::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:5px;margin:-2.5px 0 0 -22px;border-radius:3px;background:var(--line)}
+.lrow.on::after,.lrow:hover::after{background:var(--accent)}
+.app.lite .lroom canvas{object-fit:cover;object-position:50% 40%}
+.app.lite.liteh .lroom canvas{height:var(--liteh)!important;max-height:none!important}
 .app.port.touch .litebtn{display:inline-flex}
 .app.lite :is(.pane[data-pane="office"],.dockwrap,.counts,.controls,.psplit,.drawer-x,.claudebar){display:none!important}
 .app.lite .top{margin-bottom:6px;padding-bottom:6px}
@@ -623,21 +634,22 @@ body{margin:0}
 }
 /* tablet portrait: the office across the top; the list on the left and the chat on the right */
 @container app (min-width: 641px){
-  #app.lite .body{display:grid;grid-template-columns:var(--litecol,36%) 16px minmax(0,1fr);grid-template-rows:auto auto auto minmax(0,1fr);
-    grid-template-areas:"room room room" "alert bar chat" "flt bar chat" "list bar chat";column-gap:0;row-gap:0}
+  #app.lite .body{display:grid;grid-template-columns:var(--litecol,36%) 16px minmax(0,1fr);grid-template-rows:auto auto auto auto minmax(0,1fr);
+    grid-template-areas:"room room room" "hbar hbar hbar" "alert bar chat" "flt bar chat" "list bar chat";column-gap:0;row-gap:0}
+  #app.lite .lrow{grid-area:hbar;margin:-6px 0 2px}
   /* the bar between the list and the chat: drag it to make the chat wider or narrower (remembered; double tap resets) */
   #app.lite .lcol{display:block;grid-area:bar;position:relative;cursor:col-resize;touch-action:none}
   #app.lite .lcol::after{content:"";position:absolute;top:50%;left:50%;width:5px;height:44px;margin:-22px 0 0 -2.5px;border-radius:3px;background:var(--line)}
   #app.lite .lcol.on::after,#app.lite .lcol:hover::after{background:var(--accent)}
   #app.lite .lite{display:contents}
-  #app.lite .lroom{grid-area:room;margin-bottom:8px}
+  #app.lite .lroom{grid-area:room}
   #app.lite .lroom canvas{max-height:24vh;object-fit:cover;object-position:50% 40%}
   #app.lite .lalert{grid-area:alert;margin:0 0 6px}
   #app.lite .lflt{grid-area:flt;padding-top:0}
   #app.lite .llist{grid-area:list;overflow-y:auto}
   #app.lite .pane[data-pane="chat"]{grid-area:chat;display:block!important;position:relative;inset:auto;width:auto;transform:none;transition:none;min-height:0}
   #app.lite .tabs{display:none}
-  #app.lite.kbopen :is(.top,.conn,.updbar,.lroom,.lalert,.lflt,.llist,.lfoot,.lcol){display:none}
+  #app.lite.kbopen :is(.top,.conn,.updbar,.lroom,.lrow,.lalert,.lflt,.llist,.lfoot,.lcol){display:none}
   #app.lite.kbopen .body{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);grid-template-areas:"chat"}
 }
 </style>
@@ -668,6 +680,7 @@ body{margin:0}
     <main class="body">
       <section class="lite" id="lite" aria-label="Office at mga session">
         <div class="lroom"><canvas id="liteRoom" width="180" height="76" aria-label="Maliit na office: nasa desk ang gumagana, nasa pinto ang naghihintay sa iyo"></canvas><span class="ltag" id="liteTag"></span></div>
+        <div class="lrow" id="liteRow" role="separator" aria-orientation="horizontal" aria-label="Hilahin pataas o pababa para baguhin ang taas ng office" title="Hilahin pataas o pababa. I-double tap para ibalik."></div>
         <div class="lalert" id="liteAlert" aria-live="polite"></div>
         <div class="lflt" id="liteFlt" role="group" aria-label="Salain ang mga session"></div>
         <div class="llist" id="liteList"></div>
@@ -1550,6 +1563,8 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.18.0':{news:['<b>Lumalabas na ang mga pinalitan mong pangalan</b> ng thread, pati ang mga ni-rename mo sa Claude app o sa Claude Projects.','<b>Lahat ng session sa PC ay nakikita na,</b> kahit hindi nagpapadala ng update, at kahit nasa ibang Claude account.','<b>Mga Playroom:</b> may <b>I-scan ang PC</b> para sa mga mas lumang session, at naka-grupo na ayon sa project na may <b>Ilagay lahat sa</b>.','<b>Sa phone at tablet:</b> i-drag ang bar sa ilalim ng maliit na office para palakihin o paliitin ito.'],
+    todo:['Wala kang gagawin sa PC.','Wala ring i-install sa phone o tablet.']},
   '0.17.0':{news:['<b>Kusa nang nag-a-update ang phone app</b> (Android 12 pataas): dina-download nang tahimik at ini-install pag-alis mo sa app. Kapag nakabukas lang ang app, may 15 segundong countdown na may <b>Ngayon</b> at <b>Mamaya</b>.','<b>Wala nang APK kapag walang binago sa phone app.</b> Ang mga bago sa office ay galing sa PC, kaya walang ida-download.','Bumabalik nang kusa ang alerts pagkatapos ng update.'],
     todo:['Wala kang gagawin sa PC.','<b>Huling beses na lang:</b> sa tablet at phone, pindutin ang I-update at ang Install. Pagkatapos nito, kusa na ang mga update.']},
   '0.16.2':{news:['<b>Nababasa na ang mensahe ng coordinator</b> sa chat ng thread: makikita mo ang sinabi mo at ang note niya, hindi na ang mga tag.','<b>Mas malinaw na pangalan ng thread:</b> galing sa folder niya (hal. Winter Test, Code Fixer), o sa utos ng coordinator kapag iisa ang folder nila.','<b>Sa tablet, naaayos na ang lapad ng chat:</b> i-drag ang bar sa pagitan ng listahan at chat. I-double tap para ibalik.'],
@@ -2761,13 +2776,19 @@ function renderRooms(){
   const rooms=E.rooms.map((r,i)=>`<div class="room"><span class="rn">${i+1}</span><input type="text" class="rname" data-room="${esc(r.id)}" value="${esc(r.name)}" aria-label="Pangalan ng playroom ${i+1}" maxlength="40">
     <span class="kind" role="group" aria-label="Uri ng lugar">${[['office','Office'],['resort','Beach Resort']].map(([k,l])=>`<button type="button" data-rscene="${esc(r.id)}" data-v="${k}" aria-pressed="${r.scene===k}">${l}</button>`).join('')}</span>
     <span class="rc" ${r.ids.length>MAXN+1?'style="color:var(--need);font-weight:700"':''}>${r.ids.length}/${MAXN+1}</span>${E.rooms.length>1?`<button type="button" class="rx" data-rdel="${esc(r.id)}" aria-label="Alisin ang playroom ${esc(r.name)}">✕</button>`:''}</div>`).join('');
-  const rows=allRecords.map(rec=>{const rm=roomOfSid(rec.id);const isLead=rm&&rm.lead===rec.id;
+  // grouped by project folder (newest first), each with buttons that put the whole project in a playroom
+  const proj=r=>r.cwd?baseName(r.cwd):'Iba pa',groups=new Map();
+  for(const r of allRecords.slice().sort((a,b)=>(b.updated_at||0)-(a.updated_at||0))){const k=proj(r);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(r);}
+  const row=rec=>{const rm=roomOfSid(rec.id);const isLead=rm&&rm.lead===rec.id;
     return `<div class="trow2"><div class="tw"><input type="text" class="tname" data-id="${esc(rec.id)}" value="${esc(E.names[rec.id]||rec.title)}" aria-label="Pangalan ng session"><small>${esc(BLABEL[rec.status_bucket]||'')} · ${esc(rec.cwd?baseName(rec.cwd):'')}</small></div>
       <div class="where" role="group" aria-label="Saang playroom">${E.rooms.map((r,i)=>`<button type="button" data-put="${esc(rec.id)}" data-room="${esc(r.id)}" aria-pressed="${rm===r}" title="${esc(r.name)}">${i+1}</button>`).join('')}<button type="button" data-put="${esc(rec.id)}" data-room="" aria-pressed="${!rm}" title="Wala muna">–</button></div>
-      <button type="button" class="lead ${isLead?'on':''}" data-lead="${esc(rec.id)}" ${rm?'':'disabled'} aria-pressed="${!!isLead}" title="Leader ng playroom">★</button></div>`;}).join('')||'<p class="empty">Wala pang session na nagpadala ng update.</p>';
+      <button type="button" class="lead ${isLead?'on':''}" data-lead="${esc(rec.id)}" ${rm?'':'disabled'} aria-pressed="${!!isLead}" title="Leader ng playroom">★</button></div>`;};
+  const rows=[...groups.entries()].map(([k,list])=>`<div class="tgrp"><b>${esc(k)}</b><small>${list.length} session</small><span class="sp"></span><span class="pa">Ilagay lahat sa:</span>${E.rooms.map((r,i)=>`<button type="button" data-putall="${esc(k)}" data-room="${esc(r.id)}" title="${esc(r.name)}">${i+1}</button>`).join('')}<button type="button" data-putall="${esc(k)}" data-room="" title="Alisin sa mga playroom">✕</button></div>`+list.map(row).join('')).join('')
+    ||'<p class="empty">Wala pang nakitang session. Pindutin ang I-scan ang PC.</p>';
   el.innerHTML=`<div class="tp-card rooms-card" role="dialog" aria-label="Mga Playroom"><h2>Mga Playroom</h2>
     <p class="hint">Gumawa ng playroom, piliin kung Office o Beach Resort, at ilagay ang bawat session sa playroom niya (pindutin ang numero). Ang <b>★</b> ang leader ng playroom. Ang bagong session na hindi pa nailalagay ay lalabas sa <b>Bagong dating</b>. Hanggang ${MAXN+1} ang kasya sa bawat playroom (${MAXN} desk at ang leader). Naka-save ito sa PC, kaya pareho sa phone at tablet.</p>
     <div class="rooms">${rooms}<button type="button" class="btn" data-act="room-add">+ Bagong playroom</button></div>
+    <div class="scanrow"><button type="button" class="btn" data-act="rooms-scan">I-scan ang PC (huling 14 araw)</button><span id="scanMsg">${esc(E.scanMsg||'Kusang nakikita ang lahat ng session sa PC na gumana nitong huling 2 araw, kahit sa ibang account.')}</span></div>
     <div class="tlist">${rows}</div>
     <div class="row"><button type="button" class="btn" data-act="team-reset">Ibalik sa awtomatiko</button><span style="flex:1"></span><button type="button" class="btn" data-act="team-cancel">Kanselahin</button><button type="button" class="btn primary" data-act="rooms-save">I-save</button></div></div>`;
 }
@@ -2775,11 +2796,14 @@ function syncRoomInputs(){if(!ROOMS_EDIT)return;document.querySelectorAll('#team
   document.querySelectorAll('#teamPanel .tname').forEach(i=>{const rec=allRecords.find(x=>x.id===i.dataset.id);const v=i.value.trim();if(!v||(rec&&v===(rec.own_title||'')))delete ROOMS_EDIT.names[i.dataset.id];else if(!rec||v!==rec.title||ROOMS_EDIT.names[i.dataset.id])ROOMS_EDIT.names[i.dataset.id]=v;});}
 function roomsClick(e){
   const E=ROOMS_EDIT;if(!E)return false;
-  const b=e.target.closest('[data-rscene],[data-rdel],[data-put],[data-lead],[data-act="room-add"],[data-act="rooms-save"]');if(!b)return false;
+  const b=e.target.closest('[data-rscene],[data-rdel],[data-put],[data-putall],[data-lead],[data-act="room-add"],[data-act="rooms-save"],[data-act="rooms-scan"]');if(!b)return false;
   syncRoomInputs();
   if(b.dataset.rscene){const r=E.rooms.find(x=>x.id===b.dataset.rscene);if(r)r.scene=b.dataset.v;}
   else if(b.dataset.rdel){const r=E.rooms.find(x=>x.id===b.dataset.rdel);E.rooms=E.rooms.filter(x=>x!==r);}
   else if(b.dataset.put){const id=b.dataset.put;E.rooms.forEach(r=>{r.ids=r.ids.filter(x=>x!==id);if(r.lead===id)r.lead=null;});const r=E.rooms.find(x=>x.id===b.dataset.room);if(r)r.ids.push(id);}
+  else if(b.dataset.putall!==undefined){const ids=allRecords.filter(r=>(r.cwd?baseName(r.cwd):'Iba pa')===b.dataset.putall).map(r=>r.id);
+    E.rooms.forEach(r=>{r.ids=r.ids.filter(x=>!ids.includes(x));if(ids.includes(r.lead))r.lead=null;});const r=E.rooms.find(x=>x.id===b.dataset.room);if(r)r.ids.push(...ids);}
+  else if(b.dataset.act==='rooms-scan'){scanPC(b);return true;}
   else if(b.dataset.lead){const r=roomOfSid(b.dataset.lead);if(r)r.lead=r.lead===b.dataset.lead?null:b.dataset.lead;}
   else if(b.dataset.act==='room-add'){E.rooms.push({id:'p'+Date.now().toString(36),name:'Playroom '+(E.rooms.length+1),scene:E.rooms.length%2?'office':'resort',lead:null,ids:[]});}
   else if(b.dataset.act==='rooms-save'){
@@ -2788,6 +2812,15 @@ function roomsClick(e){
     const ids=[...new Set(rooms.flatMap(r=>r.ids))];const lead=(rooms.find(r=>r.lead)||{}).lead||null;
     saveTeam({lead,ids,names:E.names,rooms});$('teamPanel').hidden=true;ROOMS_EDIT=null;return true;}
   const y=$('teamPanel').querySelector('.tlist')?.scrollTop||0;renderRooms();const tl=$('teamPanel').querySelector('.tlist');if(tl)tl.scrollTop=y;return true;
+}
+// "I-scan ang PC": the PC reads every Claude folder for sessions of the last 14 days (also other accounts')
+async function scanPC(btn){
+  const E=ROOMS_EDIT;if(!E)return;btn.disabled=true;E.scanMsg='Ini-scan ang PC…';const m=$('scanMsg');if(m)m.textContent=E.scanMsg;
+  try{const r=await fetch('/api/scan',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify({days:14})});if(!r.ok)throw 0;
+    const j=await r.json();const s=await fetch('/api/state?v=-1',{headers:hdr(),cache:'no-store'});if(s.ok){const k=await s.json();if(Array.isArray(k.sessions))allRecords=k.sessions;}
+    E.scanMsg=j.added?`Nakahanap ng ${j.added} bagong session. ${j.total} na lahat.`:`Walang bago. ${j.total} session ang nasa listahan.`;}
+  catch(e){E.scanMsg='Hindi ma-scan ngayon. Subukan ulit mamaya.';}
+  if(ROOMS_EDIT===E){syncRoomInputs();renderRooms();}
 }
 async function saveTeam(t){
   try{const r=await fetch('/api/team',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr()),body:JSON.stringify(t)});if(!r.ok)throw 0;connMsg='';}
@@ -2953,6 +2986,15 @@ $('liteRoom').addEventListener('click',e=>{const c=e.currentTarget,r=c.getBoundi
  const end=e=>{if(!d||e.pointerId!==d.id)return;bar.classList.remove('on');if(d.f){app.style.setProperty('--litecol',(d.f*100).toFixed(1)+'%');try{localStorage.setItem('devroom.litecol',d.f.toFixed(3));}catch(err){}}d=null;};
  bar.addEventListener('pointerup',end);bar.addEventListener('pointercancel',end);
  bar.addEventListener('dblclick',()=>{app.style.removeProperty('--litecol');try{localStorage.removeItem('devroom.litecol');}catch(e){}});}
+
+{const bar=$('liteRow'),app=$('app');let d=null;
+ const set=h=>{app.style.setProperty('--liteh',Math.round(h)+'px');app.classList.add('liteh');};
+ try{const h=parseFloat(localStorage.getItem('devroom.liteh'));if(h>=50)set(h);}catch(e){}
+ bar.addEventListener('pointerdown',e=>{if(e.button>0)return;const c=$('liteRoom').getBoundingClientRect();d={id:e.pointerId,y:e.clientY,h:c.height};bar.setPointerCapture(e.pointerId);bar.classList.add('on');e.preventDefault();});
+ bar.addEventListener('pointermove',e=>{if(!d||e.pointerId!==d.id)return;const max=Math.max(120,innerHeight*.6);d.v=Math.max(50,Math.min(max,d.h+e.clientY-d.y));set(d.v);});
+ const end=e=>{if(!d||e.pointerId!==d.id)return;bar.classList.remove('on');if(d.v)try{localStorage.setItem('devroom.liteh',String(Math.round(d.v)));}catch(err){}d=null;};
+ bar.addEventListener('pointerup',end);bar.addEventListener('pointercancel',end);
+ bar.addEventListener('dblclick',()=>{app.classList.remove('liteh');app.style.removeProperty('--liteh');try{localStorage.removeItem('devroom.liteh');}catch(e){}});}
 
 /* ---------- interactions ---------- */
 document.addEventListener('click',e=>{
