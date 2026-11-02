@@ -42,6 +42,19 @@ static STATE: Mutex<Upd> = Mutex::new(Upd { ui: None, exe_ready: None, note: Str
 /// The newest release info seen (build, api, apk), passed on to the Android app.
 pub fn latest() -> Value { STATE.lock().ok().and_then(|s| s.latest.clone()).unwrap_or(Value::Null) }
 
+/// Where Dev Room is installed: always `DevRoom.exe`, never the running image's own path. After the swap the
+/// running image has been renamed to `DevRoom.old-<build>.exe`, and Windows then reports that name as the
+/// current exe: restarting "the current exe" started the old version again (stuck on one version until you
+/// closed it and opened DevRoom.exe yourself), and the next update was written over the wrong file.
+static APP_EXE: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+pub fn app_exe() -> Option<PathBuf> {
+    APP_EXE.get_or_init(|| {
+        let exe = std::env::current_exe().ok()?;
+        let name = exe.file_name()?.to_string_lossy().to_string();
+        if name.starts_with("DevRoom.old") || name.starts_with("DevRoom.new") { Some(exe.parent()?.join("DevRoom.exe")) } else { Some(exe) }
+    }).clone()
+}
+
 fn ui_dir() -> PathBuf { crate::server::data_dir().join("ui") }
 
 pub fn ui_html() -> Option<String> { STATE.lock().ok()?.ui.as_ref().map(|(_, h)| h.clone()) }
@@ -94,7 +107,8 @@ pub fn save_geom() {
 fn set_note(n: &str) { if let Ok(mut s) = STATE.lock() { s.note = n.to_string(); } }
 
 fn get(url: &str, limit: u64) -> Result<Vec<u8>, String> {
-    let agent = ureq::AgentBuilder::new().timeout(Duration::from_secs(60)).build();
+    // a slow line must not fail the 8 MB app download: give up only when nothing arrives for a minute
+    let agent = ureq::AgentBuilder::new().timeout_connect(Duration::from_secs(20)).timeout_read(Duration::from_secs(60)).build();
     let resp = agent.get(url).call().map_err(|e| e.to_string())?;
     let mut buf = Vec::new();
     resp.into_reader().take(limit).read_to_end(&mut buf).map_err(|e| e.to_string())?;
@@ -137,7 +151,7 @@ fn check_once() -> Result<(), String> {
     // 2. Exe swap, done once per new build; takes effect after a restart
     if STATE.lock().map(|s| s.exe_ready.map(|b| b >= build).unwrap_or(false)).unwrap_or(false) { return Ok(()); }
     if !cfg!(windows) { return Ok(()); }
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe = app_exe().ok_or("hindi mahanap ang DevRoom.exe")?;
     let dir = exe.parent().ok_or("no exe dir")?.to_path_buf();
     let bytes = get(&format!("{BASE}DevRoom.exe"), 200 * 1024 * 1024)?;
     if bytes.len() < 1024 * 1024 || &bytes[..2] != b"MZ" { return Err("download looks wrong".into()); }
@@ -146,13 +160,14 @@ fn check_once() -> Result<(), String> {
     let old = dir.join(format!("DevRoom.old-{build}.exe"));
     fs::write(&fresh, &bytes).map_err(|e| format!("Hindi maisulat ang bagong app sa {}: {e}", dir.display()))?;
     let _ = fs::remove_file(&old);
-    fs::rename(&exe, &old).map_err(|e| e.to_string())?;
-    if let Err(e) = fs::rename(&fresh, &exe) { let _ = fs::rename(&old, &exe); return Err(e.to_string()); }
+    if exe.exists() { fs::rename(&exe, &old).map_err(|e| format!("Hindi mapalitan ang {}: {e}", exe.display()))?; }
+    if let Err(e) = fs::rename(&fresh, &exe) { let _ = fs::rename(&old, &exe); return Err(format!("Hindi mailagay ang bagong app: {e}")); }
     if let Ok(mut s) = STATE.lock() { s.exe_ready = Some(build); }
     Ok(())
 }
 
 pub fn start() {
+    let _ = app_exe();   // fixed before any update renames the running image
     load_cache();
     if let Ok(exe) = std::env::current_exe() {
         // clean up copies left by earlier updates (the running exe is never one of them)
@@ -185,7 +200,8 @@ pub fn restart(hidden: bool) {
     let hidden = hidden || HIDDEN.load(Ordering::Relaxed);
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(300));
-        if let Ok(exe) = std::env::current_exe() {
+        // always the installed DevRoom.exe (the new version), never the running image's renamed file
+        if let Some(exe) = app_exe() {
             let mut cmd = std::process::Command::new(exe);
             cmd.arg("--restarted");
             if hidden { cmd.arg("--tray"); } else if MINIMIZED.load(Ordering::Relaxed) { cmd.arg("--minimized"); }
