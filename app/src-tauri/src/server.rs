@@ -187,9 +187,18 @@ pub fn install_hooks(port: u16) -> Result<Value, String> {
     Ok(json!({"ok": true, "path": path.display().to_string(), "backup": backup}))
 }
 
-/// Read the last part of a transcript (JSONL) for the latest assistant text and any session title.
-fn read_transcript(path: &str, full_title_scan: bool) -> (Option<String>, Option<String>) {
-    let Ok(mut f) = fs::File::open(path) else { return (None, None) };
+/// A session's names from its transcript: the one you gave it (`/rename`: custom-title) and the one Claude Code
+/// made (ai-title, or an older summary). The newest of each counts.
+type Titles = (Option<String>, Option<String>);
+fn title_of(v: &Value) -> Option<(bool, String)> {
+    let (custom, key) = match v.get("type").and_then(|t| t.as_str())? { "custom-title" => (true, "customTitle"), "ai-title" => (false, "aiTitle"), "summary" => (false, "summary"), _ => return None };
+    let t = v.get(key).and_then(|x| x.as_str())?.trim();
+    (!t.is_empty()).then(|| (custom, clip(t, 120)))
+}
+
+/// Read the last part of a transcript (JSONL) for the latest assistant text and the session's names.
+fn read_transcript(path: &str, full_title_scan: bool) -> (Option<String>, Titles) {
+    let Ok(mut f) = fs::File::open(path) else { return (None, (None, None)) };
     let len = f.metadata().map(|m| m.len()).unwrap_or(0);
     let tail = 512 * 1024u64;
     let _ = f.seek(SeekFrom::Start(len.saturating_sub(tail)));
@@ -197,9 +206,9 @@ fn read_transcript(path: &str, full_title_scan: bool) -> (Option<String>, Option
     let _ = f.take(tail).read_to_string(&mut buf);
     let lines: Vec<&str> = buf.lines().collect();
     let skip = if len > tail { 1 } else { 0 };
-    let (mut text, mut title) = (None, None);
+    let (mut text, mut custom, mut auto): (Option<String>, Option<String>, Option<String>) = (None, None, None);
     for line in lines.iter().skip(skip).rev() {
-        if text.is_some() && title.is_some() { break; }
+        if text.is_some() && custom.is_some() && auto.is_some() { break; }
         let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
         match v.get("type").and_then(|t| t.as_str()) {
             Some("assistant") if text.is_none() => {
@@ -209,23 +218,34 @@ fn read_transcript(path: &str, full_title_scan: bool) -> (Option<String>, Option
                     if !t.is_empty() { text = Some(t.join("\n")); }
                 }
             }
-            Some("custom-title") if title.is_none() => title = v.get("customTitle").and_then(|x| x.as_str()).map(String::from),
-            Some("summary") if title.is_none() => title = v.get("summary").and_then(|x| x.as_str()).map(String::from),
-            _ => {}
+            _ => match title_of(&v) {
+                Some((true, t)) if custom.is_none() => custom = Some(t),
+                Some((false, t)) if auto.is_none() => auto = Some(t),
+                _ => {}
+            },
         }
     }
-    if title.is_none() && full_title_scan && len < 64 * 1024 * 1024 {
+    // the first time: a name given long ago is further back than the last part
+    if (custom.is_none() || auto.is_none()) && full_title_scan && len < 64 * 1024 * 1024 {
         if let Ok(f) = fs::File::open(path) {
+            let (mut c2, mut a2) = (None, None);
             for line in BufReader::new(f).lines().map_while(Result::ok) {
-                if !line.contains("\"custom-title\"") && !line.contains("\"summary\"") { continue; }
+                if !line.contains("-title\"") && !line.contains("\"summary\"") { continue; }
                 if let Ok(v) = serde_json::from_str::<Value>(&line) {
-                    let t = v.get("customTitle").or_else(|| v.get("summary")).and_then(|x| x.as_str());
-                    if let Some(t) = t { title = Some(t.to_string()); }
+                    match title_of(&v) { Some((true, t)) => c2 = Some(t), Some((false, t)) => a2 = Some(t), None => {} }
                 }
             }
+            custom = custom.or(c2);
+            auto = auto.or(a2);
         }
     }
-    (text, title)
+    (text, (custom, auto))
+}
+
+/// Keep the names read from a transcript (a name is only ever replaced by a newer one, never cleared).
+fn set_titles(s: &mut Map<String, Value>, t: &Titles) {
+    if let Some(c) = &t.0 { s.insert("custom_title".into(), json!(c)); }
+    if let Some(a) = &t.1 { s.insert("auto_title".into(), json!(a)); }
 }
 
 fn describe_tool(tool: &str, input: &Value) -> (String, String) {
@@ -258,7 +278,7 @@ fn last_question(text: &str) -> Option<String> {
 fn is_sub_path(t: &str) -> bool { t.contains("/subagents/") || t.contains("\\subagents\\") }
 
 /// `pre` is the transcript read done outside the lock by `hook_reply` (last assistant text, title).
-fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<String>)>) {
+fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Titles)>) {
     let ev = v.get("hook_event_name").and_then(|x| x.as_str()).unwrap_or("");
     let Some(sid) = v.get("session_id").and_then(|x| x.as_str()).map(String::from) else { return };
     if sid.is_empty() || sid.len() > 80 || !sid.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') { return; }
@@ -319,9 +339,9 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<St
         s.insert("transcript".into(), json!(t));
         // Pick up the session's name (/rename or summary) once, the first time we see its transcript.
         if ev != "Stop" && !s.get("title_scanned").and_then(|x| x.as_bool()).unwrap_or(false) {
-            if let Some((_, title)) = pre {
+            if let Some((_, titles)) = pre {
                 s.insert("title_scanned".into(), json!(true));
-                if let Some(title) = title { s.insert("auto_title".into(), json!(title.clone())); }
+                set_titles(s, titles);
             }
         }
     }
@@ -406,10 +426,10 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<St
         }
         "Stop" => {
             let mut text = v.get("last_assistant_message").and_then(|x| x.as_str()).map(String::from);
-            if let Some((tx, title)) = pre {
+            if let Some((tx, titles)) = pre {
                 s.insert("title_scanned".into(), json!(true));
                 if text.is_none() { text = tx.clone(); }
-                if let Some(title) = title { s.insert("auto_title".into(), json!(title.clone())); }
+                set_titles(s, titles);
             }
             let text = text.unwrap_or_default();
             push_convo(s, "assistant", &text, 4000, "hook");
@@ -647,11 +667,11 @@ fn queue_why(s: &Value) -> &'static str {
 fn record(s: &Value, names: &Value) -> Value {
     let id = s.get("id").and_then(|x| x.as_str()).unwrap_or("");
     let cwd = s.get("cwd").and_then(|x| x.as_str()).unwrap_or("");
-    let auto = s.get("auto_title").and_then(|x| x.as_str()).filter(|t| !t.is_empty()).map(String::from);
-    let title = names.get(id).and_then(|x| x.as_str()).filter(|t| !t.trim().is_empty()).map(String::from)
-        .or(auto)
-        .or_else(|| s.get("first_prompt").and_then(|x| x.as_str()).filter(|t| !t.is_empty()).map(String::from))
+    let named = |k: &str| s.get(k).and_then(|x| x.as_str()).filter(|t| !t.trim().is_empty()).map(String::from);
+    // the name the session has without a Dev Room rename: /rename, then Claude Code's own title, then the first prompt
+    let own = named("custom_title").or_else(|| named("auto_title")).or_else(|| named("first_prompt"))
         .unwrap_or_else(|| if cwd.is_empty() { format!("Session {}", id.chars().take(8).collect::<String>()) } else { base_name(cwd) });
+    let title = names.get(id).and_then(|x| x.as_str()).filter(|t| !t.trim().is_empty()).map(String::from).unwrap_or_else(|| own.clone());
     let bucket = match s.get("status").and_then(|x| x.as_str()).unwrap_or("idle") {
         "working" => "SESSION_STATUS_BUCKET_WORKING",
         "needs" => "SESSION_STATUS_BUCKET_BLOCKED",
@@ -659,7 +679,7 @@ fn record(s: &Value, names: &Value) -> Value {
         _ => "SESSION_STATUS_BUCKET_COMPLETED",
     };
     json!({
-        "id": id, "title": title, "status_bucket": bucket,
+        "id": id, "title": title, "own_title": own, "status_bucket": bucket,
         "updated_at": s.get("updated_at").cloned().unwrap_or(json!(0)),
         "environment_kind": "bridge", "origin": "local_pc", "cwd": cwd,
         "short": s.get("short").cloned().unwrap_or(json!("")),
@@ -1129,11 +1149,13 @@ fn note_run_end(sid: &str) { if let Ok(mut m) = RUN_END.lock() { m.get_or_insert
 static IGNORE: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 /// What a transcript line adds to the chat: text, or a picture / artifact / file the session showed or sent.
-enum Item { Text(&'static str, String), Image(&'static str, String, String), File(&'static str, String, String) }
+enum Item { Text(&'static str, String), Image(&'static str, String, String), File(&'static str, String, String), Title(bool, String) }
 
 fn transcript_items(v: &Value) -> Vec<Item> {
     let mut out = Vec::new();
     if v.get("isSidechain").and_then(|x| x.as_bool()).unwrap_or(false) { return out; }
+    // a new name (/rename, or the one Claude Code gives it) shows at once
+    if let Some((c, t)) = title_of(v) { out.push(Item::Title(c, t)); return out; }
     if let Some((r, t)) = transcript_line(v) { out.push(Item::Text(r, t)); }
     let kind = v.get("type").and_then(|x| x.as_str()).unwrap_or("");
     let Some(arr) = v.get("message").and_then(|m| m.get("content")).and_then(|c| c.as_array()) else { return out };
@@ -1273,16 +1295,20 @@ fn tail_transcripts(st: &Mutex<State>) {
                 .filter_map(|line| serde_json::from_slice::<Value>(line).ok()).flat_map(|v| transcript_items(&v)).collect();
             // catching up on a session that is already running: only its current turn (from your last prompt)
             if catch_up {
+                let titles: Vec<Item> = got.iter().filter_map(|it| if let Item::Title(c, t) = it { Some(Item::Title(*c, t.clone())) } else { None }).collect();
                 if let Some(i) = got.iter().rposition(|it| matches!(it, Item::Text("user", _))) { got.drain(..i); } else { got.clear(); }
+                got.retain(|it| !matches!(it, Item::Title(..)));
+                got.extend(titles);
             }
             found.extend(got.into_iter().map(|it| (sid.clone(), it)));
         }
     }
     if found.is_empty() { return; }
     // pictures and files are saved before taking the lock (decoding and copying can take a moment)
-    enum Ready { Text(&'static str, String), Att(&'static str, String, String, String) }
+    enum Ready { Text(&'static str, String), Att(&'static str, String, String, String), Title(bool, String) }
     let ready: Vec<(String, Ready)> = found.into_iter().filter_map(|(sid, it)| Some((sid, match it {
         Item::Text(r, t) => Ready::Text(r, t),
+        Item::Title(c, t) => Ready::Title(c, t),
         Item::Image(r, mime, b64) => {
             use base64::Engine;
             let bytes = base64::engine::general_purpose::STANDARD.decode(b64.as_bytes()).ok()?;
@@ -1305,6 +1331,7 @@ fn tail_transcripts(st: &Mutex<State>) {
                     if role == "assistant" { s.insert("recent".into(), json!(clip(&text, 300))); s.insert("updated_at".into(), json!(now_ms())); }
                 }
                 Ready::Att(role, att, name, title) => push_att(s, role, &att, &name, &title),
+                Ready::Title(c, t) => { s.insert((if c { "custom_title" } else { "auto_title" }).into(), json!(t)); }
             }
         }
     }

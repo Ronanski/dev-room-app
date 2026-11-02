@@ -7,6 +7,14 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.15.0 (2026-11-02)
+
+- **Session names come from Claude Code again.** Current Claude Code writes its own title as `ai-title` (`aiTitle`) and a rename as `custom-title`; Dev Room only knew `summary`, so it fell back to the first prompt. It now keeps both (`custom_title`, `auto_title`): a Dev Room rename first, then your `/rename`, then Claude Code's title, then the first prompt. The live transcript reader picks up a new name within a second, so a rename in Claude Code or the Claude app shows at once (when it is written to the session's transcript on the PC).
+- **A rename no longer reverts.** The Mga Playroom editor compared each name box with the shown title, which already was your rename, so any click in the editor deleted it. It now compares with the session's own name (`own_title` in `/api/state`).
+- **Rename and move from the session's panel.** ✎ next to her name (Enter saves, Esc cancels, "Ibalik sa pangalan sa Claude" removes the rename) and a Playroom picker under it (with "+ Bagong playroom…"). Names on the map and tiles follow at once.
+- The panel header no longer re-renders every second (unsaved units got a new id each time).
+- Tested here with transcripts holding `custom-title` and `ai-title` lines, a live rename appended to a transcript, and renames and moves at 1366×768 and 412×900. Not tested: the real Claude app rename on the PC.
+
 ## 0.14.3 (2026-11-02)
 
 A full test pass of every button and flow on PC (1366, 1920, touch 1280), tablet (portrait and landscape, with the keyboard) and phone (portrait and landscape, Android WebView user agent, inside an iframe like the shell), plus every hook event and API route. 22 bugs fixed:
