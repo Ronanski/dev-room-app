@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="fil">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dev Room Lite</title>
+<style>
+:root{--bg:#efe6d6;--panel:#fbf6ec;--ink:#2b211b;--muted:#7b6a5c;--line:#e0d3bf;--accent:#6b4a33;
+  --work:#5f8f4e;--need:#c9573a;--idle:#c4952f;--done:#5e8aa0;--sleep:#8a86b0;--chip:#f3eadb}
+@media (prefers-color-scheme:dark){:root{--bg:#17120f;--panel:#221b16;--ink:#f1e7d8;--muted:#a8978a;--line:#3a2f27;--accent:#d8b48c;--chip:#2c241e}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:20px 16px 40px}
+h1{font-size:20px;margin:0 0 4px}
+.lead{color:var(--muted);margin:0 0 18px;max-width:900px}
+.row{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start}
+.cap{font-weight:700;margin:0 0 8px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.dev{background:#0f0c0a;border-radius:34px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.scr{background:var(--panel);border-radius:24px;overflow:hidden;display:flex;flex-direction:column;position:relative}
+.phone .scr{width:360px;height:760px}
+.tab .scr{width:600px;height:900px}
+.sb{display:flex;justify-content:space-between;padding:8px 18px 4px;font-size:12px;color:var(--muted)}
+/* header */
+.hd{display:flex;align-items:center;gap:8px;padding:6px 14px 8px}
+.hd b{font-size:16px;font-family:ui-monospace,Menlo,Consolas,monospace;letter-spacing:.02em}
+.hd .sp{flex:1}
+.lim{display:flex;gap:6px}
+.meter{font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:2px;min-width:62px}
+.meter i{display:block;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.meter i u{display:block;height:100%;background:var(--work)}
+.meter.warn i u{background:var(--idle)}
+/* office */
+.office{margin:0 12px;border-radius:14px;overflow:hidden;border:2px solid #0e0b09;background:#1c140f;position:relative}
+.office canvas{display:block;width:100%;image-rendering:pixelated}
+.tab .office canvas{height:230px;object-fit:cover;object-position:50% 40%}
+.office .tag{position:absolute;left:8px;bottom:6px;font-size:10px;color:#f1e7d8;background:rgba(0,0,0,.45);padding:1px 6px;border-radius:6px}
+/* alert */
+.alert{margin:10px 12px 0;border:1.5px solid var(--need);background:color-mix(in srgb,var(--need) 10%,var(--panel));border-radius:12px;padding:8px 10px;display:flex;gap:8px;align-items:center}
+.alert .t{flex:1;font-size:13px}
+.btn{border:0;border-radius:10px;padding:8px 12px;font:inherit;font-weight:700;background:var(--accent);color:var(--panel);cursor:pointer;min-height:36px}
+.btn.ghost{background:var(--chip);color:var(--ink)}
+/* filters */
+.flt{display:flex;gap:6px;padding:10px 12px 4px;overflow:auto}
+.flt span{font-size:12px;padding:4px 10px;border-radius:999px;background:var(--chip);white-space:nowrap}
+.flt span.on{background:var(--accent);color:var(--panel)}
+/* list */
+.list{flex:1;overflow:auto;padding:4px 12px 12px;display:flex;flex-direction:column;gap:8px}
+.it{display:flex;gap:10px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:9px 10px;cursor:pointer}
+.it.sel{outline:2px solid var(--accent)}
+.face{width:40px;height:40px;border-radius:10px;background:var(--chip);flex:none;position:relative;image-rendering:pixelated}
+.face canvas{width:100%;height:100%;border-radius:10px}
+.face .d{position:absolute;right:-2px;bottom:-2px;width:12px;height:12px;border-radius:50%;border:2px solid var(--bg)}
+.it .m{flex:1;min-width:0}
+.it .n{display:flex;justify-content:space-between;gap:6px}
+.it .n b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it .n small{color:var(--muted);flex:none}
+.it .s{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar{height:4px;border-radius:2px;background:var(--line);margin-top:5px;overflow:hidden}
+.bar u{display:block;height:100%;background:var(--work)}
+.pill{font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;color:#fff}
+/* chat */
+.ch{display:flex;flex-direction:column;flex:1;min-height:0}
+.chh{display:flex;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line)}
+.chh .back{font-size:20px;padding:0 6px;color:var(--muted)}
+.chh .m{flex:1;min-width:0}
+.chh .m small{color:var(--muted);display:block}
+.tasks{margin:8px 12px 0;border:1px solid var(--line);border-radius:12px;padding:8px 10px;font-size:12.5px;background:var(--bg)}
+.tasks .top{display:flex;justify-content:space-between;font-weight:700;margin-bottom:4px}
+.tasks div.t{display:flex;gap:6px;align-items:center;color:var(--muted)}
+.tasks div.t.cur{color:var(--ink);font-weight:600}
+.feed{flex:1;overflow:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.msg{max-width:82%;padding:8px 11px;border-radius:14px;font-size:13.5px}
+.msg.me{align-self:flex-end;background:var(--accent);color:var(--panel);border-bottom-right-radius:4px}
+.msg.her{align-self:flex-start;background:var(--chip);border-bottom-left-radius:4px}
+.msg.q{border:1.5px dashed var(--idle)}
+.qt{display:block;font-size:11px;font-weight:700;color:var(--idle);margin-bottom:2px}
+.st{align-self:flex-end;font-size:11px;color:var(--muted);margin-top:-4px}
+.typing{align-self:flex-start;font-size:12px;color:var(--muted)}
+.cmp{display:flex;gap:8px;padding:8px 12px 14px;border-top:1px solid var(--line)}
+.cmp input{flex:1;border:1px solid var(--line);border-radius:20px;padding:10px 14px;font:inherit;background:var(--bg);color:var(--ink)}
+.cmp .send{width:42px;height:42px;border-radius:50%;border:0;background:var(--accent);color:var(--panel);font-size:18px}
+/* bottom nav */
+.nav{display:flex;border-top:1px solid var(--line)}
+.nav span{flex:1;text-align:center;padding:9px 0 12px;font-size:12px;color:var(--muted)}
+.nav span.on{color:var(--ink);font-weight:700}
+.nav em{font-style:normal;background:var(--need);color:#fff;border-radius:999px;padding:0 6px;margin-left:4px;font-size:11px}
+/* tablet split */
+.split{flex:1;display:grid;grid-template-columns:240px 1fr;min-height:0;border-top:1px solid var(--line);margin-top:10px}
+.split .list{border-right:1px solid var(--line);padding-top:10px}
+.notes{max-width:1000px;margin-top:26px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.notes div{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.notes b{display:block;margin-bottom:4px}
+.notes ul{margin:0;padding-left:18px;color:var(--muted)}
+@media (max-width:420px){.phone .scr{width:calc(100vw - 56px);height:720px}.tab{display:none}}
+</style>
+</head>
+<body>
+<h1>Dev Room Lite · mockup</h1>
+<p class="lead">Portrait lang. Maliit na office sa taas (live pa rin ang mga tao), listahan ng sessions sa ilalim, tap para mag-chat. May alerts, progress at limits. Pindutin ang isang session para makita ang chat.</p>
+
+<div class="row">
+  <div><p class="cap">Phone · Home</p>
+    <div class="dev phone"><div class="scr" id="home"></div></div></div>
+  <div><p class="cap">Phone · Chat</p>
+    <div class="dev phone"><div class="scr" id="chat"></div></div></div>
+  <div class="tab"><p class="cap">Tablet portrait · list + chat</p>
+    <div class="dev tab"><div class="scr" id="tablet"></div></div></div>
+</div>
+
+<div class="notes">
+  <div><b>Ano ang nawala</b><ul><li>Malaking planta, mapa, zoom, fullscreen</li><li>Playroom editor na hiwalay (nasa ✎ / ⋯ na lang ng session)</li><li>Landscape layout</li></ul></div>
+  <div><b>Ano ang natira</b><ul><li>Maliit na office: live ang mga tao (nasa desk = gumagana, nakatayo sa pinto = kailangan ka)</li><li>Real-time chat na may ⚡ agarang sagot</li><li>Alerts, progress at checklist, 5h at weekly limits</li></ul></div>
+  <div><b>Mas magaan</b><ul><li>Isang maliit na canvas lang (mga 30 fps, humihinto kapag naka-scroll palayo o naka-background)</li><li>Mas mabilis buksan at mas tipid sa battery</li></ul></div>
+</div>
+
+<script>
+const S=[
+ {n:'Lead',full:'LOGIC_SIM Lead',st:'work',s:'Nag-uutos sa 2 agent: audit ng parser',p:[3,5],hair:'#2b1d14',shirt:'#3e5a7a',skin:'#e0b48e'},
+ {n:'HMI',full:'LOGIC_SIM HMI',st:'need',s:'Tanong: Pwede ko bang i-run ang npm install?',p:[1,4],hair:'#5a3a22',shirt:'#7a3e5a',skin:'#c99a74'},
+ {n:'Fixer',full:'CODE FIXER',st:'work',s:'Ine-edit ang parser.rs',p:[4,6],hair:'#16110d',shirt:'#5f8f4e',skin:'#e8c3a0'},
+ {n:'UI/UX',full:'APP UI/UX',st:'idle',s:'Tapos: bagong layout ng settings',p:[5,5],hair:'#8a5a32',shirt:'#c4952f',skin:'#dcae88'},
+ {n:'Tester',full:'LIVE TESTER',st:'work',s:'Pinapatakbo ang cargo test',p:[2,3],hair:'#2b1d14',shirt:'#5e8aa0',skin:'#b98965'},
+ {n:'Docs',full:'DOCS',st:'sleep',s:'Naka-break · huling update 40 min',p:[0,0],hair:'#c08a4a',shirt:'#8a86b0',skin:'#efc9a6'}];
+const COL={work:'var(--work)',need:'var(--need)',idle:'var(--idle)',sleep:'var(--sleep)'};
+const LBL={work:'Gumagana',need:'Kailangan ka',idle:'Tapos',sleep:'Naka-break'};
+function face(c,x){const g=c.getContext('2d');c.width=16;c.height=16;g.fillStyle=x.shirt;g.fillRect(3,13,10,3);g.fillStyle=x.skin;g.fillRect(5,4,6,8);g.fillRect(6,12,4,1);
+ g.fillStyle=x.hair;g.fillRect(4,2,8,3);g.fillRect(4,4,1,7);g.fillRect(11,4,1,7);g.fillStyle='#1a1410';g.fillRect(6,7,1,1);g.fillRect(9,7,1,1);g.fillStyle='#b5523c';g.fillRect(7,10,2,1);}
+function faceEl(x,size=40){return `<span class="face" style="width:${size}px;height:${size}px"><canvas data-f="${S.indexOf(x)}"></canvas><span class="d" style="background:${COL[x.st]}"></span></span>`;}
+function item(x,sel){const pc=x.p[1]?Math.round(x.p[0]/x.p[1]*100):0;
+ return `<div class="it ${sel?'sel':''}" data-i="${S.indexOf(x)}">${faceEl(x)}<div class="m"><div class="n"><b>${x.n}</b><small><span class="pill" style="background:${COL[x.st]}">${LBL[x.st]}</span></small></div><div class="s">${x.s}</div>${x.p[1]?`<div class="bar"><u style="width:${pc}%;${x.st==='idle'?'background:var(--done)':''}"></u></div>`:''}</div></div>`;}
+const header=()=>`<div class="sb"><span>11:40</span><span>Wi-Fi · 82%</span></div>
+ <div class="hd"><b>DEV ROOM</b><span class="sp"></span><div class="lim"><div class="meter"><span>5h · 38%</span><i><u style="width:38%"></u></i></div><div class="meter warn"><span>Linggo · 71%</span><i><u style="width:71%"></u></i></div></div></div>`;
+const office=h=>`<div class="office"><canvas class="room" data-h="${h}"></canvas><span class="tag">Control room · 3 gumagana</span></div>`;
+const alertBox=()=>`<div class="alert"><span style="font-size:18px">✋</span><div class="t"><b>HMI</b> ay naghihintay ng sagot mo.</div><button class="btn">Sagutin</button></div>`;
+const filters=()=>`<div class="flt"><span class="on">Lahat 6</span><span>Kailangan ka 1</span><span>Gumagana 3</span><span>Tapos 1</span><span>Logic Sim ▾</span></div>`;
+function chatView(x,back=true){const t=[['Basahin ang spec ng HMI screen',2],['Gawin ang layout ng alarms panel',1],['Ikonekta sa live data',0],['Ipasa kay Tester',0]];
+ return `<div class="ch"><div class="chh">${back?'<span class="back">‹</span>':''}${faceEl(x,38)}<div class="m"><b>${x.full}</b> <span style="color:var(--muted)">✎</span><small><span style="color:${COL[x.st]}">●</span> ${LBL[x.st]} · Playroom: Logic Sim ▾</small></div><span style="color:var(--muted);font-size:20px">⋯</span></div>
+ <div class="tasks"><div class="top"><span>Progress · ${x.p[0]}/${x.p[1]||4}</span><span style="color:var(--muted)">▾</span></div>${t.map(([a,s])=>`<div class="t ${s===1?'cur':''}">${s===2?'✅':s===1?'⏳':'⬜'} ${a}</div>`).join('')}</div>
+ <div class="feed">
+  <div class="msg her">Natapos ko na ang pagbasa ng spec. Sisimulan ko na ang alarms panel.</div>
+  <div class="msg me">Unahin mo yung alarm colors, gamitin mo yung sa ISA-101.</div><div class="st">Natanggap na niya ✓</div>
+  <div class="msg her q"><span class="qt">⚡ Agarang sagot habang abala</span>Sige Boss, ISA-101 grayscale ang base, kulay lang kapag may alarm. Gagawin ko pagkatapos ng kasalukuyang step.</div>
+  <div class="msg her" style="border:1.5px solid var(--need)"><b style="color:var(--need)">Tanong:</b> Pwede ko bang i-run ang <code>npm install</code>?<div style="display:flex;gap:6px;margin-top:6px"><button class="btn">Oo</button><button class="btn ghost">Hindi</button></div></div>
+  <div class="typing">HMI · nagta-type… ●●●</div>
+ </div>
+ <div class="cmp"><input placeholder="Mensahe kay ${x.n}…"><button class="send">↑</button></div></div>`;}
+function nav(on){return `<div class="nav"><span class="${on===0?'on':''}">🏢 Office</span><span class="${on===1?'on':''}">💬 Chat<em>1</em></span><span class="${on===2?'on':''}">⚙ Settings</span></div>`;}
+
+function renderHome(){document.getElementById('home').innerHTML=header()+office(150)+alertBox()+filters()+`<div class="list">${S.map(x=>item(x)).join('')}</div>`+nav(0);}
+let cur=1;
+function renderChat(){document.getElementById('chat').innerHTML=header().replace('<div class="hd">','<div class="hd" style="display:none">')+chatView(S[cur])+'';}
+function renderTab(){const el=document.getElementById('tablet');if(!el)return;el.innerHTML=header()+office(200)+`<div class="split"><div class="list">${S.map(x=>item(x,S.indexOf(x)===cur)).join('')}</div>${chatView(S[cur],false)}</div>`;}
+function paintFaces(){document.querySelectorAll('canvas[data-f]').forEach(c=>face(c,S[+c.dataset.f]));}
+function all(){renderHome();renderChat();renderTab();paintFaces();rooms=[...document.querySelectorAll('canvas.room')];}
+document.addEventListener('click',e=>{const it=e.target.closest('.it');if(it){cur=+it.dataset.i;all();}});
+
+/* the small office: one room, top-down 3/4 view, people at desks or walking */
+let rooms=[];const W=180;
+const DESK=[[30,46],[70,46],[110,46],[150,46],[50,92],[130,92]];
+const pos=S.map((x,i)=>({x:DESK[i][0],y:DESK[i][1]+12,tx:0,ty:0,t:Math.random()*99}));
+function person(g,x,y,p,walk,t){const b=walk?Math.sin(t*8)>0?1:0:0;
+ g.fillStyle='rgba(0,0,0,.25)';g.fillRect(x-3,y+8,7,2);
+ g.fillStyle='#2b211b';g.fillRect(x-2,y+5,2,3+b);g.fillRect(x+1,y+5,2,4-b);
+ g.fillStyle=p.shirt;g.fillRect(x-3,y,7,6);g.fillStyle=p.skin;g.fillRect(x-2,y-5,5,5);g.fillStyle=p.hair;g.fillRect(x-3,y-6,7,2);g.fillRect(x-3,y-5,1,4);g.fillRect(x+3,y-5,1,4);}
+function draw(ts){const t=ts/1000;
+ for(const c of rooms){const h=+c.dataset.h;if(c.width!==W)c.width=W;const hh=Math.round(h*W/340);if(c.height!==hh)c.height=hh;const H=c.height,g=c.getContext('2d');g.imageSmoothingEnabled=false;
+  // floor and walls
+  g.fillStyle='#8f97a3';g.fillRect(0,0,W,H);for(let y=14;y<H;y+=10)for(let x=(y/10%2)*10;x<W;x+=20){g.fillStyle='#98a0ab';g.fillRect(x,y,10,10);}
+  g.fillStyle='#3a3f48';g.fillRect(0,0,W,14);g.fillStyle='#1b2733';g.fillRect(56,3,68,8);g.fillStyle='#7fd0ff';g.fillRect(58,5,20,4);g.fillStyle='#ffd166';g.fillRect(82,6,8,1);g.fillRect(92,5,14,1);
+  g.fillStyle='#e7c46a';g.fillRect(0,13,W,1);
+  // door (where she waits when she needs you)
+  g.fillStyle='#6b4a33';g.fillRect(W-16,H-20,14,20);g.fillStyle='#c9573a';g.fillRect(W-14,H-24,10,3);
+  // plant + water cooler
+  g.fillStyle='#5f8f4e';g.fillRect(4,H-16,8,8);g.fillStyle='#6b4a33';g.fillRect(5,H-8,6,6);
+  g.fillStyle='#dfe8ef';g.fillRect(W-30,18,8,14);g.fillStyle='#7fb7e0';g.fillRect(W-29,16,6,5);
+  // desks
+  for(const [dx,dy] of DESK){g.fillStyle='#4a4f59';g.fillRect(dx-11,dy,22,7);g.fillStyle='#2b2f36';g.fillRect(dx-11,dy+7,22,2);g.fillStyle='#16202b';g.fillRect(dx-5,dy-6,10,6);}
+  // people
+  S.forEach((p,i)=>{const o=pos[i];let x=DESK[i][0],y=DESK[i][1]+13,walk=false;
+   if(p.st==='need'){x=W-22+Math.sin(t*2)*1;y=H-14;}
+   else if(p.st==='sleep'){x=16+((i*13)%20);y=H-26;}
+   else if(p.st==='idle'){x=W-34+Math.sin(t*.7+i)*14;y=40+Math.cos(t*.7+i)*4;walk=true;}
+   person(g,Math.round(x),Math.round(y),p,walk,t+i);
+   if(p.st==='work'){g.fillStyle=Math.sin(t*6+i)>0?'#7fd0ff':'#bde7ff';g.fillRect(DESK[i][0]-4,DESK[i][1]-5,8,4);}
+   if(p.st==='need'){g.fillStyle='#fff';g.fillRect(Math.round(x)-4,Math.round(y)-16,9,7);g.fillStyle='#c9573a';g.fillRect(Math.round(x),Math.round(y)-15,1,3);g.fillRect(Math.round(x),Math.round(y)-11,1,1);}
+   if(p.st==='sleep'){g.fillStyle='#cfd3ff';g.fillRect(Math.round(x)+5,Math.round(y)-12-((t*4|0)%3),3,1);}
+  });}
+ requestAnimationFrame(draw);}
+all();requestAnimationFrame(draw);
+</script>
+</body>
+</html>
