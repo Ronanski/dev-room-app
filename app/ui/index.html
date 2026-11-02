@@ -1419,10 +1419,15 @@ function applyRecords(records){
     else if(i.at!==prevAt&&prevDetail!==(s.detail+'|'+s.recent+'|'+s.ask)&&s.status!=='working'){log(s.short,statusLine(s),s);say2(s,'agent',statusLine(s));}
     else if(s.status==='working'&&prevDetail!==(s.detail+'|'+s.recent+'|'+s.ask))log(s.short,statusLine(s),s);
   }
-  // only names that really collide get a number (the short name and the full name separately)
-  {const ss={},sr={};for(const s of sessions.slice().sort((a,b)=>a.id-b.id)){const base=s.baseShort??(s.baseShort=s.short),baseRole=s.baseRole??(s.baseRole=s.role);
+  // Names that collide are told apart by the part after the colon ("FIXER : NINGNING" and "FIXER : GISELLE", as
+  // Claude Projects names its threads): short "Ningning", role "Code Fixer · NINGNING". Without one, a number.
+  {const list=sessions.slice().sort((a,b)=>a.id-b.id),cs={},cr={},ss={},sr={};
+   for(const s of list){if(s.baseShort===undefined)s.baseShort=s.short;if(s.baseRole===undefined)s.baseRole=s.role;cs[s.baseShort]=(cs[s.baseShort]||0)+1;cr[s.baseRole]=(cr[s.baseRole]||0)+1;}
+   const own=t=>{t=titleCase(String(t||'').trim());return t.length>14?t.slice(0,13).trim()+'…':t;};
+   for(const s of list){const base=s.baseShort,baseRole=s.baseRole,tk=!s.lead&&String(s.task||'').trim();
     const n=(ss[base]=(ss[base]||0)+1),m=(sr[baseRole]=(sr[baseRole]||0)+1);
-    s.short=n>1?base.replace(/[.…]$/,'')+' '+n:base;s.role=m>1?baseRole+' '+m:baseRole;}}
+    s.short=cs[base]>1&&tk?own(tk):n>1?base.replace(/[.…]$/,'')+' '+n:base;
+    s.role=cr[baseRole]>1&&tk?baseRole+' · '+tk:m>1?baseRole+' '+m:baseRole;}}
   if(!sessions.some(x=>x.id===selected)){const q=sessions.filter(x=>x.status==='needs').sort((a,b)=>b.at-a.at)[0]||sessions.find(x=>x.lead)||sessions[0];selected=q?q.id:0;}
   if(firstLoad){
     log(guard.name,`Bukas na ang ${SCENE==='resort'?'resort':'office'}. ${sessions.length} na session ang naka-duty.`);
@@ -1535,6 +1540,8 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.16.1':{news:['<b>Lumalabas na ang tunay na pangalan ng mga thread</b> mula sa Claude Projects. Dati, pangalan ng folder o ang sariling title ni Claude ang nakikita mo, kaya magkakamukha ang mga thread.','<b>Hindi na magkakamukha ang may parehong role:</b> sa halip na Fixer, Fixer 2 at Fixer 3, makikita mo na ang Ningning, Giselle at Winter.'],
+    todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
   '0.16.0':{news:['<b>Bagong Lite view sa phone at tablet</b> (naka-portrait): maliit na office sa itaas, ang listahan ng sessions sa ilalim, tapos ang chat. Mas magaan ito at mas tipid sa battery.','<b>Sa maliit na office:</b> nasa desk ang gumagana, nasa pinto at nakataas ang kamay ang naghihintay sa iyo, at nasa sofa ang matagal nang naka-break. I-tap ang tao para kausapin siya.','<b>Sa listahan:</b> nasa itaas ang naghihintay sa iyo, may progress (hal. 3/5), at may filter na Lahat, Kailangan ka, Gumagana at Tapos.','Sa tablet, nasa kaliwa ang listahan at nasa kanan ang chat.'],
     todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.','Gusto mo ang dating malaking office? Pindutin ang <b>Buong view</b> sa dulo ng listahan. Babalik ka sa Lite gamit ang <b>Lite view</b> sa itaas.']},
   '0.15.2':{news:['<b>Wala na ang Limit (5 oras at Linggo) sa itaas.</b> Para mabasa iyon, ginagamit ng Dev Room ang sign-in mo sa Claude, at bawal iyon sa terms ng Claude. Tinanggal namin para hindi ma-ban ang account mo. Hindi na ginagalaw ng Dev Room ang sign-in mo kahit kailan.'],
@@ -2840,7 +2847,7 @@ function liteLine(s){
   const r=sent(s.recent||s.detail)||'Tapos na ang turn niya.';return`${r} ${dur(now()-s.since)} na ang nakalipas.`;}
 const liteCol=s=>({need:'--need',fail:'--fail',work:'--work',done:'--done',idle:'--done',sleep:'--sleep'})[liteState(s)];
 function liteItem(s){const p=prog(s);
-  return `<button type="button" class="litem${s.id===selected?' sel':''}${s.status==='needs'||s.status==='failed'?' need':''}" data-lid="${s.id}">${faceHTML(s).replace(/--st:var\([^)]*\)/,'--st:var('+liteCol(s)+')')}<span class="lm"><span class="ln"><b>${esc(s.lead?'★ '+(s.short||s.role):(s.short||s.role))}</b>${litePill(s)}</span><span class="ls">${esc(liteLine(s))}</span>${p.total?`<span class="lp"><i class="pbar${p.phase==='done'?' ok':''}"><b style="width:${p.pct}%"></b></i><small>${p.done}/${p.total}</small></span>`:''}</span></button>`;}
+  return `<button type="button" class="litem${s.id===selected?' sel':''}${s.status==='needs'||s.status==='failed'?' need':''}" data-lid="${s.id}">${faceHTML(s).replace(/--st:var\([^)]*\)/,'--st:var('+liteCol(s)+')')}<span class="lm"><span class="ln"><b>${esc(s.lead?'★ '+(s.task||s.short||s.role):(s.baseShort||s.short||s.role)+(s.task?' · '+s.task:''))}</b>${litePill(s)}</span><span class="ls">${esc(liteLine(s))}</span>${p.total?`<span class="lp"><i class="pbar${p.phase==='done'?' ok':''}"><b style="width:${p.pct}%"></b></i><small>${p.done}/${p.total}</small></span>`:''}</span></button>`;}
 function renderLite(){
   if(!isLite())return;
   const needs=sessions.filter(s=>(s.status==='needs'||s.status==='failed')&&!s.acked);
