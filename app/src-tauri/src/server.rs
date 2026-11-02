@@ -189,9 +189,11 @@ pub fn install_hooks(port: u16) -> Result<Value, String> {
 
 /// A session's names from its transcript: the one you gave it (`/rename`: custom-title) and the one Claude Code
 /// made (ai-title, or an older summary). The newest of each counts.
+/// Claude Code 2.1.3xx also writes `agent-name` (agentName): `/rename` writes it next to custom-title, and Claude
+/// Projects threads (started by a project's coordinator) are named only through it, so it counts as the given name.
 type Titles = (Option<String>, Option<String>);
 fn title_of(v: &Value) -> Option<(bool, String)> {
-    let (custom, key) = match v.get("type").and_then(|t| t.as_str())? { "custom-title" => (true, "customTitle"), "ai-title" => (false, "aiTitle"), "summary" => (false, "summary"), _ => return None };
+    let (custom, key) = match v.get("type").and_then(|t| t.as_str())? { "custom-title" => (true, "customTitle"), "agent-name" => (true, "agentName"), "ai-title" => (false, "aiTitle"), "summary" => (false, "summary"), _ => return None };
     let t = v.get(key).and_then(|x| x.as_str())?.trim();
     (!t.is_empty()).then(|| (custom, clip(t, 120)))
 }
@@ -230,7 +232,7 @@ fn read_transcript(path: &str, full_title_scan: bool) -> (Option<String>, Titles
         if let Ok(f) = fs::File::open(path) {
             let (mut c2, mut a2) = (None, None);
             for line in BufReader::new(f).lines().map_while(Result::ok) {
-                if !line.contains("-title\"") && !line.contains("\"summary\"") { continue; }
+                if !line.contains("-title\"") && !line.contains("\"summary\"") && !line.contains("\"agent-name\"") { continue; }
                 if let Ok(v) = serde_json::from_str::<Value>(&line) {
                     match title_of(&v) { Some((true, t)) => c2 = Some(t), Some((false, t)) => a2 = Some(t), None => {} }
                 }

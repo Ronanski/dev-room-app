@@ -7,6 +7,12 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.16.1 (2026-11-02)
+
+- **Thread names from Claude Projects show up.** Claude Code 2.1.3xx names a session with an `agent-name` line (`agentName`) in its transcript. A project's coordinator names its threads only that way, and `/rename` writes it next to `custom-title`. Dev Room read only `custom-title`, `ai-title` and `summary`, so a thread showed Claude's own title or, before that, the folder name (every thread in one folder looked the same). `title_of` in `server.rs` now reads `agent-name` as the name you gave, in the tail read, the first full scan and the live reader.
+- **Threads with the same role are told apart by name.** Three threads named `FIXER : NINGNING`, `FIXER : GISELLE` and `FIXER : WINTER` showed as Fixer, Fixer 2 and Fixer 3. Now the tiles, the map and the chat say Ningning, Giselle and Winter, and the role reads `Code Fixer · NINGNING`. A number is used only when there is no name after the colon. The Lite list shows the role and the name (`Fixer · NINGNING`), and the leader's full name.
+- Tested here (a scratch build of `server.rs` fed with hook JSON and transcripts): a thread with only `agent-name` shows that name; `custom-title` and `ai-title` still work; an `agent-name` written while the session runs renames it live; three FIXER threads show as Ningning, Giselle and Winter on the PC tiles and map and in the Lite list (Playwright, 1366×768 and 390×844, no page errors; the 15 Lite checks from 0.16.0 still pass). The old server showed `Fix parser tests` and `icms-master-tool` for the same transcripts. Not tested: the real PC and a real Claude Projects thread.
+
 ## 0.16.0 (2026-11-02)
 
 - **Lite view for phone and tablet (portrait),** from `docs/lite-mockup.html`. It is on by default on a touch screen held upright; landscape and the PC keep the full view.

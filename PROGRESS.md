@@ -55,7 +55,8 @@ The work moves to a new Claude Code session that runs **on the user's Windows PC
   - Remote Control sessions on the PC, titled like "FIXER : NINGNING", "FIXER : GISELLE", "FIXER : WINTER", "DESIGN : YUNA";
   - the cloud session "DEV-ROOM-APP" (this one).
 - **The PC's Remote Control folders:** icms-master-tool, aio-icms-tool, smc-salary-calculator, gmail-organizer.
-- **Claude Code transcript title lines:** `ai-title` (`aiTitle`) and `custom-title` (`customTitle`). 0.15.0 reads both.
+- **Claude Code transcript title lines:** `ai-title` (`aiTitle`), `custom-title` (`customTitle`) and, since 2.1.3xx, `agent-name` (`agentName`). Claude Projects threads are named only through `agent-name`; 0.16.1 reads it as the given name.
+- **Claude Projects coordinator** is a cloud session: it has no hooks on the PC, so it never shows in Dev Room. Only the threads that run on the PC do.
 - **Testing on the user's PC (since 0.15.2):** Rust is the GNU toolchain (`~/.cargo/bin`, no MSVC) plus WinLibs MinGW from winget for `dlltool` and `ring`. Build the scratch server with `--target-dir C:/drt` (long Temp paths break build scripts). Run it on port 4417 with `APPDATA`, `LOCALAPPDATA`, `USERPROFILE`, `HOME` and `CLAUDE_CONFIG_DIR` set to a scratch folder: `start()` installs hooks for its own port, and it must never touch the real `~/.claude/settings.json` or `%APPDATA%DevRoom`. The real Dev Room keeps 4317 and 4318. Playwright 1.64 matches the cached Chromium; launching it needs the shell sandbox off. Stop the test server with `taskkill /IM drsrv.exe`.
 
 ## Current state (v0.16.0, 2026-11-02)
