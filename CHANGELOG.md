@@ -7,6 +7,14 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.16.2 (2026-11-02)
+
+- **Messages a Claude Projects coordinator passes to a thread are readable.** They arrive as the thread's prompt, wrapped in `<project_claude_message>` with `<relay>`, `<cited>` and `<note>` (an underscore tag, so the system-prompt filter missed it), and the chat showed the raw tags. The chat now shows them as **Coordinator → thread**, with your cited words under your name and the coordinator's note (`relayMsg` in the UI; `relay_text` in `server.rs`). The session's detail reads "Utos ng coordinator: …".
+- **Thread names when Claude Code wrote none.** A thread in its own folder is named after the folder, as words: `winter-test` is Winter Test and `code-fixer-b7c2` is Code Fixer (the hash is dropped, and the role is detected from the words). Threads that share a folder (`icms-master-tool`) are named after the coordinator's first message to them (`relay_title`, used only when the folder is shared). The Lite list shows the whole name.
+- **Tablet Lite: the chat's width is adjustable.** Drag the bar between the list and the chat (remembered in `devroom.litecol`; double tap resets).
+- In Lite, the chat header shows the real status (Tapos or Naka-break), never the big map's pastimes such as "Nagse-cellphone". "Tapos na ang agent (agent)" now reads "Tapos na ang isang agent".
+- Tested here (a scratch build of `server.rs` fed with hook JSON and coordinator relay prompts like the ones on the user's tablet; Playwright with the Android 13 WebView user agent at 800×1280 dark and 390×844): no raw tags in the chat, your words and the note shown, names Team Files, Winter Test, Code Fixer and the coordinator's task for the shared folder, the bar widens the chat, is remembered after a reload and resets on double tap, no bar on the phone, no page errors; the 15 Lite checks still pass. Not tested: the real PC and tablet. A thread that started before this version and gets no new coordinator message keeps the folder name.
+
 ## 0.16.1 (2026-11-02)
 
 - **Thread names from Claude Projects show up.** Claude Code 2.1.3xx names a session with an `agent-name` line (`agentName`) in its transcript. A project's coordinator names its threads only that way, and `/rename` writes it next to `custom-title`. Dev Room read only `custom-title`, `ai-title` and `summary`, so a thread showed Claude's own title or, before that, the folder name (every thread in one folder looked the same). `title_of` in `server.rs` now reads `agent-name` as the name you gave, in the tail read, the first full scan and the live reader.

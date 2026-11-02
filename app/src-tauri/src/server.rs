@@ -326,7 +326,7 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Titles)>)
             }
             "SubagentStop" => {
                 if busy { s.insert("detail".into(), json!("Tapos na ang isang agent; binabasa ang resulta.")); }
-                else { s.insert("recent".into(), json!(format!("Tapos na ang agent ({}) sa background.", clip(&kind, 30)))); }
+                else { s.insert("recent".into(), json!(if kind == "agent" { "Tapos na ang isang agent sa background.".to_string() } else { format!("Tapos na ang agent ({}) sa background.", clip(&kind, 30)) })); }
             }
             _ => {}
         }
@@ -384,11 +384,14 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Titles)>)
             let sys = system_prompt(p);
             if !sys { push_convo(s, "user", p, 2000, "hook"); }
             // a session without a name is called after its first prompt, not after the folder every session shares
-            let first = p.trim();
-            if !s.contains_key("first_prompt") && !first.is_empty() && !first.starts_with('<') {
-                s.insert("first_prompt".into(), json!(clip(first, 48)));
+            // a Claude Projects thread gets its work from the coordinator: name it after that, not after the wrapper
+            let relay = relay_text(p);
+            let first = relay.as_deref().unwrap_or(p).trim();
+            let key = if relay.is_some() { "relay_title" } else { "first_prompt" };
+            if !s.contains_key(key) && !first.is_empty() && !first.starts_with('<') {
+                s.insert(key.into(), json!(clip(first, 48)));
             }
-            s.insert("detail".into(), json!(if sys { "Binabasa ang ulat ng ibang session.".to_string() } else { format!("Inutusan: {}", clip(p, 140)) }));
+            s.insert("detail".into(), json!(if let Some(r) = &relay { format!("Utos ng coordinator: {}", clip(r, 140)) } else if sys { "Binabasa ang ulat ng ibang session.".to_string() } else { format!("Inutusan: {}", clip(p, 140)) }));
         }
         "PreToolUse" => {
             let tool = v.get("tool_name").and_then(|x| x.as_str()).unwrap_or("tool");
@@ -616,6 +619,31 @@ fn track_tasks(s: &mut Map<String, Value>, ev: &str, v: &Value) -> bool {
 }
 
 /// A prompt Claude Code wrote itself (wrapped in one of its tags), not something the user typed.
+/// A message a Claude Projects coordinator passes to a thread arrives as the thread's prompt, wrapped in
+/// `<project_claude_message>` (with `<relay>`, `<cited>` lines from you and the coordinator's `<note>`).
+/// Returns its plain text: the note, else your cited words, else the text without tags.
+fn relay_text(p: &str) -> Option<String> {
+    let t = p.trim_start();
+    if !t.starts_with("<project_claude_message") { return None; }
+    let inner = |tag: &str| -> Vec<String> {
+        let (open, close) = (format!("<{tag}"), format!("</{tag}>"));
+        let mut out = vec![]; let mut rest = t;
+        while let Some(i) = rest.find(&open) {
+            let after = &rest[i + open.len()..];
+            let Some(gt) = after.find('>') else { break };
+            let body = &after[gt + 1..];
+            let Some(end) = body.find(&close) else { break };
+            let x = body[..end].trim(); if !x.is_empty() { out.push(x.to_string()); }
+            rest = &body[end + close.len()..];
+        }
+        out
+    };
+    let strip = |x: &str| { let mut o = String::new(); let mut tag = false; for c in x.chars() { match c { '<' => tag = true, '>' => tag = false, _ if !tag => o.push(c), _ => {} } } o.split_whitespace().collect::<Vec<_>>().join(" ") };
+    let pick = inner("note").into_iter().next().or_else(|| inner("cited").into_iter().last()).unwrap_or_else(|| strip(t));
+    let pick = strip(&pick);
+    (!pick.is_empty()).then_some(pick)
+}
+
 fn system_prompt(p: &str) -> bool {
     const TAGS: [&str; 16] = ["system-reminder", "command-name", "command-message", "command-args", "command-contents", "local-command-stdout",
         "local-command-stderr", "local-command-caveat", "side-sessions-event", "task-notification", "user-prompt-submit-hook", "bash-input",
@@ -666,12 +694,16 @@ fn queue_why(s: &Value) -> &'static str {
     if s.get("step_at").and_then(|x| x.as_u64()).unwrap_or(0) > 0 { "step" } else { "busy" }
 }
 
-fn record(s: &Value, names: &Value) -> Value {
+/// `shared`: other sessions run in the same folder, so the folder name alone would not tell them apart.
+fn record(s: &Value, names: &Value, shared: bool) -> Value {
     let id = s.get("id").and_then(|x| x.as_str()).unwrap_or("");
     let cwd = s.get("cwd").and_then(|x| x.as_str()).unwrap_or("");
     let named = |k: &str| s.get(k).and_then(|x| x.as_str()).filter(|t| !t.trim().is_empty()).map(String::from);
-    // the name the session has without a Dev Room rename: /rename, then Claude Code's own title, then the first prompt
+    // the name the session has without a Dev Room rename: /rename, then Claude Code's own title, then the first prompt;
+    // a Claude Projects thread in its own folder (e.g. "team-files") is called after the folder, and only threads
+    // sharing a folder are called after the coordinator's first message to them
     let own = named("custom_title").or_else(|| named("auto_title")).or_else(|| named("first_prompt"))
+        .or_else(|| if shared || cwd.is_empty() { named("relay_title") } else { None })
         .unwrap_or_else(|| if cwd.is_empty() { format!("Session {}", id.chars().take(8).collect::<String>()) } else { base_name(cwd) });
     let title = names.get(id).and_then(|x| x.as_str()).filter(|t| !t.trim().is_empty()).map(String::from).unwrap_or_else(|| own.clone());
     let bucket = match s.get("status").and_then(|x| x.as_str()).unwrap_or("idle") {
@@ -820,7 +852,9 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16, tun: bool) {
             if !local && q.get("bg").map(|b| b != "1").unwrap_or(true) { s.remote_seen = now_ms(); }
             if since == s.version { drop(s); let _ = req.respond(Response::empty(204).with_header(header("Access-Control-Allow-Origin", "*"))); return; }
             let names = s.team.get("names").cloned().unwrap_or(json!({}));
-            let mut list: Vec<Value> = s.sessions.values().map(|x| record(x, &names)).collect();
+            let mut cwds: HashMap<String, usize> = HashMap::new();
+            for x in s.sessions.values() { if let Some(c) = x.get("cwd").and_then(|c| c.as_str()).filter(|c| !c.is_empty()) { *cwds.entry(c.to_string()).or_insert(0) += 1; } }
+            let mut list: Vec<Value> = s.sessions.values().map(|x| { let c = x.get("cwd").and_then(|c| c.as_str()).unwrap_or(""); record(x, &names, cwds.get(c).copied().unwrap_or(0) > 1) }).collect();
             list.sort_by_key(|r| std::cmp::Reverse(r.get("updated_at").and_then(|t| t.as_u64()).unwrap_or(0)));
             let lan = lan_ip().map(|ip| format!("http://{ip}:{port}/"));
             let body = json!({"version": s.version, "sessions": list, "team": s.team, "local": local,
@@ -1322,6 +1356,8 @@ fn tail_transcripts(st: &Mutex<State>) {
             match it {
                 Ready::Text(role, text) => {
                     push_convo(s, role, &text, if role == "user" { 2000 } else { 4000 }, "tail");
+                    // a Projects thread already running when Dev Room started: name it after the coordinator's message
+                    if role == "user" && !s.contains_key("relay_title") { if let Some(r) = relay_text(&text) { s.insert("relay_title".into(), json!(clip(&r, 48))); } }
                     if role == "assistant" { s.insert("recent".into(), json!(clip(&text, 300))); s.insert("updated_at".into(), json!(now_ms())); }
                 }
                 Ready::Att(role, att, name, title) => push_att(s, role, &att, &name, &title),
