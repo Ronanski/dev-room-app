@@ -319,7 +319,7 @@ function dur(ms){const m=Math.max(0,Math.floor(ms/1000));return m<60?`${m} min`:
 function log(who,text,s){logs.unshift({t:now(),who,text});if(logs.length>40)logs.pop();if(s){s.history.unshift({t:now(),text});if(s.history.length>6)s.history.pop();}renderLog();}
 
 function mkSession(name,source,host,status,minsAgo,desk){
-  const m=name.match(/^\[(\w+)\]\s*(.+)$/);const code=m?m[1]:'BE';
+  const m=name.match(/^([A-Za-z]+):\s*(.+)$/);const code=m?m[1].toUpperCase():'LEAD';
   const s={id:uid++,name,code,role:ROLES[code]||code,short:SHORT[code]||code,task:m?m[2]:name,source,host,status,
     since:now()-minsAgo*1000,idleStart:now()-minsAgo*1000,activity:pick(ACTS[code]),idle:null,idleUntil:0,history:[],chat:[],
     nextChange:now()+rand(6,14)*1000,pal:PAL[code]||PAL.BE,seed:Math.random()*4,desk,x:0,y:0,path:[],pose:'stand',
@@ -425,18 +425,18 @@ function leadThink(s){
 }
 
 /* ---------- initial scene ---------- */
-sessions.push(mkSession('[LEAD] v2 release orchestration','Cloud','claude.ai/code','working',22,null));
-sessions.push(mkSession('[BE] Payments API refactor','Local','laptop','working',48,DESKS[0]));
-sessions.push(mkSession('[FE] Checkout redesign','Cloud','claude.ai/code','needs',4,DESKS[1]));
-sessions.push(mkSession('[QA] E2E regression suite','Cloud','claude.ai/code','idle',14,DESKS[2]));
-sessions.push(mkSession('[OPS] CI cache fix','Local','laptop','idle',12,DESKS[4]));
-sessions.push(mkSession('[DOCS] API reference update','Cloud','claude.ai/code','idle',38,DESKS[5]));
+sessions.push(mkSession('v2 release orchestration','Cloud','claude.ai/code','working',22,null));
+sessions.push(mkSession('BE: Payments API refactor','Local','laptop','working',48,DESKS[0]));
+sessions.push(mkSession('FE: Checkout redesign','Cloud','claude.ai/code','needs',4,DESKS[1]));
+sessions.push(mkSession('QA: E2E regression suite','Cloud','claude.ai/code','idle',14,DESKS[2]));
+sessions.push(mkSession('OPS: CI cache fix','Local','laptop','idle',12,DESKS[4]));
+sessions.push(mkSession('DOCS: API reference update','Cloud','claude.ai/code','idle',38,DESKS[5]));
 sessions[0].activity=ACTS.LEAD[2];sessions[1].activity=ACTS.BE[0];
 sessions[3].forceIdle='chismis';sessions[4].forceIdle='chismis';sessions[5].forceIdle='sleep';
 sessions.forEach(s=>applyStatus(s,true));
 sessions[2].nextChange=now()+32000;
 selected=sessions[2].id;
-const POOL=[['[SEC] Auth hardening audit','Cloud','claude.ai/code'],['[DATA] Analytics export','Local','laptop'],['[QA] Mobile smoke tests','Cloud','claude.ai/code'],['[FE] Settings page','Local','laptop']];
+const POOL=[['SEC: Auth hardening audit','Cloud','claude.ai/code'],['DATA: Analytics export','Local','laptop'],['QA: Mobile smoke tests','Cloud','claude.ai/code'],['FE: Settings page','Local','laptop']];
 log('Guard','Bukas na ang office. Anim na session ang naka-duty ngayon.');
 log('Lead','Nag-delegate kay QA ng e2e tests para sa checkout.',sessions[0]);
 log('Frontend',`Pumila sa opisina mo. Tanong niya: "${ASKS.FE}"`,sessions[2]);

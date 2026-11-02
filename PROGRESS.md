@@ -54,7 +54,7 @@ Mockup only. There is no real app yet.
 ### Platforms and data
 - [ ] **Portable desktop app** and **Android app**. The mockup has a Desktop/Android preview toggle; a real app is not built yet.
 - [ ] Must work with **both local CLI sessions and cloud sessions** (claude.ai/code).
-- [ ] Each session's role comes from its **session name**, which follows a fixed format. The real format is still to be provided; the mockup assumes `[ROLE] task`.
+- [x] Each session's role comes from its **session name** in the format `ROLE: task`, for example `CODE FIXER: engine at logic` or `DOCS: team structure`. A title without a colon is the leader. The mockup and the live view both use this format.
 - [ ] Data source plan: Claude Code hooks POST events to the app's server.
   - SessionStart: a session arrived.
   - UserPromptSubmit and PreToolUse: working, with the current tool.
@@ -76,8 +76,7 @@ Mockup only. There is no real app yet.
 
 ## Open questions
 
-1. What is the real session-name format? We need 2–3 examples.
-2. Which stack should the build use?
+1. Which stack should the build use?
    - Desktop: Electron or Tauri.
    - Android: Capacitor or React Native.
-3. Where should the event server run so that both local and cloud sessions can reach it?
+2. Where should the event server run so that both local and cloud sessions can reach it?
