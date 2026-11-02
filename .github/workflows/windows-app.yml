@@ -2,7 +2,8 @@ name: Dev Room apps
 
 on:
   push:
-    branches: [main, ccr-c1736103-c42su6]
+    # release branches (claude/...) get CI too; their builds are prereleases, never Latest
+    branches: [main, ccr-c1736103-c42su6, "claude/**"]
     paths: ["app/**", "mobile/**", ".github/workflows/windows-app.yml"]
   workflow_dispatch:
 

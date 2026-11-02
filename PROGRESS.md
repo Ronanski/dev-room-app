@@ -23,7 +23,7 @@ The work moves to a new Claude Code session that runs **on the user's Windows PC
 
 ### Where it stands now (2026-11-02, PC session)
 - **0.15.2 is in draft PR #31** (branch `claude/remove-usage-meter`, base `main`). It is **not merged and not released**: the PC still runs the old meter until it is.
-- **CI does not run on this branch.** `windows-app.yml` triggers on push to `main` and `ccr-c1736103-c42su6` only (the old cloud branch), so the PR shows no checks. Before merging, either add the release branches to the trigger (for example `claude/**`) or start the workflow by hand on the branch. Ask the user which.
+- **CI on release branches:** `windows-app.yml` used to run on `main` and the old cloud branch only, so PR #31 had no checks. The user chose to add `claude/**` to the push trigger. Builds from those branches are prereleases (never Latest), so they never reach the PC or the phone before the merge.
 - Each release gets its own branch and PR from `origin/main`; never push to `main` directly (the user's rule).
 - Next: merge 0.15.2 once CI is green, then step 2 below.
 
