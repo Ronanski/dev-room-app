@@ -56,6 +56,7 @@ The work moves to a new Claude Code session that runs **on the user's Windows PC
   - the cloud session "DEV-ROOM-APP" (this one).
 - **The PC's Remote Control folders:** icms-master-tool, aio-icms-tool, smc-salary-calculator, gmail-organizer.
 - **Claude Code transcript title lines:** `ai-title` (`aiTitle`), `custom-title` (`customTitle`) and, since 2.1.3xx, `agent-name` (`agentName`). Claude Projects threads are named only through `agent-name`; 0.16.1 reads it as the given name.
+- **Thread names (0.18.2):** Claude Code 2.1.3xx sends `session_title` with SessionStart and UserPromptSubmit hooks; that is the name the Claude app shows (also Projects renames). Its newer storage may never write it to the transcript. Trust the hook first.
 - **Renames in a sidecar:** Claude Code 2.1.3xx may keep a rename only in `<transcript folder>/<session id>/custom-title.json`; 0.18.0 reads and watches it.
 - **Session scan (0.18.0):** every Claude folder (`~/.claude`, `CLAUDE_CONFIG_DIR`, `~/.claude-*`) is scanned each minute (48 h); "I-scan ang PC" goes back 14 days. This covers step 3 (multiple accounts) for seeing sessions; hooks are still installed only in `~/.claude`.
 - **Claude Projects coordinator** is a cloud session: it has no hooks on the PC, so it never shows in Dev Room. Only the threads that run on the PC do.

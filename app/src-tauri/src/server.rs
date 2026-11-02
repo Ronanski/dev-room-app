@@ -349,6 +349,12 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Titles)>)
         return;
     }
     if let Some(c) = v.get("cwd").and_then(|x| x.as_str()) { s.insert("cwd".into(), json!(c)); }
+    // Claude Code 2.1.3xx sends the session's current name with its hooks (SessionStart, UserPromptSubmit):
+    // the name the Claude app shows, also a rename made there or by a Claude Projects coordinator. With its newer
+    // storage that name may never reach the transcript file, so this is the name to trust.
+    if let Some(t) = v.get("session_title").and_then(|x| x.as_str()).map(|t| t.split_whitespace().collect::<Vec<_>>().join(" ")).filter(|t| !t.is_empty()) {
+        s.insert("hook_title".into(), json!(clip(&t, 120)));
+    }
     if let Some(m) = v.get("permission_mode").and_then(|x| x.as_str()) { s.insert("perm_mode".into(), json!(m)); }
     let transcript = v.get("transcript_path").and_then(|x| x.as_str()).map(String::from);
     if let Some(t) = &transcript {
@@ -716,12 +722,13 @@ fn record(s: &Value, names: &Value, shared: bool) -> Value {
     // the name the session has without a Dev Room rename: /rename, then Claude Code's own title, then the first prompt;
     // a Claude Projects thread in its own folder (e.g. "team-files") is called after the folder, and only threads
     // sharing a folder are called after the coordinator's first message to them
-    let own = named("custom_title").or_else(|| named("auto_title")).or_else(|| named("first_prompt"))
+    let own = named("hook_title").or_else(|| named("custom_title")).or_else(|| named("auto_title")).or_else(|| named("first_prompt"))
         .or_else(|| if shared || cwd.is_empty() { named("relay_title") } else { None })
         .unwrap_or_else(|| if cwd.is_empty() { format!("Session {}", id.chars().take(8).collect::<String>()) } else { base_name(cwd) });
     let title = names.get(id).and_then(|x| x.as_str()).filter(|t| !t.trim().is_empty()).map(String::from).unwrap_or_else(|| own.clone());
     // where the name came from, for the Detalye tab (so a wrong name can be traced on the real PC)
     let title_src = if names.get(id).and_then(|x| x.as_str()).map(|t| !t.trim().is_empty()).unwrap_or(false) { "Dev Room rename" }
+        else if named("hook_title").is_some() { "Pangalan sa Claude app (galing sa hook)" }
         else if named("custom_title").is_some() { "Claude rename (/rename, Claude app o agent-name)" }
         else if named("auto_title").is_some() { "Sariling title ni Claude (ai-title)" }
         else if named("first_prompt").is_some() { "Unang utos mo" }
