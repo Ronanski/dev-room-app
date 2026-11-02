@@ -578,6 +578,64 @@ body{margin:0}
 .psplit::after{content:"";position:absolute;left:50%;top:5px;width:46px;height:4px;margin-left:-23px;border-radius:2px;background:var(--muted);opacity:.55}
 .psplit:hover::after,.psplit.on::after{opacity:1;background:var(--accent)}
 @media (pointer:coarse){.psplit{top:-14px;height:24px}.psplit::after{top:10px}}
+
+/* ---------- Lite (0.16.0): portrait phone and tablet. A small live office, the session list, then the chat. ---------- */
+.lite,.lback,.litebtn{display:none}
+.app.port.touch .litebtn{display:inline-flex}
+.app.lite :is(.pane[data-pane="office"],.dockwrap,.counts,.controls,.psplit,.drawer-x,.claudebar){display:none!important}
+.app.lite .top{margin-bottom:6px;padding-bottom:6px}
+.app.lite .top .sub{font-size:11.5px}
+.lroom{position:relative;flex:none;border-radius:12px;overflow:hidden;border:2px solid var(--frame);background:#1c140f}
+.lroom canvas{display:block;width:100%;height:auto;image-rendering:pixelated;cursor:pointer;touch-action:manipulation}
+.lroom .ltag{position:absolute;left:8px;bottom:6px;font-size:11px;color:#f1e7d8;background:rgba(0,0,0,.5);padding:1px 7px;border-radius:6px;pointer-events:none}
+.lalert{display:flex;gap:8px;align-items:center;margin-top:8px;padding:8px 10px;border-radius:12px;border:1.5px solid var(--need);background:color-mix(in srgb,var(--need) 10%,var(--panel))}
+.lalert:empty{display:none}
+.lalert .lt{flex:1;min-width:0;font-size:13.5px}
+.lalert .lt small{display:block;color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.lflt{display:flex;gap:6px;padding:8px 0 4px;overflow-x:auto;scrollbar-width:none;flex:none}
+.lflt::-webkit-scrollbar{display:none}
+.lflt button{flex:none;border:0;border-radius:999px;padding:6px 12px;min-height:32px;font:inherit;font-size:12.5px;background:var(--chip);color:var(--ink);white-space:nowrap}
+.lflt button[aria-pressed="true"]{background:var(--accent);color:var(--panel);font-weight:700}
+.llist{display:flex;flex-direction:column;gap:8px;padding:4px 0 10px;min-height:0}
+.litem{display:flex;gap:10px;align-items:center;width:100%;text-align:left;font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:9px 10px;cursor:pointer;min-height:58px}
+.litem.sel{outline:2px solid var(--accent);outline-offset:-1px}
+.litem.need{border-color:var(--need)}
+.litem .lm{flex:1;min-width:0}
+.litem .ln{display:flex;align-items:center;gap:6px}
+.litem .ln b{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+.litem .ln .pill{flex:none;font-size:11px}
+.litem .ls{font-size:12.5px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.litem .lp{display:flex;align-items:center;gap:8px;margin-top:5px}
+.litem .lp .pbar{flex:1}
+.litem .lp small{flex:none;font-family:var(--f-mono);font-size:10.5px;color:var(--muted)}
+.lempty{color:var(--muted);text-align:center;padding:18px 8px;font-size:13px}
+.lfoot{display:flex;justify-content:center;padding:4px 0 8px}
+.lfoot .btn{font-size:12px}
+.lback{border:0;background:none;color:var(--muted);font-size:24px;line-height:1;padding:4px 10px 6px 4px;min-width:40px;min-height:40px}
+
+/* phone: Office tab = small office and the list; Chat tab = the chat with a back arrow */
+@container app (max-width: 640px){
+  .app.lite[data-tab="office"] .lite{display:flex;flex-direction:column}
+  .app.lite[data-tab="office"] .pane[data-pane="chat"]{display:none!important}
+  .app.lite[data-tab="chat"] .lite{display:none}
+  .app.lite .lback{display:block;position:absolute;left:4px;top:6px;z-index:3}
+  .app.lite .cp-head{padding-left:44px}
+}
+/* tablet portrait: the office across the top; the list on the left and the chat on the right */
+@container app (min-width: 641px){
+  #app.lite .body{display:grid;grid-template-columns:minmax(230px,36%) minmax(0,1fr);grid-template-rows:auto auto auto minmax(0,1fr);
+    grid-template-areas:"room room" "alert chat" "flt chat" "list chat";column-gap:12px;row-gap:0}
+  #app.lite .lite{display:contents}
+  #app.lite .lroom{grid-area:room;margin-bottom:8px}
+  #app.lite .lroom canvas{max-height:24vh;object-fit:cover;object-position:50% 40%}
+  #app.lite .lalert{grid-area:alert;margin:0 0 6px}
+  #app.lite .lflt{grid-area:flt;padding-top:0}
+  #app.lite .llist{grid-area:list;overflow-y:auto}
+  #app.lite .pane[data-pane="chat"]{grid-area:chat;display:block!important;position:relative;inset:auto;width:auto;transform:none;transition:none;min-height:0}
+  #app.lite .tabs{display:none}
+  #app.lite.kbopen :is(.top,.conn,.updbar,.lroom,.lalert,.lflt,.llist,.lfoot){display:none}
+  #app.lite.kbopen .body{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);grid-template-areas:"chat"}
+}
 </style>
 </head>
 <body>
@@ -597,12 +655,19 @@ body{margin:0}
           <button type="button" id="devAndroid" data-device="android" aria-pressed="false">Android</button>
         </div>
         <button type="button" class="btn" id="pauseBtn" title="I-pause ang galaw ng mga tao sa map">Pause</button>
+        <button type="button" class="btn litebtn" data-act="lite-on">Lite view</button>
       </div>
     </header>
 
     <div class="updbar" id="updbar" hidden></div>
     <div class="conn" id="conn" data-mode="connecting"></div>
     <main class="body">
+      <section class="lite" id="lite" aria-label="Office at mga session">
+        <div class="lroom"><canvas id="liteRoom" width="180" height="76" aria-label="Maliit na office: nasa desk ang gumagana, nasa pinto ang naghihintay sa iyo"></canvas><span class="ltag" id="liteTag"></span></div>
+        <div class="lalert" id="liteAlert" aria-live="polite"></div>
+        <div class="lflt" id="liteFlt" role="group" aria-label="Salain ang mga session"></div>
+        <div class="llist" id="liteList"></div>
+      </section>
       <section class="pane" data-pane="office" aria-label="Office">
         <div class="mapwrap">
           <canvas id="map" width="2240" height="1260" aria-label="Isometric café-style office map with session characters"></canvas>
@@ -617,7 +682,7 @@ body{margin:0}
 
       <section class="pane" data-pane="chat" aria-label="Chat">
         <div class="psplit" id="pSplit" role="separator" aria-orientation="horizontal" aria-label="Hilahin pataas o pababa para baguhin ang taas ng panel" title="Hilahin para baguhin ang taas ng panel"></div>
-        <div class="chatpanel"><button type="button" class="drawer-x" data-act="drawer-close" aria-label="Isara ang panel">×</button>
+        <div class="chatpanel"><button type="button" class="drawer-x" data-act="drawer-close" aria-label="Isara ang panel">×</button><button type="button" class="lback" data-act="lite-back" aria-label="Bumalik sa listahan">‹</button>
           <div class="cp-head" id="cpHead"></div>
           <div class="cp-tabs" role="tablist">
             <button type="button" role="tab" data-ptab="alarms" aria-selected="true">Alarms</button>
@@ -1470,6 +1535,8 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.16.0':{news:['<b>Bagong Lite view sa phone at tablet</b> (naka-portrait): maliit na office sa itaas, ang listahan ng sessions sa ilalim, tapos ang chat. Mas magaan ito at mas tipid sa battery.','<b>Sa maliit na office:</b> nasa desk ang gumagana, nasa pinto at nakataas ang kamay ang naghihintay sa iyo, at nasa sofa ang matagal nang naka-break. I-tap ang tao para kausapin siya.','<b>Sa listahan:</b> nasa itaas ang naghihintay sa iyo, may progress (hal. 3/5), at may filter na Lahat, Kailangan ka, Gumagana at Tapos.','Sa tablet, nasa kaliwa ang listahan at nasa kanan ang chat.'],
+    todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.','Gusto mo ang dating malaking office? Pindutin ang <b>Buong view</b> sa dulo ng listahan. Babalik ka sa Lite gamit ang <b>Lite view</b> sa itaas.']},
   '0.15.2':{news:['<b>Wala na ang Limit (5 oras at Linggo) sa itaas.</b> Para mabasa iyon, ginagamit ng Dev Room ang sign-in mo sa Claude, at bawal iyon sa terms ng Claude. Tinanggal namin para hindi ma-ban ang account mo. Hindi na ginagalaw ng Dev Room ang sign-in mo kahit kailan.'],
     todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
   '0.15.1':{news:['<b>Kusa nang nag-a-update ang PC app.</b> Dati, pagkatapos ma-download ang update, ang lumang kopya ang binubuksan ulit ng app, kaya naiipit ito sa v0.11.0 hangga\'t hindi mo isinasara nang mano-mano.','Kapag hindi mailagay ang update, makikita mo na sa itaas kung bakit.'],
@@ -2292,6 +2359,7 @@ let nextDraw=0;
 function frame(ts){
   if(ts<nextDraw-2){requestAnimationFrame(frame);return;}
   nextDraw=Math.max(nextDraw,ts-16.67)+16.67;
+  if(isLite()){liteDraw(ts);requestAnimationFrame(frame);return;}   // Lite: only the small office is drawn (lighter on the battery)
   if(needResize){needResize=false;resizeMap();}
   const budget=16.7;
   Q.tick(ts-last,budget);const dt=Math.min(.05,(ts-last)/1000);last=ts;const t=ts/1000;
@@ -2724,7 +2792,7 @@ function render(){
     <span class="count"><i class="dot" style="background:var(--sleep)"></i><b>${sleepN}</b> tulog</span>
     <span class="count"><i class="dot" style="background:var(--done)"></i><b>${by('done')+by('failed')}</b> tapos o may error</span>`);
   {const dh=sessions.map(dockCard).join('')+`<button type="button" class="addcard" data-act="add">+ Magdagdag ng session</button>`;if(dh!==render.dock){render.dock=dh;const f=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#dock [data-id]');const fid=f&&f.dataset.id;$('dock').innerHTML=dh;dockCols();if(fid)$('dock').querySelector(`[data-id="${fid}"]`)?.focus();}}
-  renderPanel();
+  renderPanel();renderLite();
   const tb=$('tabBadge');tb.hidden=!needN;tb.textContent=needN;
   $('clock').textContent=dayLabel(now())+', '+simLabel(now());$('sbClock').textContent=simLabel(now()).replace(/ (AM|PM)/,'');
 }
@@ -2745,13 +2813,110 @@ function pruneToasts(){const box=$('toasts');if(!box)return;for(const el of [...
 function setDrawer(on,tab){const a=$('app');if(tab){ptab=tab;chatKey='';}a.classList.toggle('drawer',on);const b=$('chatToggle');if(b)b.textContent=on?'Isara ang panel':'Panel';render();}
 function openChat(id){
   selected=id;ptab='chat';chatKey='';const fs=sessions.find(x=>x.id===id);if(fs){cam.follow=fs;if(cam.z<1.5)setZoom(1.8);}
-  if(compact()){const fs2=sessions.find(x=>x.id===id);if(fs2){chatFilter=fs2.sid;chatTo=fs2.sid;}$('app').dataset.tab='chat';document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab==='chat'));}
+  if(compact()||isLite()){const fs2=sessions.find(x=>x.id===id);if(fs2){chatFilter=fs2.sid;chatTo=fs2.sid;}$('app').dataset.tab='chat';document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab==='chat'));}
   $('app').classList.add('drawer');const b=$('chatToggle');if(b)b.textContent='Isara ang panel';
   render();
 }
 
+/* ---------- Lite (portrait phone and tablet) ---------- */
+// On by default on a touch screen held upright; "Buong view" turns it off on this device (remembered).
+const LITE_FORCE=/[?&]lite=1/.test(location.search);
+let liteOff=false;try{liteOff=localStorage.getItem('devroom.full')==='1';}catch(e){}
+let liteFilter='all';
+const isLite=()=>$('app').classList.contains('lite');
+const isTouch=()=>LITE_FORCE||/Android/i.test(navigator.userAgent)||(window.matchMedia&&matchMedia('(pointer:coarse)').matches);
+function liteState(s){
+  if(s.status==='needs')return'need';if(s.status==='failed')return'fail';if(s.status==='working')return'work';if(s.status==='done')return'done';
+  return s.idle==='sleep'||s.idle==='doze'||now()-s.since>30*MIN?'sleep':'idle';}
+const LITE_F={all:['Lahat',()=>true],need:['Kailangan ka',s=>s.status==='needs'||s.status==='failed'],work:['Gumagana',s=>s.status==='working'],
+  done:['Tapos',s=>s.status==='done'||s.status==='idle']};
+// the real state only (the big map's pastimes, like billiards, are not shown here)
+function litePill(s){const st=liteState(s);if(st!=='idle'&&st!=='sleep')return pill(s);
+  return `<span class="pill" style="--st:var(${st==='sleep'?'--sleep':'--done'})">${st==='sleep'?'Naka-break':'Tapos'}</span>`;}
+function liteLine(s){
+  if(s.status==='needs')return s.ask||'May tanong siya sa iyo.';
+  if(s.status==='failed')return sent(s.detail)||'May nag-fail sa huling turn niya.';
+  if(s.status==='working'){const c=prog(s).cur;return sent(s.detail||s.recent||(c&&c.t)||'Nagtatrabaho');}
+  const r=sent(s.recent||s.detail)||'Tapos na ang turn niya.';return`${r} ${dur(now()-s.since)} na ang nakalipas.`;}
+const liteCol=s=>({need:'--need',fail:'--fail',work:'--work',done:'--done',idle:'--done',sleep:'--sleep'})[liteState(s)];
+function liteItem(s){const p=prog(s);
+  return `<button type="button" class="litem${s.id===selected?' sel':''}${s.status==='needs'||s.status==='failed'?' need':''}" data-lid="${s.id}">${faceHTML(s).replace(/--st:var\([^)]*\)/,'--st:var('+liteCol(s)+')')}<span class="lm"><span class="ln"><b>${esc(s.lead?'★ '+(s.short||s.role):(s.short||s.role))}</b>${litePill(s)}</span><span class="ls">${esc(liteLine(s))}</span>${p.total?`<span class="lp"><i class="pbar${p.phase==='done'?' ok':''}"><b style="width:${p.pct}%"></b></i><small>${p.done}/${p.total}</small></span>`:''}</span></button>`;}
+function renderLite(){
+  if(!isLite())return;
+  const needs=sessions.filter(s=>(s.status==='needs'||s.status==='failed')&&!s.acked);
+  const a=needs[0];
+  setHTML($('liteAlert'),a?`<span aria-hidden="true" style="font-size:18px">✋</span><span class="lt"><b>${esc(a.short||a.role)}</b> ${a.status==='failed'?'ay may error.':'ay naghihintay ng sagot mo.'}${needs.length>1?` May ${needs.length-1} pa.`:''}<small>${esc(liteLine(a))}</small></span><button type="button" class="btn primary" data-lid="${a.id}">Sagutin</button>`:'');
+  if(!LITE_F[liteFilter])liteFilter='all';
+  setHTML($('liteFlt'),Object.entries(LITE_F).map(([k,[l,f]])=>`<button type="button" data-lf="${k}" aria-pressed="${k===liteFilter}">${l} ${sessions.filter(f).length}</button>`).join(''));
+  const f=LITE_F[liteFilter][1],rank=s=>s.status==='needs'||s.status==='failed'?0:1;
+  const list=sessions.filter(f).map((s,i)=>[s,i]).sort((x,y)=>rank(x[0])-rank(y[0])||x[1]-y[1]).map(x=>x[0]);
+  setHTML($('liteList'),(list.length?list.map(liteItem).join(''):`<p class="lempty">${sessions.length?'Walang session dito ngayon.':'Wala pang session. Magsimula ng session sa Claude Code sa PC mo, at lalabas siya rito.'}</p>`)+
+    `<div class="lfoot"><button type="button" class="btn" data-act="lite-off">Buong view (malaking office)</button></div>`);
+  const cur=UNITS.find(u=>u.key===UNIT)||UNITS[0],nw=sessions.filter(s=>s.status==='working').length;
+  const tag=`${cur&&cur.label?cur.label+' · ':''}${nw} gumagana`;const t=$('liteTag');if(t.textContent!==tag)t.textContent=tag;
+}
+function setLite(){
+  const app=$('app'),on=LITE_FORCE||(app.classList.contains('port')&&isTouch()&&!liteOff);
+  app.classList.toggle('touch',isTouch());
+  if(on===app.classList.contains('lite'))return;
+  app.classList.toggle('lite',on);needResize=true;
+  if(on){ptab='chat';chatKey='';if(!app.dataset.tab)app.dataset.tab='office';}
+  render();
+}
+/* the small office: one room seen from the front; people at desks, at the door when they need you, resting when idle */
+const LR={W:180,H:76,next:0,spots:[]};
+function liteDesk(i,n){const cols=Math.min(4,Math.max(3,Math.ceil(n/2))),row=Math.floor(i/cols),c=i%cols,w=128/cols;return{x:Math.round(14+w*c+w/2),y:row?52:30};}
+function litePerson(g,x,y,p,walk,t,sel){const b=walk&&Math.sin(t*8)>0?1:0;
+  if(sel){g.fillStyle='#f0cf98';g.fillRect(x-5,y+8,11,2);}else{g.fillStyle='rgba(0,0,0,.28)';g.fillRect(x-3,y+8,7,2);}
+  g.fillStyle=p.pants||'#2b211b';g.fillRect(x-2,y+5,2,3+b);g.fillRect(x+1,y+5,2,4-b);
+  g.fillStyle=p.shirt;g.fillRect(x-3,y,7,6);g.fillStyle=p.skin;g.fillRect(x-2,y-5,5,5);
+  g.fillStyle=p.hair;g.fillRect(x-3,y-6,7,2);g.fillRect(x-3,y-5,1,4);g.fillRect(x+3,y-5,1,4);
+  g.fillStyle='#1a1410';g.fillRect(x-1,y-3,1,1);g.fillRect(x+1,y-3,1,1);}
+function liteDraw(ts){
+  const c=$('liteRoom');if(!c||ts<LR.next)return;LR.next=ts+33;   // about 30 fps
+  const g=c.getContext('2d'),W=LR.W,H=LR.H,t=ts/1000,n=sessions.length;g.imageSmoothingEnabled=false;
+  // floor, back wall, window with the plant's screens, door on the right
+  g.fillStyle='#8f8676';g.fillRect(0,0,W,H);
+  for(let y=16;y<H;y+=8)for(let x=((y/8)%2)*8;x<W;x+=16){g.fillStyle='#968d7d';g.fillRect(x,y,8,8);}
+  g.fillStyle='#4a3a2e';g.fillRect(0,0,W,15);g.fillStyle='#1b2733';g.fillRect(50,3,64,8);
+  g.fillStyle='#7fd0ff';g.fillRect(52,5,18,4);g.fillStyle='#ffd166';g.fillRect(74,6,8,1);g.fillRect(86,5,14,1);g.fillStyle='#e7c46a';g.fillRect(0,14,W,1);
+  g.fillStyle='#6b4a33';g.fillRect(W-17,H-24,14,24);g.fillStyle='#c9573a';g.fillRect(W-15,H-28,10,3);
+  // lounge sofa (bottom left), water cooler and plant
+  g.fillStyle='#7a5a44';g.fillRect(3,H-15,30,9);g.fillStyle='#8d6a52';g.fillRect(3,H-19,30,5);
+  g.fillStyle='#dfe8ef';g.fillRect(W-32,18,7,13);g.fillStyle='#7fb7e0';g.fillRect(W-31,16,5,4);
+  g.fillStyle='#5f8f4e';g.fillRect(40,H-12,7,7);g.fillStyle='#6b4a33';g.fillRect(41,H-6,5,5);
+  const spots=[];let atDoor=0,onSofa=0,walking=0;
+  sessions.slice(0,8).forEach((s,i)=>{const d=liteDesk(i,Math.min(n,8)),st=liteState(s);
+    // desk with a monitor (lit while she works; red when something failed)
+    g.fillStyle='#4a4f59';g.fillRect(d.x-11,d.y,22,6);g.fillStyle='#2b2f36';g.fillRect(d.x-11,d.y+6,22,2);
+    g.fillStyle=st==='work'?(Math.sin(t*6+i)>0?'#7fd0ff':'#bde7ff'):st==='fail'?(Math.sin(t*5)>0?'#d0654c':'#6a2a22'):st==='done'?'#c9d3ae':'#16202b';g.fillRect(d.x-5,d.y-6,10,6);
+    let x=d.x,y=d.y+12,walk=false;
+    if(st==='need'){x=W-24-atDoor*9;y=H-13;atDoor++;}
+    else if(st==='sleep'){x=8+onSofa*8;y=H-20;onSofa++;}
+    else if(st==='idle'){x=W-44+Math.sin(t*.7+i)*12-walking*6;y=34+Math.cos(t*.7+i)*4;walk=true;walking++;}
+    x=Math.round(x);y=Math.round(y);
+    litePerson(g,x,y,s.pal,walk,t+i,s.id===selected);
+    if(st==='need'){g.fillStyle='#fff';g.fillRect(x-4,y-16,9,8);g.fillStyle='#c9573a';g.fillRect(x,y-15,1,4);g.fillRect(x,y-10,1,1);}
+    if(st==='sleep'){g.fillStyle='#cfd3ff';g.fillRect(x+4,y-11-((t*3|0)%3),3,1);}
+    if(st==='done'){g.fillStyle='#8fae7a';g.fillRect(x+4,y-12,4,4);}
+    if(st==='fail'){g.fillStyle='rgba(110,100,92,.8)';g.fillRect(d.x-1,d.y-10-((t*6|0)%4),3,2);}
+    spots.push({id:s.id,x,y});});
+  LR.spots=spots;
+}
+$('liteRoom').addEventListener('click',e=>{const c=e.currentTarget,r=c.getBoundingClientRect();
+  // object-fit:cover can crop the canvas on a tablet, so map the tap through the drawn scale
+  const k=Math.max(r.width/LR.W,r.height/LR.H),ox=(r.width-LR.W*k)/2,oy=(r.height-LR.H*k)*.4;
+  const x=(e.clientX-r.left-ox)/k,y=(e.clientY-r.top-oy)/k;
+  let best=null,bd=14;for(const p of LR.spots){const d=Math.hypot(p.x-x,p.y-2-y);if(d<bd){bd=d;best=p;}}
+  if(best)openChat(best.id);});
+
 /* ---------- interactions ---------- */
 document.addEventListener('click',e=>{
+  {const li=e.target.closest('[data-lid]');if(li){openChat(+li.dataset.lid);return;}
+   const lf=e.target.closest('[data-lf]');if(lf){liteFilter=lf.dataset.lf;render();return;}
+   if(e.target.closest('[data-act="lite-back"]')){const ob=document.querySelector('.tabs button[data-tab="office"]');if(ob)ob.click();return;}
+   if(e.target.closest('[data-act="lite-off"]')){liteOff=true;try{localStorage.setItem('devroom.full','1');}catch(err){}setLite();return;}
+   if(e.target.closest('[data-act="lite-on"]')){liteOff=false;try{localStorage.removeItem('devroom.full');}catch(err){}setLite();return;}}
   const ak=e.target.closest('[data-ack]');if(ak){const s=sessions.find(x=>x.id===+ak.dataset.ack);if(s){s.acked=true;ackRemember(s);log('Boss',`ACK: alarm ni ${s.short}.`,s);chatKey='';render();}return;}
   const pk=e.target.closest('[data-pick]');if(pk&&!e.target.closest('[data-ack]')){selected=+pk.dataset.pick;const fs=sessions.find(x=>x.id===selected);if(fs){cam.follow=fs;}chatKey='';render();return;}
   const ag=e.target.closest('.dcard');if(ag){openChat(+ag.dataset.id);return;}
@@ -2896,7 +3061,7 @@ for(const id of ['rcpt','units']){const r=$(id);if(r)r.addEventListener('wheel',
 // short, wide space, does not flip a portrait tablet into the landscape layout while you type.
 {const app=$('app');const upd=()=>{const so=screen.orientation&&screen.orientation.type;const kb=app.classList.contains('kbopen');
    const port=so?so.startsWith('portrait')||(!kb&&innerHeight>innerWidth):(kb?app.classList.contains('port'):innerHeight>innerWidth);
-   if(port!==app.classList.contains('port')){app.classList.toggle('port',port);needResize=true;}};
+   if(port!==app.classList.contains('port')){app.classList.toggle('port',port);needResize=true;}setLite();};
  upd();addEventListener('resize',upd);screen.orientation&&screen.orientation.addEventListener('change',upd);}
 // tablet portrait: drag the bar above the panel to make the panel taller or shorter (remembered; double tap resets)
 {const sp=$('pSplit'),app=$('app');let d=null;
