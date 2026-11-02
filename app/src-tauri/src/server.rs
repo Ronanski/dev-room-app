@@ -263,7 +263,7 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<St
         // The run Dev Room starts to hand your message over (`claude -p --resume`) ends with SessionEnd too, while
         // the session itself is still open in Claude Code: that one must not remove it (it made sessions vanish
         // right after you chatted). A real end is only acted on after a quiet minute (see liveness).
-        let ours = RUNS.lock().map(|r| r.iter().any(|x| x == &sid)).unwrap_or(false);
+        let ours = ran_recently(&sid);
         if let Some(s) = st.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()) {
             if !ours { s.insert("ended_at".into(), json!(now_ms())); }
             if s.get("status").and_then(|x| x.as_str()) == Some("working") { s.insert("status".into(), json!("idle")); s.insert("short".into(), json!("")); }
@@ -272,6 +272,12 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<St
         return;
     }
     if !HOOK_EVENTS.contains(&ev) { return; }
+    if IGNORE.lock().map(|i| i.contains(&sid)).unwrap_or(false) { return; }
+    if ev == "UserPromptSubmit" && v.get("prompt").and_then(|x| x.as_str()).map(|p| p.starts_with(QUICK_MARK)).unwrap_or(false) {
+        if let Ok(mut i) = IGNORE.lock() { i.push(sid.clone()); if i.len() > 200 { i.remove(0); } }
+        if st.sessions.remove(&sid).is_some() { st.bump(); }
+        return;
+    }
     let now = now_ms();
     let entry = st.sessions.entry(sid.clone()).or_insert_with(|| json!({
         "id": sid, "status": "idle", "detail": "", "ask": "", "recent": "", "short": "", "auto_title": "", "title_scanned": false, "started_at": now
@@ -1007,9 +1013,14 @@ fn liveness(st: &Mutex<State>) {
         (queued && resumable(o)).then(|| k.clone())
     }).collect();
     // a session that really ended (SessionEnd, then a quiet minute, and no run of ours) leaves the office
+    // (one you placed in a playroom stays for ten quiet minutes)
+    let placed: Vec<String> = s.team.get("rooms").and_then(|r| r.as_array()).map(|rs| rs.iter()
+        .flat_map(|r| r.get("ids").and_then(|i| i.as_array()).cloned().unwrap_or_default())
+        .filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default();
     let ended: Vec<String> = s.sessions.iter().filter(|(k, v)| {
         let e = v.get("ended_at").and_then(|x| x.as_u64()).unwrap_or(0);
-        e > 0 && now.saturating_sub(e) > 60_000 && !RUNS.lock().map(|r| r.iter().any(|x| x == *k)).unwrap_or(false)
+        let wait = if placed.iter().any(|p| p == *k) { 600_000 } else { 60_000 };
+        e > 0 && now.saturating_sub(e) > wait && !ran_recently(k)
     }).map(|(k, _)| k.clone()).collect();
     for k in &ended { s.sessions.remove(k); }
     if !ended.is_empty() { changed = true; save = true; }
@@ -1078,6 +1089,15 @@ pub fn start(port: u16) -> Option<u16> {
 static SHARED: std::sync::OnceLock<Arc<Mutex<State>>> = std::sync::OnceLock::new();
 static TAIL: Mutex<Option<HashMap<String, (String, u64, bool)>>> = Mutex::new(None);
 static RUNS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+/// When Dev Room's own run for a session last ended: its SessionEnd hook can arrive after the run is gone.
+static RUN_END: Mutex<Option<HashMap<String, u64>>> = Mutex::new(None);
+fn ran_recently(sid: &str) -> bool {
+    RUNS.lock().map(|r| r.iter().any(|x| x == sid)).unwrap_or(false)
+        || RUN_END.lock().ok().and_then(|m| m.as_ref().and_then(|m| m.get(sid).copied())).map(|t| now_ms().saturating_sub(t) < 120_000).unwrap_or(false)
+}
+fn note_run_end(sid: &str) { if let Ok(mut m) = RUN_END.lock() { m.get_or_insert_with(HashMap::new).insert(sid.to_string(), now_ms()); } }
+/// Sessions that are Dev Room's own quick-answer copies (if their hooks ever fire): never shown.
+static IGNORE: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 /// What a transcript line adds to the chat: text, or a picture / artifact / file the session showed or sent.
 enum Item { Text(&'static str, String), Image(&'static str, String, String), File(&'static str, String, String) }
@@ -1353,6 +1373,7 @@ fn resumable(s: &Map<String, Value>) -> bool {
    The message stays queued for the session itself, which acts on it after its current step. */
 static QUICK: Mutex<Vec<String>> = Mutex::new(Vec::new());
 const QUICK_WAIT_MS: u64 = 2500;
+const QUICK_MARK: &str = "[Dev Room] Mensahe ni Boss habang";
 
 fn quick_answer(sid: &str, id: u64) {
     let sid = sid.to_string();
@@ -1380,7 +1401,7 @@ fn quick_answer(sid: &str, id: u64) {
             (text, cwd)
         };
         let (text, cwd) = job;
-        let prompt = format!("[Dev Room] Mensahe ni Boss habang nasa gitna ka ng isang hakbang. Sagutin mo siya NGAYON, maikli at malinaw, batay sa alam mo na (status, progreso, sagot sa tanong niya). Huwag magsimula ng bagong trabaho o mag-edit dito: read-only ang sagot na ito. Matatanggap din ng tunay mong session ang mensaheng ito pagkatapos ng kasalukuyang hakbang, at doon mo ito gagawin.\n\nMensahe ni Boss:\n{text}");
+        let prompt = format!("{QUICK_MARK} nasa gitna ka ng isang hakbang. Sagutin mo siya NGAYON, maikli at malinaw, batay sa alam mo na (status, progreso, sagot sa tanong niya). Huwag magsimula ng bagong trabaho o mag-edit dito: read-only ang sagot na ito. Matatanggap din ng tunay mong session ang mensaheng ito pagkatapos ng kasalukuyang hakbang, at doon mo ito gagawin.\n\nMensahe ni Boss:\n{text}");
         let mut c = std::process::Command::new(&bin);
         c.args(["-p", "--resume", &sid, "--fork-session", "--permission-mode", "plan", "--output-format", "json", "--settings", r#"{"disableAllHooks":true}"#]);
         if let Some(d) = &cwd { c.current_dir(d); }
@@ -1491,6 +1512,7 @@ fn deliver_now(sid: &str) {
             }
             g.bump(); g.save();
         }
+        note_run_end(&sid);
         RUNS.lock().unwrap_or_else(|e| e.into_inner()).retain(|r| r != &sid);
         // messages sent while it answered and not picked up by a tool call
         deliver_soon(&sid);
