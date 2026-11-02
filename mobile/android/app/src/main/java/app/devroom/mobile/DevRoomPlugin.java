@@ -266,6 +266,46 @@ public class DevRoomPlugin extends Plugin {
         }).start();
     }
 
+    /**
+     * How much of the web view the status bar, the navigation bar (keys or gesture bar) and a notch cover, in CSS
+     * pixels. The office runs in an iframe, where env(safe-area-inset-*) is always 0, so the shell passes these on.
+     * Measured from where the web view really is, so it is 0 when the app is not drawn under the bars.
+     */
+    @PluginMethod
+    public void insets(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            JSObject r = new JSObject();
+            try {
+                View wv = getBridge().getWebView();
+                View decor = getActivity().getWindow().getDecorView();
+                WindowInsetsCompat in = ViewCompat.getRootWindowInsets(decor);
+                float d = wv.getResources().getDisplayMetrics().density;
+                int[] at = new int[2];
+                wv.getLocationInWindow(at);
+                int top = 0, bottom = 0, left = 0, right = 0;
+                if (in != null) {
+                    Insets b = in.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+                    top = Math.max(0, b.top - at[1]);
+                    bottom = Math.max(0, (at[1] + wv.getHeight()) - (decor.getHeight() - b.bottom));
+                    left = Math.max(0, b.left - at[0]);
+                    right = Math.max(0, (at[0] + wv.getWidth()) - (decor.getWidth() - b.right));
+                }
+                r.put("top", Math.round(top / d)); r.put("bottom", Math.round(bottom / d));
+                r.put("left", Math.round(left / d)); r.put("right", Math.round(right / d));
+            } catch (Exception e) {
+                r.put("top", 0); r.put("bottom", 0); r.put("left", 0); r.put("right", 0);
+            }
+            call.resolve(r);
+        });
+    }
+
+    /** Leaves the app (as Home does), for the back key on the office's first screen. */
+    @PluginMethod
+    public void minimize(PluginCall call) {
+        getActivity().runOnUiThread(() -> getActivity().moveTaskToBack(true));
+        call.resolve();
+    }
+
     @PluginMethod
     public void info(PluginCall call) {
         JSObject r = new JSObject();

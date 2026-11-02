@@ -11,7 +11,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif}
 #office{position:fixed;inset:0;width:100%;height:100%;border:0;display:none;background:var(--bg)}
-.pair{max-width:520px;margin:0 auto;padding:calc(24px + env(safe-area-inset-top)) 16px 24px;display:flex;flex-direction:column;gap:14px}
+.pair{max-width:520px;margin:0 auto;padding:calc(24px + var(--sat,env(safe-area-inset-top,0px))) 16px 24px;display:flex;flex-direction:column;gap:14px}
 h1{font-size:24px;margin:0}
 ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
@@ -20,7 +20,7 @@ button{font:inherit;padding:10px 14px;border-radius:8px;border:1px solid var(--a
 button.ghost{background:none;color:var(--ink);border-color:var(--line)}
 .hint{color:var(--muted);font-size:13px;margin:0}
 .err{color:var(--need);font-weight:700;margin:0}
-.bar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:5;display:none;gap:10px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--work);border-left:5px solid var(--work);border-radius:10px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:14px}
+.bar{position:fixed;left:12px;right:12px;bottom:calc(12px + var(--sab,env(safe-area-inset-bottom,0px)));z-index:5;display:none;gap:10px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--work);border-left:5px solid var(--work);border-radius:10px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:14px}
 .bar span{flex:1;min-width:160px}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 </style>
@@ -188,8 +188,27 @@ async function getApk(){
     b.innerHTML='<span id="updMsg"></span><button id="upd">Subukan ulit</button>';$('updMsg').textContent=String(e&&e.message||e||'Hindi na-download ang update.');$('upd').onclick=getApk;
   }finally{updBusy=false;try{h&&h.remove();}catch(e){}}
 }
+/* The phone's own bars: the app is drawn under the status bar and the navigation keys (edge to edge), and the
+   office runs in an iframe where env(safe-area-inset-*) is always 0. Measure the real overlap natively and pass it on. */
+let ins={top:0,bottom:0,left:0,right:0};
+async function readInsets(){
+  if(!(DevRoom&&DevRoom.insets))return;
+  try{const r=await DevRoom.insets();if(!r)return;const n={top:+r.top||0,bottom:+r.bottom||0,left:+r.left||0,right:+r.right||0};
+    if(JSON.stringify(n)!==JSON.stringify(ins)){ins=n;const d=document.documentElement.style;for(const k in n)d.setProperty('--sa'+k[0],n[k]+'px');}
+    sendInsets();}catch(e){}
+}
+function sendInsets(){const w=$('office').contentWindow;if(w&&current)try{w.postMessage(Object.assign({type:'devroom:insets'},ins),new URL(current).origin);}catch(e){}}
+addEventListener('resize',()=>{readInsets();setTimeout(readInsets,400);});
+// Android's back key: the office goes back a step (chat to the list, a panel closes); on its first screen, leave the app
+let backWait=0;
+function onBack(){
+  const w=$('office').contentWindow;
+  if(!(w&&current&&$('office').style.display!=='none')){DevRoom&&DevRoom.minimize&&DevRoom.minimize();return;}
+  clearTimeout(backWait);backWait=setTimeout(()=>{DevRoom&&DevRoom.minimize&&DevRoom.minimize();},500);   // an older office does not answer
+  try{w.postMessage({type:'devroom:back'},new URL(current).origin);}catch(e){}
+}
 function sendCaps(){const w=$('office').contentWindow;if(w&&canView&&current)try{w.postMessage({type:'devroom:caps',claudeView:true},new URL(current).origin);}catch(e){}}
-$('office').addEventListener('load',()=>{sendCaps();sendApk();sendVia();});
+$('office').addEventListener('load',()=>{sendCaps();sendApk();sendVia();readInsets();});
 let claudeOn=false;
 function claudeHide(){if(claudeOn&&DevRoom){claudeOn=false;DevRoom.claudeView({show:false}).catch(()=>{});}}
 const num=v=>Math.round(Math.max(0,Math.min(10000,Number(v)||0)));
@@ -197,7 +216,8 @@ window.addEventListener('message',e=>{
   // only the office frame, served by the paired PC, may ask
   if(e.source!==$('office').contentWindow)return;
   const d=e.data||{};
-  if(d.type==='devroom:hello'){sendCaps();sendApk();sendVia();return;}
+  if(d.type==='devroom:hello'){sendCaps();sendApk();sendVia();readInsets();return;}
+  if(d.type==='devroom:backDone'){clearTimeout(backWait);if(!d.handled&&DevRoom&&DevRoom.minimize)DevRoom.minimize();return;}
   if(d.type==='devroom:update'){getApk();return;}
   if(d.type==='devroom:claudeView'){
     if(!canView)return;
@@ -222,10 +242,12 @@ $('go').onclick=()=>{const p=parseLink($('link').value);if(!p){showPair('Hindi t
     if(i&&i.updateError){const b=$('bar');b.style.display='flex';b.innerHTML='<span id="updMsg"></span><button id="upd">I-install</button><button class="ghost" id="later">Mamaya</button>';$('updMsg').textContent=i.updateError;$('upd').onclick=getApk;$('later').onclick=()=>{b.style.display='none';};}}}catch(e){}
   if(App){
     App.addListener('appUrlOpen',e=>handleUrl(e.url));
-    App.addListener('resume',()=>{checkUpdate();showOffice();});
+    App.addListener('resume',()=>{checkUpdate();showOffice();readInsets();});
+    App.addListener('backButton',onBack);
     App.addListener('pause',()=>{if(au.state==='ready'){clearInterval(au.timer);au.timer=0;installNow();}});
   }
   setInterval(checkUpdate,10*60*1000);
+  readInsets();setTimeout(readInsets,1500);
   // keep checking the connection: home Wi-Fi, Tailscale or the internet (Malayo mode), whichever answers
   setInterval(()=>{if(!document.hidden)showOffice();},30000);
   try{const l=App&&await App.getLaunchUrl();if(l&&l.url){handleUrl(l.url);return;}}catch(e){}

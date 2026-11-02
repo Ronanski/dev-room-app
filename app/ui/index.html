@@ -28,7 +28,7 @@
   --work:#8fae7a; --need:#e07a5f; --idle:#d2a75a; --sleep:#a4a2c0; --done:#87aab6; --fail:#d07060; --frame:#0e0b09; color-scheme:dark}
 
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:max(8px,env(safe-area-inset-top,0px));padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
+  padding-left:max(16px,var(--sal,env(safe-area-inset-left,0px)));padding-right:max(16px,var(--sar,env(safe-area-inset-right,0px)));padding-top:max(8px,var(--sat,env(safe-area-inset-top,0px)));padding-bottom:max(8px,var(--sab,env(safe-area-inset-bottom,0px)))}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 [hidden]{display:none!important}
@@ -40,7 +40,7 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline
 .app:fullscreen{height:100vh!important;padding:10px;box-sizing:border-box}
 .app.focus .top,.app.focus .conn,.app.focus .updbar:not(.counting),.app.focus .legend,.app.focus .rule,.app.focus .tabs,.app.focus .statusbar{display:none!important}
 .app.focus .updbar.counting{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:60;box-shadow:0 8px 24px rgba(42,32,26,.28)}
-.app.focus{position:fixed;inset:0;z-index:50;height:100%!important;padding:max(6px,env(safe-area-inset-top,0px)) max(6px,env(safe-area-inset-right,0px)) max(6px,env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-left,0px));box-sizing:border-box;background:var(--bg)}
+.app.focus{position:fixed;inset:0;z-index:50;height:100%!important;padding:max(6px,var(--sat,env(safe-area-inset-top,0px))) max(6px,var(--sar,env(safe-area-inset-right,0px))) max(6px,var(--sab,env(safe-area-inset-bottom,0px))) max(6px,var(--sal,env(safe-area-inset-left,0px)));box-sizing:border-box;background:var(--bg)}
 .app.focus .body{grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"office" "dock";height:100%;row-gap:6px}
 /* fullscreen keeps a one-line strip of session cards under the map */
 .app.focus .dockwrap{display:block!important}
@@ -239,8 +239,8 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .viewer[data-mode="card"] .vscrim,.viewer[data-mode="sheet"] .vscrim{display:block}
 .vwin{position:absolute;box-sizing:border-box;pointer-events:auto;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 22px 60px rgba(0,0,0,.34),0 2px 8px rgba(0,0,0,.18);overflow:hidden;animation:vpop .18s ease-out}
 .viewer[data-mode="card"] .vwin{left:max(16px,4vw);right:max(16px,4vw);top:50%;transform:translateY(-50%);height:min(76dvh,1000px);animation:vfade .18s ease-out}
-.viewer[data-mode="sheet"] .vwin{left:0;right:0;bottom:0;height:min(88dvh,calc(100dvh - 40px));border-radius:18px 18px 0 0;border-bottom:0;padding-bottom:env(safe-area-inset-bottom);animation:vup .22s ease-out}
-.viewer[data-mode="full"] .vwin{inset:0;border-radius:0;border:0;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);animation:none}
+.viewer[data-mode="sheet"] .vwin{left:0;right:0;bottom:0;height:min(88dvh,calc(100dvh - 40px));border-radius:18px 18px 0 0;border-bottom:0;padding-bottom:var(--sab,env(safe-area-inset-bottom,0px));animation:vup .22s ease-out}
+.viewer[data-mode="full"] .vwin{inset:0;border-radius:0;border:0;padding:var(--sat,env(safe-area-inset-top,0px)) var(--sar,env(safe-area-inset-right,0px)) var(--sab,env(safe-area-inset-bottom,0px)) var(--sal,env(safe-area-inset-left,0px));animation:none}
 .vbar{display:flex;align-items:center;gap:6px;padding:6px 6px 6px 14px;border-bottom:1px solid var(--line);background:var(--chip);touch-action:none;user-select:none;-webkit-user-select:none}
 .viewer[data-mode="float"] .vbar{cursor:grab}
 .viewer.dragging .vbar{cursor:grabbing}
@@ -408,15 +408,15 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
   .toast .ti{display:none}
   .toast .acts{margin-top:4px}
   /* phone: the tab bar is fixed at the bottom and never covers content; a short header; one toast at a time */
-  .tabs{position:fixed;left:0;right:0;bottom:0;margin:0;padding-bottom:env(safe-area-inset-bottom,0px);z-index:20}
-  .app{padding-bottom:calc(66px + env(safe-area-inset-bottom,0px))}
+  .tabs{position:fixed;left:0;right:0;bottom:0;margin:0;padding-bottom:var(--sab,env(safe-area-inset-bottom,0px));z-index:20}
+  .app{padding-bottom:calc(66px + var(--sab,env(safe-area-inset-bottom,0px)))}
   .app[data-tab="office"] .dockwrap{padding-bottom:0}
   .counts{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
   .counts .count{white-space:nowrap;flex:none;min-height:0}
   .counts::-webkit-scrollbar{display:none}
   #pauseBtn{display:none}
   .app[data-tab="chat"] .top,.app[data-tab="chat"] .conn{display:none}
-  .app[data-tab="chat"] .chatpanel{height:calc(100dvh - 90px - env(safe-area-inset-bottom,0px))}
+  .app[data-tab="chat"] .chatpanel{height:calc(100dvh - 90px - var(--sab,env(safe-area-inset-bottom,0px)))}
   .toasts .toast:not(:last-child){display:none}
   .app.kbopen .tabs,.app.kbopen .cp-head,.app.kbopen .cp-tabs,.app.kbopen .cfilter{display:none}
   .app.kbopen .chatpanel{height:calc(100dvh - 16px)}
@@ -581,6 +581,18 @@ body{margin:0}
 
 /* ---------- Lite (0.16.0): portrait phone and tablet. A small live office, the session list, then the chat. ---------- */
 .lite,.lback,.litebtn,.lcol{display:none}
+/* Lite on a phone: exactly one screen high (inside the status bar and the navigation keys); the Office/Chat tabs sit
+   at the bottom in the flow, and the list or the chat fills the space between, so nothing runs past the screen */
+@media (max-width:640px){
+  .stage[data-device="desktop"] #app.lite{height:calc(100dvh - max(8px,var(--sat,env(safe-area-inset-top,0px))) - max(8px,var(--sab,env(safe-area-inset-bottom,0px))));min-height:0;padding-bottom:0;display:flex;flex-direction:column;overflow:hidden}
+  #app.lite .body{flex:1;min-height:0;display:flex;flex-direction:column;gap:0}
+  #app.lite[data-tab="office"] .lite{flex:1;min-height:0}
+  #app.lite[data-tab="office"] .llist{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+  #app.lite[data-tab="chat"] .pane[data-pane="chat"]{display:flex!important;flex:1;min-height:0}
+  #app.lite .chatpanel{position:relative;flex:1;height:auto!important;min-height:0}
+  #app.lite .tabs{position:static;flex:none;margin:6px 0 0;padding-bottom:0}
+  #app.lite.kbopen .tabs{display:none}
+}
 /* Mga Playroom: sessions grouped by project, with "put all" buttons; the scan row */
 .tgrp{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 2px 4px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:1}
 .tgrp b{font-size:13.5px}.tgrp small{color:var(--muted)}.tgrp .sp{flex:1}.tgrp .pa{font-size:12px;color:var(--muted)}
@@ -1563,8 +1575,8 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
-  '0.18.0':{news:['<b>Lumalabas na ang mga pinalitan mong pangalan</b> ng thread, pati ang mga ni-rename mo sa Claude app o sa Claude Projects.','<b>Lahat ng session sa PC ay nakikita na,</b> kahit hindi nagpapadala ng update, at kahit nasa ibang Claude account.','<b>Mga Playroom:</b> may <b>I-scan ang PC</b> para sa mga mas lumang session, at naka-grupo na ayon sa project na may <b>Ilagay lahat sa</b>.','<b>Sa phone at tablet:</b> i-drag ang bar sa ilalim ng maliit na office para palakihin o paliitin ito.'],
-    todo:['Wala kang gagawin sa PC.','Wala ring i-install sa phone o tablet.']},
+  '0.18.0':{news:['<b>Lumalabas na ang mga pinalitan mong pangalan</b> ng thread, pati ang mga ni-rename mo sa Claude app o sa Claude Projects.','<b>Lahat ng session sa PC ay nakikita na,</b> kahit hindi nagpapadala ng update, at kahit nasa ibang Claude account.','<b>Mga Playroom:</b> may <b>I-scan ang PC</b> para sa mga mas lumang session, at naka-grupo na ayon sa project na may <b>Ilagay lahat sa</b>.','<b>Sa phone at tablet:</b> i-drag ang bar sa ilalim ng maliit na office para palakihin o paliitin ito.','<b>Sa phone:</b> hindi na natatakpan ng nav keys at ng status bar ang app, hindi na lumalampas ang chat, at bumabalik na ang tabs pagkasara ng keyboard. Ang back key ay bumabalik sa listahan.'],
+    todo:['Wala kang gagawin sa PC.','Sa phone at tablet: kusang mag-a-update ang app (naka-0.17.0 ka na). Kung wala pang 0.17.0, pindutin ang I-update at Install.']},
   '0.17.0':{news:['<b>Kusa nang nag-a-update ang phone app</b> (Android 12 pataas): dina-download nang tahimik at ini-install pag-alis mo sa app. Kapag nakabukas lang ang app, may 15 segundong countdown na may <b>Ngayon</b> at <b>Mamaya</b>.','<b>Wala nang APK kapag walang binago sa phone app.</b> Ang mga bago sa office ay galing sa PC, kaya walang ida-download.','Bumabalik nang kusa ang alerts pagkatapos ng update.'],
     todo:['Wala kang gagawin sa PC.','<b>Huling beses na lang:</b> sa tablet at phone, pindutin ang I-update at ang Install. Pagkatapos nito, kusa na ang mga update.']},
   '0.16.2':{news:['<b>Nababasa na ang mensahe ng coordinator</b> sa chat ng thread: makikita mo ang sinabi mo at ang note niya, hindi na ang mga tag.','<b>Mas malinaw na pangalan ng thread:</b> galing sa folder niya (hal. Winter Test, Code Fixer), o sa utos ng coordinator kapag iisa ang folder nila.','<b>Sa tablet, naaayos na ang lapad ng chat:</b> i-drag ang bar sa pagitan ng listahan at chat. I-double tap para ibalik.'],
@@ -1717,6 +1729,8 @@ function showUpd(){
 }
 if(window.parent!==window)addEventListener('message',e=>{if(e.source!==window.parent)return;const d=e.data||{};
   if(d.type==='devroom:via'){const v={wifi:' (Wi-Fi)',tailscale:' (Tailscale)',remote:' (malayo, internet)'}[d.via]||'';const el=$('via');if(el&&el.textContent!==v)el.textContent=v;return;}
+  if(d.type==='devroom:insets'){const st=document.documentElement.style;for(const k of ['top','bottom','left','right'])st.setProperty('--sa'+k[0],Math.max(0,Math.min(200,Number(d[k])||0))+'px');needResize=true;return;}
+  if(d.type==='devroom:back'){let h=false;try{h=goBack();}catch(err){}try{window.parent.postMessage({type:'devroom:backDone',handled:h},'*');}catch(err){}return;}
   if(d.type==='devroom:apk'){UPD.apk={build:Number(d.build)||0,latest:Number(d.latest)||0,ver:String(d.ver||'').replace(/[^0-9A-Za-z.\-]/g,''),auto:!!d.auto};showUpd();}});
 // A downloaded update installs itself: right away when the window is not on screen, otherwise after 15 s
 // without input (never while you are typing a message), with a 5 s countdown and a button to wait.
@@ -3050,6 +3064,23 @@ $('viewer').addEventListener('click',e=>{
   const im=e.target.closest('.vbody img');if(im){const b=$('vBody'),z=!b.classList.contains('zoomed');const r=im.getBoundingClientRect(),fx=(e.clientX-r.left)/r.width,fy=(e.clientY-r.top)/r.height;
     b.classList.toggle('zoomed',z);if(z){b.scrollLeft=im.naturalWidth*fx-b.clientWidth/2;b.scrollTop=im.naturalHeight*fy-b.clientHeight/2;}}
 });
+// Android's back key, passed on by the phone app: one step back. Returns false on the first screen (the app then leaves).
+function goBack(){
+  const app=$('app');
+  if(!$('viewer').hidden){$('viewer').querySelector('[data-act="vclose"]')?.click();return true;}
+  if(!$('whatsNew').hidden){$('whatsNew').querySelector('[data-act="wn-ok"]')?.click();$('whatsNew').hidden=true;return true;}
+  if(!$('teamPanel').hidden){$('teamPanel').hidden=true;ROOMS_EDIT=null;return true;}
+  if(app.classList.contains('kbopen')){document.activeElement&&document.activeElement.blur&&document.activeElement.blur();app.classList.remove('kbopen');return true;}
+  if(app.dataset.tab==='chat'&&(compact()||isLite())){document.querySelector('.tabs button[data-tab="office"]')?.click();return true;}
+  if(app.classList.contains('drawer')&&!isLite()){setDrawer(false);return true;}
+  return false;
+}
+// The keyboard can close without the message box losing focus (Android's back key or gesture): then the page grows
+// back to its full height, and the typing layout (no tabs, no chat header) must end too.
+{let full=innerHeight,lastO=screen.orientation&&screen.orientation.type;
+ addEventListener('resize',()=>{const o=screen.orientation&&screen.orientation.type;if(o!==lastO){lastO=o;full=innerHeight;return;}
+   if(!$('app').classList.contains('kbopen')){full=Math.max(full,innerHeight);return;}
+   if(innerHeight>=full-80){$('app').classList.remove('kbopen');const a=document.activeElement;if(a&&$('composer').contains(a))a.blur();}});}
 $('composer').addEventListener('focusin',()=>{$('app').classList.add('kbopen');setTimeout(()=>{document.querySelector('.chatpanel').scrollIntoView({block:'start'});const b=$('cpBody');b.scrollTop=b.scrollHeight;},350);});
 $('composer').addEventListener('focusout',()=>setTimeout(()=>{if(!$('composer').contains(document.activeElement))$('app').classList.remove('kbopen');},200));
 $('awaySel').addEventListener('change',e=>setAway(e.target.value));
