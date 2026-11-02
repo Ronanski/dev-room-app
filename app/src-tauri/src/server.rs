@@ -254,6 +254,9 @@ fn last_question(text: &str) -> Option<String> {
     Some(clip(&tail, 220))
 }
 
+/// A subagent's own transcript lives in a `subagents` folder (a project folder merely named so is not one).
+fn is_sub_path(t: &str) -> bool { t.contains("/subagents/") || t.contains("\\subagents\\") }
+
 /// `pre` is the transcript read done outside the lock by `hook_reply` (last assistant text, title).
 fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<String>)>) {
     let ev = v.get("hook_event_name").and_then(|x| x.as_str()).unwrap_or("");
@@ -263,10 +266,13 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<St
         // The run Dev Room starts to hand your message over (`claude -p --resume`) ends with SessionEnd too, while
         // the session itself is still open in Claude Code: that one must not remove it (it made sessions vanish
         // right after you chatted). A real end is only acted on after a quiet minute (see liveness).
-        let ours = ran_recently(&sid);
+        // Only a plain end ("other") can be that run: leaving with /exit, /clear or a logout is always you.
+        let reason = v.get("reason").and_then(|x| x.as_str()).unwrap_or("other");
+        let ours = ran_recently(&sid) && reason == "other";
         if let Some(s) = st.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()) {
             if !ours { s.insert("ended_at".into(), json!(now_ms())); }
-            if s.get("status").and_then(|x| x.as_str()) == Some("working") { s.insert("status".into(), json!("idle")); s.insert("short".into(), json!("")); }
+            let stt = s.get("status").and_then(|x| x.as_str()).unwrap_or("");
+            if stt == "working" || (stt == "needs" && !ours) { s.insert("ask".into(), json!("")); s.insert("status".into(), json!("idle")); s.insert("short".into(), json!("")); }
             st.bump(); st.save();
         }
         return;
@@ -286,7 +292,7 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<St
     // A subagent's hooks carry its parent's session id. They must not make the parent look busy: when the
     // parent's own turn is over (it left agents running in the background), it is free, and a message from
     // you goes to it right away, like in the Claude app. They also must not replace its transcript.
-    let sub = v.get("agent_id").is_some() || v.get("transcript_path").and_then(|x| x.as_str()).map(|t| t.contains("subagents")).unwrap_or(false);
+    let sub = v.get("agent_id").is_some() || v.get("transcript_path").and_then(|x| x.as_str()).map(|t| is_sub_path(t)).unwrap_or(false);
     if sub {
         let busy = s.get("status").and_then(|x| x.as_str()) == Some("working") && !s.get("live_guess").and_then(|x| x.as_bool()).unwrap_or(false);
         let kind = v.get("agent_type").and_then(|x| x.as_str()).filter(|k| !k.is_empty()).unwrap_or("agent").to_string();
@@ -336,6 +342,10 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<St
     if ev == "PostToolUse" || ev == "Stop" { s.remove("step_at"); }
     let tasks_changed = track_tasks(s, ev, v);
     match ev {
+        // an auto-compact in the middle of a turn also starts the session again: it is still working
+        "SessionStart" if v.get("source").and_then(|x| x.as_str()) == Some("compact") => {
+            s.insert("detail".into(), json!("Nililigpit ang usapan (compact) para tumuloy."));
+        }
         "SessionStart" => {
             s.insert("status".into(), json!("idle"));
             s.insert("ask".into(), json!(""));
@@ -350,7 +360,7 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<St
             let p = v.get("prompt").and_then(|x| x.as_str()).unwrap_or("");
             // Claude Code's own turns (reports from other sessions, task notices) are not something you typed
             let sys = system_prompt(p);
-            if !sys { push_convo(s, "user", p, 2000); }
+            if !sys { push_convo(s, "user", p, 2000, "hook"); }
             // a session without a name is called after its first prompt, not after the folder every session shares
             let first = p.trim();
             if !s.contains_key("first_prompt") && !first.is_empty() && !first.starts_with('<') {
@@ -402,7 +412,7 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Option<St
                 if let Some(title) = title { s.insert("auto_title".into(), json!(title.clone())); }
             }
             let text = text.unwrap_or_default();
-            push_convo(s, "assistant", &text, 4000);
+            push_convo(s, "assistant", &text, 4000, "hook");
             s.insert("recent".into(), json!(clip(&text, 300)));
             s.insert("detail".into(), json!(""));
             s.insert("short".into(), json!(""));
@@ -483,7 +493,7 @@ fn hook_reply(req: Request, st: &Mutex<State>, v: &Value) {
     let mut g = lk(st);
     apply_hook(&mut g, v, &pre);
     // a subagent's tool call carries the parent's session id; messages are for the main session only
-    let sub = v.get("agent_id").is_some() || v.get("transcript_path").and_then(|x| x.as_str()).map(|t| t.contains("subagents")).unwrap_or(false);
+    let sub = v.get("agent_id").is_some() || v.get("transcript_path").and_then(|x| x.as_str()).map(|t| is_sub_path(t)).unwrap_or(false);
     if sub { drop(g); return respond_json(req, 200, &json!({})); }
     if ev == "PostToolUse" || ev == "UserPromptSubmit" {
         let got = g.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()).and_then(take_queued);
@@ -594,18 +604,29 @@ fn system_prompt(p: &str) -> bool {
     TAGS.contains(&name.as_str()) || (name.contains('-') && rest[name.len()..].starts_with(['>', ' ']))
 }
 
-fn push_convo(s: &mut Map<String, Value>, role: &str, text: &str, max: usize) {
+/// `src` is who reports the line: "hook", "tail" (the live transcript reader), "quick" or "sys".
+fn push_convo(s: &mut Map<String, Value>, role: &str, text: &str, max: usize, src: &str) {
     let text = text.trim();
     if text.is_empty() { return; }
     let t: String = if text.chars().count() > max { format!("{}…", text.chars().take(max).collect::<String>()) } else { text.to_string() };
     let c = s.entry("convo").or_insert_with(|| json!([]));
     if !c.is_array() { *c = json!([]); }
     let arr = c.as_array_mut().unwrap();
-    // the live transcript reader and the hooks report the same lines: keep one
+    // The live transcript reader and the hooks report the same lines: a line from one is the copy of a line the
+    // other one reported and that is not paired yet. The same text said twice by one of them is two messages
+    // (you can send "continue" twice), so it is kept.
     let now = now_ms();
-    if arr.iter().rev().take(8).any(|m| m.get("role").and_then(|x| x.as_str()) == Some(role) && m.get("text").and_then(|x| x.as_str()) == Some(t.as_str())
-        && now.saturating_sub(m.get("at").and_then(|x| x.as_u64()).unwrap_or(0)) < 30 * 60 * 1000) { return; }
-    arr.push(json!({"role": role, "text": t, "at": now}));
+    if src == "hook" || src == "tail" {
+        if let Some(m) = arr.iter_mut().rev().take(8).find(|m| m.get("role").and_then(|x| x.as_str()) == Some(role)
+            && m.get("text").and_then(|x| x.as_str()) == Some(t.as_str())
+            && match m.get("src").and_then(|x| x.as_str()) { Some(o) => o != src && (o == "hook" || o == "tail"), None => true }
+            && !m.get("paired").and_then(|x| x.as_bool()).unwrap_or(false)
+            && now.saturating_sub(m.get("at").and_then(|x| x.as_u64()).unwrap_or(0)) < 30 * 60 * 1000) {
+            m["paired"] = json!(true);
+            return;
+        }
+    }
+    arr.push(json!({"role": role, "text": t, "at": now, "src": src}));
     if arr.len() > 40 { let n = arr.len() - 40; arr.drain(..n); }
     let n = s.get("convo_n").and_then(|x| x.as_u64()).unwrap_or(0) + 1;
     s.insert("convo_n".into(), json!(n));
@@ -619,6 +640,7 @@ fn queue_why(s: &Value) -> &'static str {
     if RUNS.lock().map(|r| r.iter().any(|x| x == id)).unwrap_or(false) { return "answering"; }
     let o = s.as_object();
     if o.map(resumable).unwrap_or(false) { return if claude_bin().is_some() { "soon" } else { "nocli" }; }
+    if s.get("status").and_then(|x| x.as_str()) == Some("needs") { return "ask"; }
     if s.get("step_at").and_then(|x| x.as_u64()).unwrap_or(0) > 0 { "step" } else { "busy" }
 }
 
@@ -794,7 +816,13 @@ fn handle(mut req: Request, st: &Arc<Mutex<State>>, port: u16, tun: bool) {
         (Method::Post, "/api/team") => {
             if !token_ok { return respond_json(req, 401, &json!({"error": "pairing"})); }
             let Some(v) = read_body(&mut req) else { return respond_json(req, 400, &json!({"error": "bad json"})) };
+            if !v.is_object() { return respond_json(req, 400, &json!({"error": "bad team"})); }
             let mut s = lk(st);
+            // a part left out is kept as it is (an empty body must not wipe your playrooms)
+            let mut v = v;
+            for k in ["lead", "ids", "names", "rooms"] {
+                if v.get(k).is_none() { if let Some(cur) = s.team.get(k).cloned() { v[k] = cur; } }
+            }
             let bad = v.get("lead").map(|x| !x.is_string() && !x.is_null()).unwrap_or(false)
                 || v.get("ids").map(|x| !x.is_array()).unwrap_or(false)
                 || v.get("names").map(|x| !x.is_object()).unwrap_or(false);
@@ -1020,7 +1048,8 @@ fn liveness(st: &Mutex<State>) {
     let ended: Vec<String> = s.sessions.iter().filter(|(k, v)| {
         let e = v.get("ended_at").and_then(|x| x.as_u64()).unwrap_or(0);
         let wait = if placed.iter().any(|p| p == *k) { 600_000 } else { 60_000 };
-        e > 0 && now.saturating_sub(e) > wait && !ran_recently(k)
+        // (the end was already judged when it came: only a run of ours going on right now keeps her)
+        e > 0 && now.saturating_sub(e) > wait && !RUNS.lock().map(|r| r.iter().any(|x| x == *k)).unwrap_or(false)
     }).map(|(k, _)| k.clone()).collect();
     for k in &ended { s.sessions.remove(k); }
     if !ended.is_empty() { changed = true; save = true; }
@@ -1272,7 +1301,7 @@ fn tail_transcripts(st: &Mutex<State>) {
         if let Some(s) = g.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()) {
             match it {
                 Ready::Text(role, text) => {
-                    push_convo(s, role, &text, if role == "user" { 2000 } else { 4000 });
+                    push_convo(s, role, &text, if role == "user" { 2000 } else { 4000 }, "tail");
                     if role == "assistant" { s.insert("recent".into(), json!(clip(&text, 300))); s.insert("updated_at".into(), json!(now_ms())); }
                 }
                 Ready::Att(role, att, name, title) => push_att(s, role, &att, &name, &title),
@@ -1395,12 +1424,19 @@ fn quick_answer(sid: &str, id: u64) {
             let Some(inbox) = s.get_mut("inbox").and_then(|i| i.as_array_mut()) else { drop(g); return done(&sid) };
             let Some(m) = inbox.iter_mut().find(|m| m.get("id").and_then(|x| x.as_u64()) == Some(id)) else { drop(g); return done(&sid) };
             if m.get("state").and_then(|x| x.as_str()) != Some("queued") { drop(g); return done(&sid); }
-            m["quick"] = json!("asking");
-            let text = m.get("text").and_then(|x| x.as_str()).unwrap_or("").to_string();
+            // every message still waiting without an answer of its own is answered together
+            let mut ids = Vec::new();
+            let mut texts = Vec::new();
+            for m in inbox.iter_mut().filter(|m| m.get("state").and_then(|x| x.as_str()) == Some("queued") && m.get("quick").is_none()) {
+                m["quick"] = json!("asking");
+                if let Some(i) = m.get("id").and_then(|x| x.as_u64()) { ids.push(i); }
+                texts.push(m.get("text").and_then(|x| x.as_str()).unwrap_or("").to_string());
+            }
+            if ids.is_empty() { drop(g); return done(&sid); }
             g.bump();
-            (text, cwd)
+            (texts.join("\n\n"), cwd, ids)
         };
-        let (text, cwd) = job;
+        let (text, cwd, ids) = job;
         let prompt = format!("{QUICK_MARK} nasa gitna ka ng isang hakbang. Sagutin mo siya NGAYON, maikli at malinaw, batay sa alam mo na (status, progreso, sagot sa tanong niya). Huwag magsimula ng bagong trabaho o mag-edit dito: read-only ang sagot na ito. Matatanggap din ng tunay mong session ang mensaheng ito pagkatapos ng kasalukuyang hakbang, at doon mo ito gagawin.\n\nMensahe ni Boss:\n{text}");
         let mut c = std::process::Command::new(&bin);
         c.args(["-p", "--resume", &sid, "--fork-session", "--permission-mode", "plan", "--output-format", "json", "--settings", r#"{"disableAllHooks":true}"#]);
@@ -1416,18 +1452,30 @@ fn quick_answer(sid: &str, id: u64) {
         });
         {
             let mut g = lk(&st);
+            let mut again = None;
             if let Some(s) = g.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()) {
-                if let Some(a) = &answer {
-                    push_convo(s, "assistant", a, 4000);
+                // too late: the session itself already answered (its turn is over), so the copy's answer is old news
+                let late = s.get("status").and_then(|x| x.as_str()) != Some("working")
+                    && s.get("inbox").and_then(|i| i.as_array()).map(|a| a.iter().filter(|m| m.get("id").and_then(|x| x.as_u64()).map(|i| ids.contains(&i)).unwrap_or(false))
+                        .all(|m| m.get("state").and_then(|x| x.as_str()) != Some("queued"))).unwrap_or(true);
+                if let (Some(a), false) = (&answer, late) {
+                    push_convo(s, "assistant", a, 4000, "quick");
                     if let Some(last) = s.get_mut("convo").and_then(|c| c.as_array_mut()).and_then(|c| c.last_mut()) { last["quick"] = json!(true); }
                 }
-                if let Some(m) = s.get_mut("inbox").and_then(|i| i.as_array_mut()).and_then(|a| a.iter_mut().find(|m| m.get("id").and_then(|x| x.as_u64()) == Some(id))) {
-                    m["quick"] = json!(if answer.is_some() { "done" } else { "failed" });
+                if let Some(inbox) = s.get_mut("inbox").and_then(|i| i.as_array_mut()) {
+                    for m in inbox.iter_mut().filter(|m| m.get("id").and_then(|x| x.as_u64()).map(|i| ids.contains(&i)).unwrap_or(false)) {
+                        m["quick"] = json!(if late { "late" } else if answer.is_some() { "done" } else { "failed" });
+                    }
+                    // a message that came while this one was being answered gets its own turn
+                    again = inbox.iter().find(|m| m.get("state").and_then(|x| x.as_str()) == Some("queued") && m.get("quick").is_none()).and_then(|m| m.get("id").and_then(|x| x.as_u64()));
                 }
             }
             g.bump(); g.save();
+            drop(g);
+            done(&sid);
+            if let Some(next) = again { quick_answer(&sid, next); }
+            return;
         }
-        done(&sid);
     });
 }
 
@@ -1503,7 +1551,7 @@ fn deliver_now(sid: &str) {
             let mut g = lk(&st);
             if let Some(s) = g.sessions.get_mut(&sid).and_then(|s| s.as_object_mut()) {
                 if let Some(n) = &note {
-                    push_convo(s, "sys", n, 400);
+                    push_convo(s, "sys", n, 400, "sys");
                     if let Some(inbox) = s.get_mut("inbox").and_then(|i| i.as_array_mut()) {
                         for m in inbox.iter_mut() { if ids.contains(m.get("id").unwrap_or(&Value::Null)) { m["state"] = json!("failed"); } }
                     }

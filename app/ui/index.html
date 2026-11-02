@@ -28,7 +28,7 @@
   --work:#8fae7a; --need:#e07a5f; --idle:#d2a75a; --sleep:#a4a2c0; --done:#87aab6; --fail:#d07060; --frame:#0e0b09; color-scheme:dark}
 
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:8px}
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:max(8px,env(safe-area-inset-top,0px));padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 [hidden]{display:none!important}
@@ -40,7 +40,7 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline
 .app:fullscreen{height:100vh!important;padding:10px;box-sizing:border-box}
 .app.focus .top,.app.focus .conn,.app.focus .updbar:not(.counting),.app.focus .legend,.app.focus .rule,.app.focus .tabs,.app.focus .statusbar{display:none!important}
 .app.focus .updbar.counting{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:60;box-shadow:0 8px 24px rgba(42,32,26,.28)}
-.app.focus{position:fixed;inset:0;z-index:50;height:100%!important;padding:6px;box-sizing:border-box;background:var(--bg)}
+.app.focus{position:fixed;inset:0;z-index:50;height:100%!important;padding:max(6px,env(safe-area-inset-top,0px)) max(6px,env(safe-area-inset-right,0px)) max(6px,env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-left,0px));box-sizing:border-box;background:var(--bg)}
 .app.focus .body{grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"office" "dock";height:100%;row-gap:6px}
 /* fullscreen keeps a one-line strip of session cards under the map */
 .app.focus .dockwrap{display:block!important}
@@ -55,7 +55,7 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline
 .app.focus .pane[data-pane="office"]{display:flex!important;height:100%}
 .app.focus .mapwrap{height:100%;flex:1}
 .app{container-type:inline-size;container-name:app;position:relative;background:var(--bg);overflow-x:clip}
-html,body{overflow-x:hidden}
+html,body{overflow-x:clip}
 .statusbar{display:none}
 
 .top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding-bottom:8px;border-bottom:1px solid var(--line);margin-bottom:8px;flex:none}
@@ -284,6 +284,10 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .msg.md code{font-family:var(--f-mono);font-size:.92em;background:color-mix(in srgb,var(--ink) 9%,transparent);padding:0 4px;border-radius:4px}
 .msg.md pre{margin:4px 0 6px;padding:8px;border-radius:8px;background:color-mix(in srgb,var(--ink) 9%,transparent);overflow-x:auto;white-space:pre}
 .msg.md pre code{background:none;padding:0}
+.msg.md .tbl{overflow-x:auto;margin:4px 0 6px;max-width:100%}
+.msg.md table{border-collapse:collapse;font-size:.92em}
+.msg.md th,.msg.md td{border:1px solid var(--line);padding:3px 8px;text-align:left;vertical-align:top}
+.msg.md th{background:color-mix(in srgb,var(--ink) 7%,transparent);font-weight:700}
 .msg.md hr{border:0;border-top:1px solid var(--line);margin:6px 0}
 .cp-head .raw{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cmsg .st{font-size:10.5px;color:var(--muted)}
@@ -344,13 +348,14 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .wn-card .row{display:flex;justify-content:flex-end}
 #whatsNew{z-index:70}
 .teampanel{position:absolute;inset:0;z-index:10;background:color-mix(in srgb,var(--ink) 35%,transparent);display:flex;align-items:flex-start;justify-content:center;padding:40px 12px}
-.tp-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;max-width:560px;width:100%;display:flex;flex-direction:column;gap:10px;max-height:80vh}
+.tp-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;max-width:560px;width:100%;display:flex;flex-direction:column;gap:10px;max-height:80vh;overflow:auto;box-sizing:border-box}
 .tlist{overflow:auto;display:flex;flex-direction:column;gap:6px;min-height:0}
 .trow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:8px 10px}
 .trow label b{display:block;font-size:13px;overflow-wrap:anywhere}
 .trow small{color:var(--muted);font-size:11.5px}
 .lead-pick{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted)}
 .tp-card .row{display:flex;gap:8px;flex-wrap:wrap}
+.tp-card>.row:last-child{position:sticky;bottom:-16px;background:var(--panel);padding:8px 0 12px;margin-bottom:-12px;z-index:1}
 .rooms-card{max-width:680px;overflow-y:auto;overscroll-behavior:contain}
 .rooms-card .tlist{overflow:visible;max-height:none;flex:none}
 .rooms{display:flex;flex-direction:column;gap:6px}
@@ -363,7 +368,7 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
 .kind button{font:inherit;font-size:12px;border:0;background:var(--panel);color:var(--ink);padding:5px 10px;cursor:pointer;min-height:32px}
 .kind button[aria-pressed="true"]{background:var(--accent);color:var(--panel);font-weight:700}
 .trow2{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:7px 10px}
-.trow2 .tname{width:100%;box-sizing:border-box;font:inherit;font-size:13px;font-weight:700;border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:var(--bg);color:var(--ink)}
+.trow2 .tname{width:100%;box-sizing:border-box;font:inherit;font-size:13px;font-weight:700;border:1px solid var(--line);border-radius:6px;padding:3px 6px;min-height:32px;background:var(--bg);color:var(--ink)}
 .trow2 small{color:var(--muted);font-size:11.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .where{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
 .where button{min-width:32px;min-height:32px;border-radius:50%;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;font-weight:700;font-size:12.5px;cursor:pointer}
@@ -388,7 +393,7 @@ h2{font-family:var(--f-display);font-weight:500;font-size:15px;letter-spacing:.4
   .app[data-tab="chat"] .pane[data-pane="chat"]{display:block}
   .zoom{left:8px;right:8px;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
   .zoom::-webkit-scrollbar{display:none}
-  .zoom button{height:28px;min-width:28px;padding:0 7px;font-size:12px;flex:none}
+  .zoom button{height:32px;min-width:32px;padding:0 7px;font-size:12px;flex:none}
   .zoom #bsDown,.zoom #bsUp{display:none}
   .toasts{left:8px;right:8px;bottom:8px;max-width:none}
   .toast{padding:7px 9px;font-size:12px}
@@ -482,6 +487,12 @@ body{margin:0}
 @media (prefers-reduced-motion:reduce){.pane[data-pane="chat"]{transition:none}}
 /* Tablet portrait (and any tall window wider than a phone): the panel docks under the office instead of covering
    half of it. Office on top, session cards, then the chat across the full width. */
+/* short screens (a phone on its side): the page scrolls instead of squeezing the office, and the panel takes the screen */
+@media (max-height:520px){
+  .stage[data-device="desktop"] .app:not(.focus){height:auto;min-height:calc(100dvh - 16px)}
+  .app.drawer .pane[data-pane="chat"]{position:fixed;top:8px;bottom:8px}
+  .app.drawer .cfilter,.app.drawer .cp-head .sub{display:none}
+}
 @container app (min-width: 641px){
   .app.port.drawer .body{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(220px,1fr) auto minmax(0,1.35fr);grid-template-areas:"office" "dock" "chat";row-gap:8px}
   .app.port.drawer .pane[data-pane="chat"]{grid-area:chat;position:relative;inset:auto;width:auto;min-height:0;transform:none;transition:none}
@@ -494,6 +505,9 @@ body{margin:0}
   /* the panel's height follows the bar you drag (remembered) */
   .app.port.drawer .body{grid-template-rows:minmax(160px,1fr) auto minmax(200px,var(--chath,56%))}
   .app.port.drawer .psplit{display:block}
+  /* typing: the keyboard takes half the screen, so only the chat stays (the office comes back when it closes) */
+  .app.port.drawer.kbopen :is(.top,.conn,.updbar,.pane[data-pane="office"],.dockwrap,.psplit){display:none}
+  .app.port.drawer.kbopen .body{grid-template-rows:minmax(0,1fr);grid-template-areas:"chat"}
 }
 /* Session tiles: equal width, filling the row; up to 4 a row (dockCols), the rest wrap below. Face, one name, status. */
 .app .dock{display:grid;grid-template-columns:repeat(var(--cols,4),minmax(0,1fr));gap:8px;overflow:visible;mask-image:none;padding-bottom:0}
@@ -1189,8 +1203,8 @@ const ROLE_WORDS=[[/^(lead|leader)$/i,'LEAD','Team Lead','Lead','LEAD'],[/ui\/?u
   [/fix|backend|code/i,'FIX','Code Fixer','Fixer','BE'],[/test|qa/i,'TEST','Tester','Tester','QA'],[/doc/i,'DOCS','Docs Writer','Docs','DOCS'],[/sec/i,'SEC','Security','Security','SEC'],[/data/i,'DATA','Data','Data','DATA'],[/ops|devops|deploy/i,'OPS','DevOps','DevOps','OPS']];
 const BUCKET={SESSION_STATUS_BUCKET_WORKING:'working',SESSION_STATUS_BUCKET_BLOCKED:'needs',SESSION_STATUS_BUCKET_REVIEW_READY:'done',SESSION_STATUS_BUCKET_COMPLETED:'idle',SESSION_STATUS_BUCKET_FAILED:'failed'};
 const baseName=p=>String(p).replace(/[\\/]+$/,'').split(/[\\/]/).pop();
-const sent=x=>{x=String(x||'').trim();if(!x)return'';x=x[0].toUpperCase()+x.slice(1);return /[.!?]$/.test(x)?x:x+'.';};
-const titleCase=w=>w.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
+const sent=x=>{x=String(x||'').replace(/```[\w-]*/g,'').replace(/^\s{0,3}#{1,6}\s+/gm,'').replace(/\*\*|__|`/g,'').replace(/^\s*\|?[\s:|-]*-{3,}[\s:|-]*$/gm,'').replace(/\s*\|\s*/g,' · ').replace(/\s*\n+\s*/g,' ').replace(/(^ · | · $)/g,'').trim();if(!x)return'';x=x[0].toUpperCase()+x.slice(1);return /[.!?]$/.test(x)?x:x+'.';};
+const titleCase=w=>w.toLowerCase().replace(/(^|[\s(/])(\p{L})/gu,(m,a,c)=>a+c.toUpperCase());
 function parseTitle(title,isLead){
   const m=String(title||'').match(/^([^:]+):\s*(.+)$/);
   if(isLead)return{code:'LEAD',role:'Team Lead',short:'Lead',pal:'LEAD',task:String(title||'Walang pangalan')};
@@ -1285,7 +1299,8 @@ function computeUnits(records){
 }
 let themeNow='none';
 // recolour the baked office (floor, walls, furniture) once per switch; characters keep their own colours
-function applyTheme(f){
+function edgeCol(){try{const d=bg.getContext('2d').getImageData(1,1,1,1).data;return d[3]>200?`rgb(${d[0]},${d[1]},${d[2]})`:'#1c140f';}catch(e){return'#1c140f';}}
+function applyTheme(f){bg.edge=null;
   if(f===themeNow)return;themeNow=f;
   const recolor=(src,dst)=>{const g=dst.getContext('2d');g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,dst.width,dst.height);g.filter=f;g.drawImage(src,0,0);g.filter='none';};
   if(!bg.orig){const c=document.createElement('canvas');c.width=bg.width;c.height=bg.height;c.getContext('2d').drawImage(bg,0,0);bg.orig=c;}
@@ -1442,6 +1457,8 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.14.3':{news:['<b>Buong pagsusuri ng app:</b> 22 bug ang naayos sa PC, tablet at phone.','<b>Chat:</b> may ⚡ sagot na rin ang pangalawang mensahe habang abala siya; hindi na lumalabas ang lumang ⚡ pagkatapos ng tunay na sagot; hindi na nawawala ang paulit-ulit na mensahe (hal. dalawang "continue"); hindi na siya nagmumukhang tapos habang nagko-compact.','<b>Tablet na naka-portrait:</b> kita na ang sinusulat mo kapag bukas ang keyboard.','<b>Phone:</b> laging kita ang Office/Chat sa ibaba; ang pag-tap sa tao ay nagbubukas ng chat; ayos na kapag nakatagilid ang phone.','<b>PC:</b> buong office na talaga ang "Buong office"; may table na sa chat; kita lagi ang napiling "Para kay".'],
+    todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
   '0.14.2':{news:['<b>Hindi na nawawala ang session na kinakausap mo</b>, sa chat man o sa playroom. Mas matagal na rin bago umalis ang session na nasa playroom mo kapag totoong isinara ito.'],
     todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
   '0.14.1':{news:['<b>Tablet na naka-portrait:</b> hindi na lumiliit ang app kapag nagta-type ka, at portrait pa rin ang ayos kahit bukas ang keyboard.',
@@ -2231,7 +2248,7 @@ function buildResort(){
   });
 }
 
-function bake(){
+function bake(){bg.edge=null;
   STAT.length=0;DYN.length=0;NAV.rec=[];
   const R=BGRES,g=bg.getContext('2d');
   for(const o of objs.slice().sort((a,b)=>a.d-b.d)){
@@ -2267,7 +2284,7 @@ function frame(ts){
     }
   }
   updateCam(dt);
-  if(cam.x<0||cam.y<0||cam.x+viewW()>SW||cam.y+viewH()>SH){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#1c140f';ctx.fillRect(0,0,cv.width,cv.height);}
+  if(cam.x<0||cam.y<0||cam.x+viewW()>SW||cam.y+viewH()>SH){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=bg.edge||(bg.edge=edgeCol());ctx.fillRect(0,0,cv.width,cv.height);}
   const k=kc()*DPR;ctx.setTransform(k,0,0,k,-cam.x*k,-cam.y*k);ctx.imageSmoothingEnabled=false;
   ctx.drawImage(bg,0,0,SW,SH);
   const items=objs.slice();
@@ -2412,11 +2429,19 @@ function md(src){
     .replace(/\*\*([^*\n]+?)\*\*/g,'<b>$1</b>').replace(/__([^_\n]+?)__/g,'<b>$1</b>')
     .replace(/(^|[^*\w])\*([^*\n]+?)\*(?!\w)/g,'$1<i>$2</i>').replace(/(^|[^_\w])_([^_\n]+?)_(?!\w)/g,'$1<i>$2</i>')
     .replace(/\[([^\]\n]+)\]\((https?:[^)\s]+)\)/g,'$1');
-  const lines=String(src||'').replace(/\r/g,'').split('\n');const out=[];let list=null,para=[],code=null;
+  const lines=String(src||'').replace(/\r/g,'').split('\n');const out=[];let list=null,para=[],code=null,tbl=[];
   const flushP=()=>{if(para.length){out.push('<p>'+para.map(inline).join('<br>')+'</p>');para=[];}};
+  // a table: a |row| line, a |---| line, then more rows (anything else stays plain text)
+  const cells=r=>r.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(c=>c.trim());
+  const flushT=()=>{if(!tbl.length)return;const t=tbl;tbl=[];
+    if(t.length>=2&&/^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(t[1])){
+      out.push('<div class="tbl"><table><thead><tr>'+cells(t[0]).map(c=>'<th>'+inline(c)+'</th>').join('')+'</tr></thead><tbody>'+t.slice(2).map(r=>'<tr>'+cells(r).map(c=>'<td>'+inline(c)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>');}
+    else para.push(...t);};
   const flushL=()=>{if(list){out.push(`<${list.t}>`+list.items.map(x=>'<li>'+inline(x)+'</li>').join('')+`</${list.t}>`);list=null;}};
   for(const ln of lines){
     if(code!==null){if(/^\s*```/.test(ln)){out.push('<pre><code>'+esc(code.join('\n'))+'</code></pre>');code=null;}else code.push(ln);continue;}
+    if(/^\s*\|.*\|\s*$/.test(ln)){flushP();flushL();tbl.push(ln);continue;}
+    flushT();
     if(/^\s*```/.test(ln)){flushP();flushL();code=[];continue;}
     let m;
     if(!ln.trim()){flushP();flushL();continue;}
@@ -2427,6 +2452,7 @@ function md(src){
     if(list&&/^\s{2,}\S/.test(ln)){list.items[list.items.length-1]+=' '+ln.trim();continue;}
     flushL();para.push(ln);
   }
+  flushT();
   if(code!==null)out.push('<pre><code>'+esc(code.join('\n'))+'</code></pre>');
   flushP();flushL();return out.join('');
 }
@@ -2499,6 +2525,7 @@ function queueText(s){
     case'answering':return'Nakapila: sinasagot pa niya ang nauna mong mensahe; kasama ito sa susunod niyang hakbang.';
     case'step':return`Nakapila: nasa gitna siya ng ${step}${mins?` (${mins} min na)`:''}. Papasok ito pagkatapos ng hakbang na iyon, tulad sa Claude app.`;
     case'nocli':return'Nakapila: hindi mahanap ng Dev Room ang Claude Code sa PC, kaya hindi ito maipasa agad. Papasok ito sa susunod na galaw ng session.';
+    case'ask':return'Nakapila: may hinihintay siyang sagot o pahintulot mo sa Claude Code; papasok ito pagkatapos noon.';
     case'soon':return'Ipinapasa…';
     case'busy':return'Nakapila: tumatakbo pa ang turn niya; papasok ito sa susunod niyang hakbang.';
     default:return s.status==='working'?'Nakapila: papasok ito sa susunod niyang hakbang.':'Ipinapasa…';}
@@ -2575,9 +2602,9 @@ function renderPanel(){
       if(near||forceScroll){forceScroll=false;body.scrollTop=body.scrollHeight;}else body.scrollTop=top;}
     {const one=chatFilter!=='all'&&bySid(chatFilter);if(one)chatTo=one.sid;
      const rk=(one?'1':'*')+chatTo+'|'+sessions.map(x=>x.sid+x.short).join(',');const rc=$('rcpt');
-     if(rc.dataset.k!==rk){rc.dataset.k=rk;rc.innerHTML=one?`<span>Para kay <b>${esc(one.role)}</b></span>`:`<span>Para kay</span>`+sessions.map(x=>`<button type="button" data-rcpt="${esc(x.sid)}" aria-pressed="${x.sid===chatTo}"><i style="background:${x.pal.shirt}"></i>${esc(x.short)}</button>`).join('');}
+     if(rc.dataset.k!==rk){rc.dataset.k=rk;rc.innerHTML=one?`<span>Para kay <b>${esc(one.role)}</b></span>`:`<span>Para kay</span>`+sessions.map(x=>`<button type="button" data-rcpt="${esc(x.sid)}" aria-pressed="${x.sid===chatTo}"><i style="background:${x.pal.shirt}"></i>${esc(x.short)}</button>`).join('');rc.querySelector('[aria-pressed="true"]')?.scrollIntoView({inline:'nearest',block:'nearest'});}
      // only when it changes: touching the box while you type breaks the phone keyboard (letters came out reversed)
-     const tgt=bySid(chatTo),ph=tgt?`Mensahe kay ${tgt.short}…`:'Mensahe…';const mi=$('msgInput');if(mi.placeholder!==ph)mi.placeholder=ph;}
+     const tgt=bySid(chatTo),ph=tgt?`Mensahe kay ${tgt.short.replace(/…$/,'')}…`:'Mensahe…';const mi=$('msgInput');if(mi.placeholder!==ph)mi.placeholder=ph;}
     const sel2=$('chatTo');const opts=sessions.map(x=>`<option value="${esc(x.sid)}">${esc(x.role)}${x.listening?' · naka-abang':x.status==='working'?' · nagtatrabaho':''}</option>`).join('');
     if(sel2.dataset.k!==opts){sel2.dataset.k=opts;sel2.innerHTML=opts;}if(sel2.value!==chatTo)sel2.value=chatTo;
     const aw=$('awaySel');if(aw.value!==awayMode)aw.value=awayMode;
@@ -2730,7 +2757,7 @@ document.addEventListener('click',e=>{
     if(ap&&ap.act){try{window.parent.postMessage({type:'devroom:update'},'*');}catch(x){}}
     connMsg=[pc&&('PC: '+pc.d),ap&&('Phone: '+ap.d)].filter(Boolean).join(' ');setConn();clearTimeout(showUpd.t);showUpd.t=setTimeout(()=>{connMsg='';setConn();},12000);return;}
   if(e.target.closest('[data-act="restart-wait"]')){autoRestart.wait();return;}
-  const cb=e.target.closest('[data-act="claude"]');if(cb){cb.closest('.toast')?.remove();openClaude(cb.dataset.sid!=null?+cb.dataset.sid:null);return;}
+  const cb=e.target.closest('[data-act="claude"]');if(cb){cb.closest('.toast')?.remove();openClaude(cb.dataset.sid!=null?+cb.dataset.sid:null);setTimeout(()=>$('msgInput')?.focus({preventScroll:true}),80);return;}
   if(e.target.closest('[data-act="wn-ok"]')){$('whatsNew').hidden=true;try{localStorage.setItem('devroom.seenNotes',NOTES_VER);}catch(e){}return;}
   if(e.target.closest('[data-act="pair"]')){openPair();return;}
   if(e.target.closest('[data-act="team-cancel"]')){$('teamPanel').hidden=true;return;}
@@ -2745,7 +2772,7 @@ document.addEventListener('click',e=>{
   if(e.target.closest('.count.need')){setDrawer(true,'alarms');return;}
   const a=e.target.closest('[data-act="reply"]');
   if(a){const s=sessions.find(x=>x.id===+a.dataset.id);if(s&&s.status==='needs')answer(s,a.dataset.mode==='approve'?'Approved. Sige, ituloy mo.':'Hindi muna. Huwag mo munang gawin iyan.',a.dataset.mode);return;}
-  const pt=e.target.closest('[data-ptab]');if(pt){ptab=pt.dataset.ptab;chatKey='';renderPanel();return;}
+  const pt=e.target.closest('[data-ptab]');if(pt){ptab=pt.dataset.ptab;chatKey='';$('cpBody').scrollTop=0;forceScroll=ptab==='chat';renderPanel();return;}
   const tab=e.target.closest('.tabs button');if(tab){$('app').dataset.tab=tab.dataset.tab;chatKey='';if(embedClaude&&tab.dataset.tab==='chat')ptab='chat';document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b===tab));render();return;}
   const dv=e.target.closest('.seg button');if(dv){$('stage').dataset.device=dv.dataset.device;document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',b===dv));chatKey='';render();return;}
 });
@@ -2796,13 +2823,14 @@ cv.addEventListener('pointerup',e=>{
   cv.classList.remove('drag');const d=drag;drag=null;if(wasPinch||!d||d.moved)return;
   const q=toScreen(e);
   let best=null,bd=20;for(const s of sessions){const p=isoP(s);const dd=Math.hypot(p.x-q.x,p.y-16-q.y);if(dd<bd){bd=dd;best=s;}}
-  if(best){selected=best.id;cam.follow=best;ptab='chat';chatKey='';$('app').classList.add('drawer');render();}
+  if(best){openChat(best.id);}
   else if($('app').classList.contains('drawer'))setDrawer(false);
 });
 cv.addEventListener('wheel',e=>{e.preventDefault();const q=toScreen(e);cam.follow=null;setZoom(cam.z*(e.deltaY<0?1.15:1/1.15),q.x,q.y);},{passive:false});
 $('zIn').addEventListener('click',()=>setZoom(cam.z*1.25));
 $('zOut').addEventListener('click',()=>setZoom(cam.z/1.25));
-$('zFit').addEventListener('click',()=>{cam.follow=null;setZoom(1);});
+const wholeOffice=()=>{cam.follow=null;setZoom(1);centerOn(SW/2,SH/2);};
+$('zFit').addEventListener('click',wholeOffice);
 const BS=[1,1.3,1.6,2,2.5];let bsI=1;try{const v=localStorage.getItem('devroom.bubble');if(v!==null&&+v>=0&&+v<BS.length)bsI=+v;}catch(e){}
 function applyBS(){overlay.style.setProperty('--bs',BS[bsI]);$('bsDown').disabled=bsI===0;$('bsUp').disabled=bsI===BS.length-1;try{localStorage.setItem('devroom.bubble',String(bsI));}catch(e){}}
 $('bsUp').addEventListener('click',()=>{bsI=Math.min(BS.length-1,bsI+1);applyBS();});
@@ -2813,7 +2841,7 @@ applyBS();
 const FS_OK=window.top===window&&!/; wv\)|Capacitor/i.test(navigator.userAgent);
 {const fb=$('fsBtn');const app=$('app');
  // Map-only mode. Uses the Fullscreen API when allowed, and fills the window anyway when it is not (phones, the Android app).
- const fit=()=>setTimeout(()=>{resizeMap();cam.follow=null;setZoom(1);},60);
+ const fit=()=>setTimeout(()=>{resizeMap();wholeOffice();},60);
  const setFocus=on=>{app.classList.toggle('focus',on);fb.textContent=on?'Lumabas sa fullscreen':'Fullscreen';fit();};
  fb.addEventListener('click',()=>{
    const on=!app.classList.contains('focus');setFocus(on);
@@ -2834,12 +2862,13 @@ document.addEventListener('keydown',e=>{
 {let opener=null;
  for(const id of ['teamPanel','whatsNew']){const el=$(id);
   new MutationObserver(()=>{
-    if(!el.hidden){opener=document.activeElement;setTimeout(()=>{const f=el.querySelector('input,button,select,textarea');f&&f.focus();},0);}
+    if(!el.hidden){opener=document.activeElement;setTimeout(()=>{const f=matchMedia('(pointer:coarse)').matches?el.querySelector('button'):el.querySelector('input,button,select,textarea');f&&f.focus({preventScroll:true});},0);}
     else if(opener&&document.contains(opener)){opener.focus();opener=null;}
   }).observe(el,{attributes:true,attributeFilter:['hidden']});
   el.addEventListener('keydown',e=>{if(e.key!=='Tab')return;const f=[...el.querySelectorAll('input,button,select,textarea,a[href]')].filter(x=>!x.disabled&&x.offsetParent);if(!f.length)return;
     const a=f[0],z=f[f.length-1];if(e.shiftKey&&document.activeElement===a){z.focus();e.preventDefault();}else if(!e.shiftKey&&document.activeElement===z){a.focus();e.preventDefault();}});}}
 // the dock scrolls sideways with the mouse wheel and fades at the edge while there is more
+for(const id of ['rcpt','units']){const r=$(id);if(r)r.addEventListener('wheel',e=>{if(Math.abs(e.deltaY)>Math.abs(e.deltaX)&&r.scrollWidth>r.clientWidth){r.scrollLeft+=e.deltaY;e.preventDefault();}},{passive:false});}
 {const d=$('dock');const edge=()=>d.classList.toggle('at-end',d.scrollLeft+d.clientWidth>=d.scrollWidth-4);
  d.addEventListener('wheel',e=>{if(Math.abs(e.deltaY)>Math.abs(e.deltaX)&&d.scrollWidth>d.clientWidth){d.scrollLeft+=e.deltaY;e.preventDefault();}},{passive:false});
  d.addEventListener('scroll',edge,{passive:true});new ResizeObserver(()=>{edge();dockCols();}).observe(d);new MutationObserver(()=>requestAnimationFrame(dockCols)).observe($('app'),{attributes:true,attributeFilter:['class']});setInterval(edge,2000);}

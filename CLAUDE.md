@@ -48,13 +48,16 @@ The user's real team is **LOGIC_SIM_PROJECT**: a leader plus subsessions (CODE F
     - `tail_transcripts` follows each transcript (every 0.9 s) and pushes prompts and replies to the conversation.
     - `deliver_now` continues an idle session with `claude -p --resume <sid>`, in its cwd and `perm_mode`.
     - Working sessions get messages through the PostToolUse `additionalContext`.
-    - **Real-time while busy:** a message still queued after 2.5 s gets an answer from a fork of the session (`quick_answer`: `--fork-session`, plan mode, `disableAllHooks`), shown as ⚡ in the chat; the message stays queued for the session itself.
+    - **Real-time while busy:** a message still queued after 2.5 s gets an answer from a fork of the session (`quick_answer`: `--fork-session`, plan mode, `disableAllHooks`), shown as ⚡ in the chat; the message stays queued for the session itself. Messages that arrive meanwhile are answered together next; an answer that comes after the session itself answered is dropped (`quick: late`).
+    - **Convo lines** carry `src` (hook, tail, quick, sys): a hook line and a transcript line with the same text are paired once; the same text twice from one source is two messages.
     - The Chat tab is Dev Room's own chat; never replace it with claude.ai.
   - Subagent hooks (`agent_id`, or a `subagents` transcript) carry the parent's session id: they only update its detail text while it works, never its status or transcript, so a lead with agents in the background stays free for messages. Prompts Claude Code writes itself (`system_prompt()`, `SYS_PROMPT` in the UI) are not shown as the user's messages.
   - **Progress:** `track_tasks` keeps each session's task list (`tasks`: id, t, a, st) from TodoWrite / TaskCreate / TaskUpdate; the UI's `prog()` drives tile bars, map bars, the Detalye checklist and the report walk to the Boss (`reportToBoss`).
   - **Queue reason:** `queue_why` (answering, step, nocli, busy, soon) is shown under a waiting message (`queueText`).
   - **Plan limits:** `fetch_usage` reads the 5-hour and weekly utilization every 2 minutes with the token in `~/.claude/.credentials.json` (never passed on); `usage` in `/api/state`, shown by `renderUsage`. `DEVROOM_USAGE_URL` points it at a stand-in for tests.
-  - **SessionEnd** from Dev Room's own `claude -p --resume` run is ignored (`ran_recently`: running, or ended under two minutes ago, since the hook can arrive after the run exits); a real one sets `ended_at`, and liveness removes the session after a quiet minute (ten for one placed in a playroom). Quick-answer copies (prompt starts with `QUICK_MARK`) are dropped and ignored if their hooks fire.
+  - **SessionStart** with `source: "compact"` comes mid-turn: it never sets the session idle.
+  - Subagent transcripts are recognised by a `/subagents/` folder only (`is_sub_path`), never by a project name.
+  - **SessionEnd** with `reason: "other"` from Dev Room's own `claude -p --resume` run is ignored (`ran_recently`: running, or ended under two minutes ago, since the hook can arrive after the run exits); `/exit`, `/clear` and logout always count; a real one sets `ended_at`, and liveness removes the session after a quiet minute (ten for one placed in a playroom). Quick-answer copies (prompt starts with `QUICK_MARK`) are dropped and ignored if their hooks fire.
   - A liveness thread marks a session as working while its transcript keeps being written after Stop.
   - State lives in `%APPDATA%\DevRoom\state.json` and is written atomically.
 - **`app/src-tauri/src/main.rs`:**
@@ -75,7 +78,9 @@ The user's real team is **LOGIC_SIM_PROJECT**: a leader plus subsessions (CODE F
   - New scenes must keep the same desk and spot coordinates.
 - **Fullscreen:** the Fullscreen API is not used inside the Android app (`FS_OK`); its WebView collapsed the page. CSS alone fills the screen there.
 - **Portrait:** the class `port` on `.app` comes from `screen.orientation` (not the space left by the keyboard). While typing the app has `kbopen` (never `typing`: that is the chat's working-line class).
-- **Tablet portrait:** with the panel open on a portrait screen ≥ 641 px wide, the panel docks under the office (grid `office / dock / chat`) instead of overlaying it. The bar above it (`#pSplit`) sets its height (`--chath`, remembered in localStorage `devroom.chath`).
+- **Tablet portrait:** with the panel open on a portrait screen ≥ 641 px wide, the panel docks under the office (grid `office / dock / chat`) instead of overlaying it. The bar above it (`#pSplit`) sets its height (`--chath`, remembered in localStorage `devroom.chath`). While typing (`kbopen`) only the chat shows.
+- **Short screens** (height ≤ 520, a phone on its side): the page scrolls and the panel is fixed to the screen's height.
+- **Body overflow** is `overflow-x:clip`, never `hidden` (hidden broke the phone's sticky tab bar).
 - **Session tiles (`#dock`):** an equal-width grid, up to 4 a row (`dockCols`), with the session's face (`faceURL`, cut from her sprite), one short name and a status dot; lower in portrait and fullscreen.
 - **`mobile/`:** the Capacitor Android shell.
   - It shows the office in an iframe, served by the PC.
