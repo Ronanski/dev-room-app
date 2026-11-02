@@ -580,7 +580,7 @@ body{margin:0}
 @media (pointer:coarse){.psplit{top:-14px;height:24px}.psplit::after{top:10px}}
 
 /* ---------- Lite (0.16.0): portrait phone and tablet. A small live office, the session list, then the chat. ---------- */
-.lite,.lback,.litebtn{display:none}
+.lite,.lback,.litebtn,.lcol{display:none}
 .app.port.touch .litebtn{display:inline-flex}
 .app.lite :is(.pane[data-pane="office"],.dockwrap,.counts,.controls,.psplit,.drawer-x,.claudebar){display:none!important}
 .app.lite .top{margin-bottom:6px;padding-bottom:6px}
@@ -623,8 +623,12 @@ body{margin:0}
 }
 /* tablet portrait: the office across the top; the list on the left and the chat on the right */
 @container app (min-width: 641px){
-  #app.lite .body{display:grid;grid-template-columns:minmax(230px,36%) minmax(0,1fr);grid-template-rows:auto auto auto minmax(0,1fr);
-    grid-template-areas:"room room" "alert chat" "flt chat" "list chat";column-gap:12px;row-gap:0}
+  #app.lite .body{display:grid;grid-template-columns:var(--litecol,36%) 16px minmax(0,1fr);grid-template-rows:auto auto auto minmax(0,1fr);
+    grid-template-areas:"room room room" "alert bar chat" "flt bar chat" "list bar chat";column-gap:0;row-gap:0}
+  /* the bar between the list and the chat: drag it to make the chat wider or narrower (remembered; double tap resets) */
+  #app.lite .lcol{display:block;grid-area:bar;position:relative;cursor:col-resize;touch-action:none}
+  #app.lite .lcol::after{content:"";position:absolute;top:50%;left:50%;width:5px;height:44px;margin:-22px 0 0 -2.5px;border-radius:3px;background:var(--line)}
+  #app.lite .lcol.on::after,#app.lite .lcol:hover::after{background:var(--accent)}
   #app.lite .lite{display:contents}
   #app.lite .lroom{grid-area:room;margin-bottom:8px}
   #app.lite .lroom canvas{max-height:24vh;object-fit:cover;object-position:50% 40%}
@@ -633,7 +637,7 @@ body{margin:0}
   #app.lite .llist{grid-area:list;overflow-y:auto}
   #app.lite .pane[data-pane="chat"]{grid-area:chat;display:block!important;position:relative;inset:auto;width:auto;transform:none;transition:none;min-height:0}
   #app.lite .tabs{display:none}
-  #app.lite.kbopen :is(.top,.conn,.updbar,.lroom,.lalert,.lflt,.llist,.lfoot){display:none}
+  #app.lite.kbopen :is(.top,.conn,.updbar,.lroom,.lalert,.lflt,.llist,.lfoot,.lcol){display:none}
   #app.lite.kbopen .body{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);grid-template-areas:"chat"}
 }
 </style>
@@ -667,6 +671,7 @@ body{margin:0}
         <div class="lalert" id="liteAlert" aria-live="polite"></div>
         <div class="lflt" id="liteFlt" role="group" aria-label="Salain ang mga session"></div>
         <div class="llist" id="liteList"></div>
+        <div class="lcol" id="liteCol" role="separator" aria-orientation="vertical" aria-label="Hilahin pakaliwa o pakanan para baguhin ang lapad ng chat" title="Hilahin para baguhin ang lapad ng chat. I-double tap para ibalik."></div>
       </section>
       <section class="pane" data-pane="office" aria-label="Office">
         <div class="mapwrap">
@@ -1269,6 +1274,11 @@ const titleCase=w=>w.toLowerCase().replace(/(^|[\s(/])(\p{L})/gu,(m,a,c)=>a+c.to
 function parseTitle(title,isLead){
   const m=String(title||'').match(/^([^:]+):\s*(.+)$/);
   if(isLead)return{code:'LEAD',role:'Team Lead',short:'Lead',pal:'LEAD',task:String(title||'Walang pangalan')};
+  if(!m&&/^[a-z0-9]+(?:[-_][a-z0-9]+)+$/i.test(String(title||'').trim())){
+    // a folder-style name (Claude Projects threads run in folders like "winter-test" or "code-fixer-b7c2"): words, no hash
+    const w=String(title).trim().split(/[-_]+/);if(w.length>1&&/\d/.test(w[w.length-1])&&/^[0-9a-f]{2,8}$/i.test(w[w.length-1]))w.pop();
+    const pretty=titleCase(w.join(' ').toLowerCase()),hit=ROLE_WORDS.find(r=>r[0].test(pretty));
+    return{code:hit?hit[1]:(w.slice(0,3).map(x=>x[0]).join('')||'S').toUpperCase(),role:pretty,short:pretty.length>14?pretty.slice(0,13).trim()+'…':pretty,pal:hit?hit[4]:'BE',task:''};}
   if(!m){const t=String(title||'Session');return{code:(t.split(/[\s_:-]+/).filter(Boolean).slice(0,3).map(w=>w[0]).join('')||'S').toUpperCase(),role:t,short:t.length>14?t.slice(0,13).trim()+'…':t,pal:'BE',task:''};}
   const word=m[1].trim(),hit=ROLE_WORDS.find(r=>r[0].test(word));
   if(hit)return{code:hit[1],role:hit[2],short:hit[3],pal:hit[4],task:m[2]};
@@ -1540,6 +1550,8 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.16.2':{news:['<b>Nababasa na ang mensahe ng coordinator</b> sa chat ng thread: makikita mo ang sinabi mo at ang note niya, hindi na ang mga tag.','<b>Mas malinaw na pangalan ng thread:</b> galing sa folder niya (hal. Winter Test, Code Fixer), o sa utos ng coordinator kapag iisa ang folder nila.','<b>Sa tablet, naaayos na ang lapad ng chat:</b> i-drag ang bar sa pagitan ng listahan at chat. I-double tap para ibalik.'],
+    todo:['Wala kang gagawin sa PC.','Sa tablet o phone, wala ring kailangang i-install para dito.']},
   '0.16.1':{news:['<b>Lumalabas na ang tunay na pangalan ng mga thread</b> mula sa Claude Projects. Dati, pangalan ng folder o ang sariling title ni Claude ang nakikita mo, kaya magkakamukha ang mga thread.','<b>Hindi na magkakamukha ang may parehong role:</b> sa halip na Fixer, Fixer 2 at Fixer 3, makikita mo na ang Ningning, Giselle at Winter.'],
     todo:['Wala kang gagawin sa PC.','Sa tablet o phone, pindutin ang I-update at ang Install.']},
   '0.16.0':{news:['<b>Bagong Lite view sa phone at tablet</b> (naka-portrait): maliit na office sa itaas, ang listahan ng sessions sa ilalim, tapos ang chat. Mas magaan ito at mas tipid sa battery.','<b>Sa maliit na office:</b> nasa desk ang gumagana, nasa pinto at nakataas ang kamay ang naghihintay sa iyo, at nasa sofa ang matagal nang naka-break. I-tap ang tao para kausapin siya.','<b>Sa listahan:</b> nasa itaas ang naghihintay sa iyo, may progress (hal. 3/5), at may filter na Lahat, Kailangan ka, Gumagana at Tapos.','Sa tablet, nasa kaliwa ang listahan at nasa kanan ang chat.'],
@@ -2459,7 +2471,7 @@ function actText(s){
   return`${IDLE_SENT[s.idle]||'Naka-break.'} Idle na siya nang ${dur(now()-s.idleStart)}.`;
 }
 function av(s,size){const u=s.pal&&s.look!==undefined?faceURL(s):'';return u?`<span class="av avf" style="${size?`width:${size}px;height:${size}px;`:''}--shirt:${s.pal.shirt}"><img src="${u}" alt="" draggable="false"></span>`:`<span class="av" style="${size?`width:${size}px;height:${size}px;`:''}background:${s.pal.shirt};--hair:${s.pal.hair}"><span>${esc(s.code)}</span></span>`;}
-function pill(s){return `<span class="pill${s.status==='needs'?' solid':''}" style="--st:var(${stColor(s)})">${esc(stLabel(s))}</span>`;}
+function pill(s){if(isLite()&&s.status==='idle')return litePill(s);return `<span class="pill${s.status==='needs'?' solid':''}" style="--st:var(${stColor(s)})">${esc(stLabel(s))}</span>`;}
 const sel=()=>sessions.find(x=>x.id===selected)||sessions[0];
 
 /* chat */
@@ -2550,6 +2562,17 @@ function md(src){
   if(code!==null)out.push('<pre><code>'+esc(code.join('\n'))+'</code></pre>');
   flushP();flushL();return out.join('');
 }
+// A Claude Projects coordinator hands work to a thread as a prompt wrapped in <project_claude_message>: <relay>,
+// <cited> lines (your own words, with your name) and its <note>. Show it as readable text, never as the raw tags.
+function relayMsg(t){
+  t=String(t||'');if(!/^\s*<project_claude_message\b/.test(t))return null;
+  const un=x=>String(x).replace(/<[^>]+>/g,'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').trim();
+  const out=[];
+  for(const c of t.matchAll(/<cited\b([^>]*)>([\s\S]*?)<\/cited>/gi)){const nm=(c[1].match(/\bname="([^"]*)"/)||[])[1]||'Ikaw';const tx=un(c[2]);if(tx)out.push('**'+nm+':** '+tx);}
+  const notes=[...t.matchAll(/<note\b[^>]*>([\s\S]*?)<\/note>/gi)].map(n=>un(n[1])).filter(Boolean);
+  if(notes.length)out.push(notes.join('\n\n'));
+  if(!out.length){const b=un(t);if(b)out.push(b);}
+  return out.join('\n\n')||null;}
 function cleanMsg(t){
   const SYS='system-reminder|command-name|command-message|command-args|command-contents|local-command-stdout|local-command-stderr|local-command-caveat|side-sessions-event|task-notification|user-prompt-submit-hook|bash-input|bash-stdout|bash-stderr';
   return String(t||'').replace(new RegExp('<('+SYS+')\\b[^>]*>[\\s\\S]*?<\\/\\1>','gi'),'').replace(new RegExp('<\\/?('+SYS+')\\b[^>]*>','gi'),'').replace(/\n{3,}/g,'\n\n').trim();
@@ -2634,6 +2657,7 @@ function chatFeed(){
     const sent=new Set((s.inbox||[]).map(m=>String(m.text||'').trim()));
     for(const m of (CONVO[s.sid]||[])){
       if(m.att){items.push({s,t:m.at,you:m.role==='user',att:m.att,name:m.name||'',title:m.title||''});continue;}
+      if(m.role==='user'){const rl=relayMsg(m.text);if(rl){items.push({s,t:m.at,you:false,coord:true,text:rl});continue;}}
       if(m.role==='user'&&SYS_PROMPT.test(m.text||''))continue;   // Claude Code's own turns, not something you typed
       const text=cleanMsg(m.text);if(!text||(m.role==='user'&&sent.has(text)))continue;items.push({s,t:m.at,you:m.role==='user',sys:m.role==='sys',text,quick:!!m.quick});}
     for(const m of (s.inbox||[]))items.push({s,t:m.at,you:true,text:m.text,st:m.state,app:true,q:m.quick||''});
@@ -2641,11 +2665,11 @@ function chatFeed(){
   }
   items.sort((a,b)=>a.t-b.t);
   const out=items.slice(-120).map(it=>{
-    const who=it.you?`<b>Boss</b> → ${esc(it.s.short)}`:`<i style="background:${it.s.pal.shirt}"></i><b>${esc(it.s.short)}</b>`;
+    const who=it.coord?`<b>Coordinator</b> → ${esc(it.s.short)}`:it.you?`<b>Boss</b> → ${esc(it.s.short)}`:`<i style="background:${it.s.pal.shirt}"></i><b>${esc(it.s.short)}</b>`;
     const st=it.app?`<span class="st">${(it.st==='queued'?(it.q==='asking'?'Sumasagot na siya ngayon, habang tinatapos niya ang kasalukuyang hakbang…':it.q==='done'?'Nasagot na niya sa ibaba. Gagawin niya ito pagkatapos ng kasalukuyang hakbang.':queueText(it.s)):{sending:'Ipinapadala…',queued:'Ipinapasa…',sent:'Natanggap na niya ✓',delivered:'Natanggap na niya ✓',failed:'Hindi naipadala.'}[it.st]||'')}${it.st==='failed'&&it.pi!=null?` <button type="button" class="linkbtn" data-retry="${it.pi}">Subukan ulit</button> <button type="button" class="linkbtn" data-drop="${it.pi}">Alisin</button>`:''}${it.why?' ('+esc(it.why)+')':''}${it.app?' · mula sa app':''}</span>`:'';
     if(it.att)return `<div class="cmsg ${it.you?'you':''}"><span class="who">${who} · ${simLabel(it.t)}</span>${attHTML(it)}</div>`;
     if(it.sys)return `<div class="msg sys" data-chatto="${esc(it.s.sid)}">${esc(it.s.short)}: ${esc(it.text)} · ${simLabel(it.t)}</div>`;
-    return `<div class="cmsg ${it.you?'you':''}" data-chatto="${esc(it.s.sid)}"><span class="who">${who} · ${simLabel(it.t)}</span><div class="msg md ${it.you?'you':'agent'}">${it.quick?'<span class="qtag">⚡ Agarang sagot habang abala</span>':''}${md(it.text)}</div>${st}</div>`;
+    return `<div class="cmsg ${it.you?'you':''}" data-chatto="${esc(it.s.sid)}"><span class="who">${who} · ${simLabel(it.t)}</span><div class="msg md ${it.you?'you':'agent'}">${it.quick?'<span class="qtag">⚡ Agarang sagot habang abala</span>':''}${it.coord?'<span class="qtag">📨 Ipinasa ng coordinator ng project</span>':''}${md(it.text)}</div>${st}</div>`;
   });
   // a queued message to a session that already stopped (and is not waiting) only arrives with its next turn
   const typing=list.filter(s=>s.status==='working').map(s=>`<div class="typing" data-chatto="${esc(s.sid)}"><i style="background:${s.pal.shirt}"></i><b>${esc(s.short)}</b> ${esc(s.detail&&s.detail.length<90?s.detail:'nagtatrabaho')}<span class="dots"><span></span><span></span><span></span></span></div>`);
@@ -2830,7 +2854,7 @@ function openChat(id){
 const LITE_FORCE=/[?&]lite=1/.test(location.search);
 let liteOff=false;try{liteOff=localStorage.getItem('devroom.full')==='1';}catch(e){}
 let liteFilter='all';
-const isLite=()=>$('app').classList.contains('lite');
+function isLite(){const a=document.getElementById('app');return !!a&&a.classList.contains('lite');}
 const isTouch=()=>LITE_FORCE||/Android/i.test(navigator.userAgent)||(window.matchMedia&&matchMedia('(pointer:coarse)').matches);
 function liteState(s){
   if(s.status==='needs')return'need';if(s.status==='failed')return'fail';if(s.status==='working')return'work';if(s.status==='done')return'done';
@@ -2847,7 +2871,7 @@ function liteLine(s){
   const r=sent(s.recent||s.detail)||'Tapos na ang turn niya.';return`${r} ${dur(now()-s.since)} na ang nakalipas.`;}
 const liteCol=s=>({need:'--need',fail:'--fail',work:'--work',done:'--done',idle:'--done',sleep:'--sleep'})[liteState(s)];
 function liteItem(s){const p=prog(s);
-  return `<button type="button" class="litem${s.id===selected?' sel':''}${s.status==='needs'||s.status==='failed'?' need':''}" data-lid="${s.id}">${faceHTML(s).replace(/--st:var\([^)]*\)/,'--st:var('+liteCol(s)+')')}<span class="lm"><span class="ln"><b>${esc(s.lead?'★ '+(s.task||s.short||s.role):(s.baseShort||s.short||s.role)+(s.task?' · '+s.task:''))}</b>${litePill(s)}</span><span class="ls">${esc(liteLine(s))}</span>${p.total?`<span class="lp"><i class="pbar${p.phase==='done'?' ok':''}"><b style="width:${p.pct}%"></b></i><small>${p.done}/${p.total}</small></span>`:''}</span></button>`;}
+  return `<button type="button" class="litem${s.id===selected?' sel':''}${s.status==='needs'||s.status==='failed'?' need':''}" data-lid="${s.id}">${faceHTML(s).replace(/--st:var\([^)]*\)/,'--st:var('+liteCol(s)+')')}<span class="lm"><span class="ln"><b>${esc(s.lead?'★ '+(s.task||s.short||s.role):s.task?(s.baseShort||s.short)+' · '+s.task:(s.role||s.short))}</b>${litePill(s)}</span><span class="ls">${esc(liteLine(s))}</span>${p.total?`<span class="lp"><i class="pbar${p.phase==='done'?' ok':''}"><b style="width:${p.pct}%"></b></i><small>${p.done}/${p.total}</small></span>`:''}</span></button>`;}
 function renderLite(){
   if(!isLite())return;
   const needs=sessions.filter(s=>(s.status==='needs'||s.status==='failed')&&!s.acked);
@@ -2916,6 +2940,16 @@ $('liteRoom').addEventListener('click',e=>{const c=e.currentTarget,r=c.getBoundi
   const x=(e.clientX-r.left-ox)/k,y=(e.clientY-r.top-oy)/k;
   let best=null,bd=14;for(const p of LR.spots){const d=Math.hypot(p.x-x,p.y-2-y);if(d<bd){bd=d;best=p;}}
   if(best)openChat(best.id);});
+
+{const bar=$('liteCol'),app=$('app');let d=null;
+ try{const f=parseFloat(localStorage.getItem('devroom.litecol'));if(f>.15&&f<.7)app.style.setProperty('--litecol',(f*100).toFixed(1)+'%');}catch(e){}
+ const body=()=>document.querySelector('.body').getBoundingClientRect();
+ bar.addEventListener('pointerdown',e=>{if(e.button>0)return;d={id:e.pointerId};bar.setPointerCapture(e.pointerId);bar.classList.add('on');e.preventDefault();});
+ bar.addEventListener('pointermove',e=>{if(!d||e.pointerId!==d.id)return;const b=body();
+   const w=Math.max(200,Math.min(b.width-16-320,e.clientX-b.left-8));d.f=w/b.width;app.style.setProperty('--litecol',w+'px');});
+ const end=e=>{if(!d||e.pointerId!==d.id)return;bar.classList.remove('on');if(d.f){app.style.setProperty('--litecol',(d.f*100).toFixed(1)+'%');try{localStorage.setItem('devroom.litecol',d.f.toFixed(3));}catch(err){}}d=null;};
+ bar.addEventListener('pointerup',end);bar.addEventListener('pointercancel',end);
+ bar.addEventListener('dblclick',()=>{app.style.removeProperty('--litecol');try{localStorage.removeItem('devroom.litecol');}catch(e){}});}
 
 /* ---------- interactions ---------- */
 document.addEventListener('click',e=>{
