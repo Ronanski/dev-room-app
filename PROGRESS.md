@@ -11,6 +11,45 @@ Dev Room shows them all in one place instead. Each session is a character in a s
 - who needs the user's input,
 - what each session is doing right now, and how far along it is.
 
+## HANDOFF (2026-11-02): read this first
+
+The work moves to a new Claude Code session that runs **on the user's Windows PC** with local access to this repo. A cloud session cannot attach to a Windows computer, so PC-side checks must happen there. Continue from here.
+
+### Decisions the user made (final)
+- **Dev Room depends on the PC/laptop.** Every Claude Code session is started on that machine, in a folder with a GitHub repo, with Remote Control on. The phone reaches the PC from any network through Malayo mode.
+- **Legal only. The user must not be banned.** Never use a Claude login (OAuth) token in Dev Room and never call undocumented Anthropic APIs. Since Feb 2026, using Free, Pro or Max OAuth tokens in any other product is a Consumer Terms violation (see the Claude Code legal and compliance page). Allowed: hooks, transcripts on disk, the Claude Code CLI itself (`claude -p --resume`), Channels (research preview), and the scheduled-task API trigger, which uses its own token.
+- **Multiple accounts** on the one PC: one Claude config folder per account (`CLAUDE_CONFIG_DIR`).
+- **Lite UI, portrait only**, for phone and tablet, from `docs/lite-mockup.html`: a small live office, then the session list, then the chatroom, with alerts, progress, rename, playroom and two-way chat. The user picked "small office + list", "small office", all four features, and "phone and tablet".
+
+### Next steps, in order (report after each one)
+1. **Remove the plan-limits meter.** `fetch_usage` / `USAGE` / `claude_token` in `server.rs`, `usage` in `/api/state`, `renderUsage` and `#usage` in `index.html`, plus the CLAUDE.md and NOTES text. It sends the user's OAuth token to the usage service, which is not allowed.
+2. **Check the real PC install:**
+   - the running version and that `DevRoom.exe` sits where the user keeps it;
+   - the autostart entry (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run\DevRoom`) points at `DevRoom.exe`;
+   - hooks are present in `~/.claude/settings.json` without removing the user's other hooks (`icms-commandments.js`);
+   - `%APPDATA%\DevRoom` holds `state.json`, `window.json` and `ui\`.
+   
+   0.15.1 fixed the self-update (`app_exe()`). Confirm that the next release installs and restarts without a manual close.
+3. **Multiple accounts:**
+   - install the hooks into every Claude config folder the user names;
+   - tag each session with its account (from the config dir or `transcript_path`);
+   - show the tag in the UI.
+4. **Main/sub (branch) detection.** A branched session's transcript carries `forkedFrom: {sessionId, messageUuid}` (seen in the Claude Code 2.1.316 binary). Read it in `read_transcript` and the live tail, then:
+   - auto-group each main with its branches into one playroom, the main as ★ lead;
+   - indent the subs under their main.
+   
+   First look at a real branched transcript on the PC (`~/.claude/projects/*/*.jsonl`) to confirm the field.
+5. **Name sync app → Claude, legally.** `/rename` writes a `custom-title` line to the transcript. Test on the PC whether appending such a line, while the session is idle, is picked up by Claude Code and the Claude app. If it is not reliable, keep names one-way (Claude → app).
+6. **Build the Lite UI** (portrait) per the mockup, as the main UI for phone and tablet.
+7. **A laptop readiness check in the app:** the PC is asleep or offline, hooks are missing, or the CLI is not found.
+
+### Facts worth knowing
+- **Real sessions seen in the user's account:**
+  - Remote Control sessions on the PC, titled like "FIXER : NINGNING", "FIXER : GISELLE", "FIXER : WINTER", "DESIGN : YUNA";
+  - the cloud session "DEV-ROOM-APP" (this one).
+- **The PC's Remote Control folders:** icms-master-tool, aio-icms-tool, smc-salary-calculator, gmail-organizer.
+- **Claude Code transcript title lines:** `ai-title` (`aiTitle`) and `custom-title` (`customTitle`). 0.15.0 reads both.
+
 ## Current state (v0.15.1, 2026-11-02)
 
 Shipped and auto-updating (releases v0.10.0 → v0.15.1 were all merged and published):
@@ -40,7 +79,8 @@ Shipped and auto-updating (releases v0.10.0 → v0.15.1 were all merged and publ
 - **Docs:** `docs/flowcharts.html`, nine ISO 5807 flowcharts of the whole system, also published as the artifact "Dev Room System Flow" (private to the user; no links to the user).
 
 ### Waiting on the user
-- **Quality plan, proposed 2026-11-02; waiting for the user's go.**
+- **Superseded by the HANDOFF above.** The quality plan below still applies as a later step.
+- **Quality plan, proposed 2026-11-02.**
   1. Automated tests in CI: the server with a stand-in `claude`, plus Playwright at PC, tablet portrait and landscape, and phone sizes. A failing test blocks the merge.
   2. Android conditions: WebView user agent and iframe, the keyboard shrinking the viewport, rotation.
   3. Real Claude Code behaviour: late SessionEnd, subagents, background agents, Esc, long steps. Every bug the user reports becomes a test.
