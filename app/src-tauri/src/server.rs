@@ -720,6 +720,15 @@ fn record(s: &Value, names: &Value, shared: bool) -> Value {
         .or_else(|| if shared || cwd.is_empty() { named("relay_title") } else { None })
         .unwrap_or_else(|| if cwd.is_empty() { format!("Session {}", id.chars().take(8).collect::<String>()) } else { base_name(cwd) });
     let title = names.get(id).and_then(|x| x.as_str()).filter(|t| !t.trim().is_empty()).map(String::from).unwrap_or_else(|| own.clone());
+    // where the name came from, for the Detalye tab (so a wrong name can be traced on the real PC)
+    let title_src = if names.get(id).and_then(|x| x.as_str()).map(|t| !t.trim().is_empty()).unwrap_or(false) { "Dev Room rename" }
+        else if named("custom_title").is_some() { "Claude rename (/rename, Claude app o agent-name)" }
+        else if named("auto_title").is_some() { "Sariling title ni Claude (ai-title)" }
+        else if named("first_prompt").is_some() { "Unang utos mo" }
+        else if (shared || cwd.is_empty()) && named("relay_title").is_some() { "Unang utos ng coordinator" }
+        else if !cwd.is_empty() { "Pangalan ng folder (walang pangalan sa transcript)" } else { "Session id" };
+    let transcript = s.get("transcript").and_then(|x| x.as_str()).unwrap_or("");
+    let side = Path::new(transcript).parent().map(|d| d.join(id).join("custom-title.json").is_file()).unwrap_or(false);
     let bucket = match s.get("status").and_then(|x| x.as_str()).unwrap_or("idle") {
         "working" => "SESSION_STATUS_BUCKET_WORKING",
         "needs" => "SESSION_STATUS_BUCKET_BLOCKED",
@@ -727,7 +736,8 @@ fn record(s: &Value, names: &Value, shared: bool) -> Value {
         _ => "SESSION_STATUS_BUCKET_COMPLETED",
     };
     json!({
-        "id": id, "title": title, "own_title": own, "status_bucket": bucket,
+        "id": id, "title": title, "own_title": own, "status_bucket": bucket, "title_src": title_src, "transcript": transcript, "sidecar": side,
+        "found_by": if s.get("scanned").and_then(|x| x.as_bool()).unwrap_or(false) { "scan" } else { "hooks" },
         "updated_at": s.get("updated_at").cloned().unwrap_or(json!(0)),
         "environment_kind": "bridge", "origin": "local_pc", "cwd": cwd,
         "short": s.get("short").cloned().unwrap_or(json!("")),

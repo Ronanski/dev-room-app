@@ -7,6 +7,12 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.18.1 (2026-11-02)
+
+- **The phone's tabs stay clear of the navigation keys even before the new phone app is installed.** An Android app older than 0.18.0 sends no bar sizes; the office (inside the app, on Android) now keeps 28 px at the top and 48 px at the bottom until real sizes arrive, instead of 0.
+- **Detalye shows where a session's name came from** (Dev Room rename, Claude rename, Claude's own title, your first prompt, the coordinator, or the folder because the transcript has no name), whether a `custom-title.json` exists, whether it was found by hooks or by the scan, and its transcript path. `/api/state` records carry `title_src`, `transcript`, `sidecar` and `found_by`. The user reported that renames and the phone fixes did not work on the real devices; this makes the cause visible there instead of guessed.
+- Tested here: a scratch server shows the right source for a sidecar rename, a transcript rename and a first prompt; inside an app-like frame without bar sizes the tabs end 48 px above the bottom; no page errors. Not tested: the real phone and PC.
+
 ## 0.18.0 (2026-11-02)
 
 - **Renames show up again.** Claude Code 2.1.3xx can keep a rename only in a sidecar file, `<transcript folder>/<session id>/custom-title.json` (`{"customTitle": …}`), for renames from the Claude app or a Claude Projects thread. Dev Room never read it, so renamed threads kept their old names. `server.rs` now reads it when a session is first seen (it wins when it is newer than the transcript's last write) and watches it live in the transcript reader (re-read only when the file changes), after the transcript's own lines so an old name in a session's history never covers it.
