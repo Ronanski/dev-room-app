@@ -59,6 +59,10 @@ const App=C&&C.registerPlugin?C.registerPlugin('App'):null;
 const APK_URL='https://github.com/Ronanski/dev-room-app/releases/latest/download/DevRoom.apk';
 const store={get(k){try{return localStorage.getItem(k);}catch(e){return null;}},set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v);}catch(e){}}};
 let myBuild=Number(window.APK_BUILD||0);
+// APK_SHELL is this app's own code (the mobile/ folder). A release that only changes the office (served by the PC)
+// has the same shell, so the phone downloads nothing.
+const myShell=String(window.APK_SHELL||'');
+let dev={};   // DevRoom.info(): silentUpdate (Android 12+), canInstall, updateError
 $('ver').textContent=`Dev Room app v${window.APK_VERSION||'dev'} (build ${myBuild})`;
 
 function parseLink(s){
@@ -117,9 +121,12 @@ async function checkUpdate(){
   try{
     const r=await fetch(`${url}/api/state?bg=1&t=${encodeURIComponent(token)}`,{cache:'no-store'});
     if(r.status===401){unpaired=true;showPair('Hindi na tinatanggap ng PC ang pairing na ito. I-scan ulit ang QR code.');return;}
-    const j=await r.json();const latest=j.latest&&j.latest.apk||0;
-    apk={build:myBuild,latest,ver:String(j.latest&&j.latest.version||'')};sendApk();
-    if(latest>myBuild&&store.get('devroom.skip')!==String(latest)){
+    const j=await r.json();const L=j.latest||{},latest=Number(L.apk||0),ls=String(L.shell||'');
+    const need=latest>myBuild&&!(ls&&myShell&&ls===myShell);
+    const auto=need&&!!(DevRoom&&DevRoom.downloadUpdate&&dev.silentUpdate&&dev.canInstall);
+    apk={build:myBuild,latest:need?latest:myBuild,ver:String(L.version||''),auto};sendApk();
+    if(auto){autoUpdate(latest);return;}
+    if(need&&store.get('devroom.skip')!==String(latest)){
       const b=$('bar');b.style.display='flex';
       const ver=String(j.latest.version||'').replace(/[^0-9A-Za-z.\-]/g,'');
       b.innerHTML=`<span>May bagong bersyon ng Dev Room app${ver?' (v'+ver+')':''}. I-download at i-install ito, at mananatili ang pairing mo.</span>`+'<button id="upd">I-update</button><button class="ghost" id="later">Mamaya</button>';
@@ -134,6 +141,38 @@ const canView=!!(DevRoom&&window.Capacitor&&Capacitor.isPluginAvailable&&Capacit
 // the office shows whether this phone app is up to date (and offers the update) in its header
 let apk=null;
 function sendApk(){const w=$('office').contentWindow;if(w&&apk&&current)try{w.postMessage(Object.assign({type:'devroom:apk'},apk),new URL(current).origin);}catch(e){}}
+/* Self-update without a tap (Android 12+): download quietly, then install when you leave the app. If the app stays
+   on screen (a tablet showing the office), a 15 s countdown with Ngayon and Mamaya; the app closes for a moment and
+   you open it again. Android may still ask once (then a notification "I-tap para i-install" also appears). */
+const au={state:'',build:0,left:0,timer:0,snooze:0};
+async function autoUpdate(build){
+  if(au.state==='downloading'||au.state==='installing')return;
+  if(au.state==='ready'&&au.build===build){maybeInstall();return;}
+  au.state='downloading';au.build=build;
+  try{await DevRoom.downloadUpdate({url:APK_URL});au.state='ready';maybeInstall();}
+  catch(e){au.state='';}   // tried again at the next check
+}
+function maybeInstall(){
+  if(au.state!=='ready')return;
+  if(document.hidden){installNow();return;}
+  if(Date.now()<au.snooze||au.timer)return;
+  const b=$('bar');au.left=15;
+  const draw=()=>{b.style.display='flex';b.innerHTML=`<span>Mag-a-update ang Dev Room app sa loob ng ${au.left} s. Magsasara ito saglit; buksan mo lang ulit. Mananatili ang pairing mo.</span><button id="upd">Ngayon</button><button class="ghost" id="later">Mamaya</button>`;
+    $('upd').onclick=()=>{clearInterval(au.timer);au.timer=0;installNow();};
+    $('later').onclick=()=>{clearInterval(au.timer);au.timer=0;au.snooze=Date.now()+60*60*1000;b.style.display='none';};};
+  draw();au.timer=setInterval(()=>{au.left--;if(au.left<=0){clearInterval(au.timer);au.timer=0;installNow();}else draw();},1000);
+}
+async function installNow(){
+  if(au.state!=='ready')return;au.state='installing';
+  const b=$('bar');
+  try{
+    const r=await DevRoom.installUpdate({url:APK_URL,silent:true});
+    if(r&&r.needsPermission){au.state='ready';b.style.display='flex';b.innerHTML='<span>Isang beses lang: i-on ang <b>Allow from this source</b> para sa Dev Room, bumalik dito, at pindutin ang I-update.</span><button id="upd">I-update</button>';$('upd').onclick=installNow;return;}
+    if(!document.hidden){b.style.display='flex';b.innerHTML='<span>Ini-install ang update… Magsasara saglit ang app.</span>';}
+  }catch(e){au.state='';b.style.display='flex';b.innerHTML='<span id="updMsg"></span><button id="upd">Subukan ulit</button>';$('updMsg').textContent=String(e&&e.message||e||'Hindi na-install ang update.');$('upd').onclick=getApk;}
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&au.state==='ready'){clearInterval(au.timer);au.timer=0;installNow();}});
+
 // The update downloads inside the app and opens Android's installer: no browser, nothing piling up in Downloads.
 let updBusy=false;
 async function getApk(){
@@ -179,10 +218,12 @@ function handleUrl(u){const p=parseLink(u);if(!(p&&p.url&&p.token))return;
 $('go').onclick=()=>{const p=parseLink($('link').value);if(!p){showPair('Hindi tama ang link. Kopyahin ang buong link mula sa QR code, kasama ang ?t= sa dulo.');return;}save(p);showOffice();};
 
 (async()=>{
-  try{if(DevRoom){const i=await DevRoom.info();if(i&&i.versionCode)myBuild=Math.max(myBuild,Number(i.versionCode));}}catch(e){}
+  try{if(DevRoom){const i=await DevRoom.info();dev=i||{};if(i&&i.versionCode)myBuild=Math.max(myBuild,Number(i.versionCode));
+    if(i&&i.updateError){const b=$('bar');b.style.display='flex';b.innerHTML='<span id="updMsg"></span><button id="upd">I-install</button><button class="ghost" id="later">Mamaya</button>';$('updMsg').textContent=i.updateError;$('upd').onclick=getApk;$('later').onclick=()=>{b.style.display='none';};}}}catch(e){}
   if(App){
     App.addListener('appUrlOpen',e=>handleUrl(e.url));
     App.addListener('resume',()=>{checkUpdate();showOffice();});
+    App.addListener('pause',()=>{if(au.state==='ready'){clearInterval(au.timer);au.timer=0;installNow();}});
   }
   setInterval(checkUpdate,10*60*1000);
   // keep checking the connection: home Wi-Fi, Tailscale or the internet (Malayo mode), whichever answers

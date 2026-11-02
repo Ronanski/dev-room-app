@@ -1550,6 +1550,8 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.17.0':{news:['<b>Kusa nang nag-a-update ang phone app</b> (Android 12 pataas): dina-download nang tahimik at ini-install pag-alis mo sa app. Kapag nakabukas lang ang app, may 15 segundong countdown na may <b>Ngayon</b> at <b>Mamaya</b>.','<b>Wala nang APK kapag walang binago sa phone app.</b> Ang mga bago sa office ay galing sa PC, kaya walang ida-download.','Bumabalik nang kusa ang alerts pagkatapos ng update.'],
+    todo:['Wala kang gagawin sa PC.','<b>Huling beses na lang:</b> sa tablet at phone, pindutin ang I-update at ang Install. Pagkatapos nito, kusa na ang mga update.']},
   '0.16.2':{news:['<b>Nababasa na ang mensahe ng coordinator</b> sa chat ng thread: makikita mo ang sinabi mo at ang note niya, hindi na ang mga tag.','<b>Mas malinaw na pangalan ng thread:</b> galing sa folder niya (hal. Winter Test, Code Fixer), o sa utos ng coordinator kapag iisa ang folder nila.','<b>Sa tablet, naaayos na ang lapad ng chat:</b> i-drag ang bar sa pagitan ng listahan at chat. I-double tap para ibalik.'],
     todo:['Wala kang gagawin sa PC.','Sa tablet o phone, wala ring kailangang i-install para dito.']},
   '0.16.1':{news:['<b>Lumalabas na ang tunay na pangalan ng mga thread</b> mula sa Claude Projects. Dati, pangalan ng folder o ang sariling title ni Claude ang nakikita mo, kaya magkakamukha ang mga thread.','<b>Hindi na magkakamukha ang may parehong role:</b> sa halip na Fixer, Fixer 2 at Fixer 3, makikita mo na ang Ningning, Giselle at Winter.'],
@@ -1686,6 +1688,7 @@ function pcUpd(){
 }
 function apkUpd(){
   const a=UPD.apk;if(!a)return null;
+  if(a.latest>a.build&&a.auto)return{st:'wait',t:'Phone app: kusang nag-a-update',d:`May bagong phone app${a.ver?' (v'+a.ver+')':''}. Dina-download ito nang tahimik at mai-install pag-alis mo sa app (o pagkatapos ng 15 s na countdown). Wala kang pipindutin.`};
   if(a.latest>a.build)return{st:'act',t:'Phone app: pindutin para i-update',d:`Ang phone app ay build ${a.build}; ang pinakabago ay build ${a.latest}${a.ver?' (v'+a.ver+')':''}. Pindutin ito para i-download at i-install. Mananatili ang pairing mo.`,act:true};
   return{st:'ok',t:'✓ Phone app pinakabago',d:`Ang phone app ay build ${a.build}, ang pinakabago.`};
 }
@@ -1699,7 +1702,7 @@ function showUpd(){
 }
 if(window.parent!==window)addEventListener('message',e=>{if(e.source!==window.parent)return;const d=e.data||{};
   if(d.type==='devroom:via'){const v={wifi:' (Wi-Fi)',tailscale:' (Tailscale)',remote:' (malayo, internet)'}[d.via]||'';const el=$('via');if(el&&el.textContent!==v)el.textContent=v;return;}
-  if(d.type==='devroom:apk'){UPD.apk={build:Number(d.build)||0,latest:Number(d.latest)||0,ver:String(d.ver||'').replace(/[^0-9A-Za-z.\-]/g,'')};showUpd();}});
+  if(d.type==='devroom:apk'){UPD.apk={build:Number(d.build)||0,latest:Number(d.latest)||0,ver:String(d.ver||'').replace(/[^0-9A-Za-z.\-]/g,''),auto:!!d.auto};showUpd();}});
 // A downloaded update installs itself: right away when the window is not on screen, otherwise after 15 s
 // without input (never while you are typing a message), with a 5 s countdown and a button to wait.
 const autoRestart={ready:false,ver:'',left:0,timer:0,waitUntil:0,lastInput:Date.now(),
