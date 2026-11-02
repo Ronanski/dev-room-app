@@ -1,6 +1,7 @@
 package app.devroom.mobile;
 
 import android.Manifest;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -150,54 +151,117 @@ public class DevRoomPlugin extends Plugin {
         claude.setLayoutParams(lp);
     }
 
-    /**
-     * Downloads the new app inside Dev Room (no browser, nothing left in Downloads) and opens Android's
-     * installer on it. Progress comes as "updateProgress" events. The first time, Android asks to allow
-     * installs from Dev Room; the call then resolves with needsPermission and opens that setting.
-     */
-    @PluginMethod
-    public void installUpdate(PluginCall call) {
-        String url = call.getString("url");
-        if (url == null || !url.startsWith("https://github.com/Ronanski/dev-room-app/releases/")) { call.reject("bad url"); return; }
+    /** The APK is kept here between the download and the install. */
+    private java.io.File apkFile() { return new java.io.File(new java.io.File(getContext().getCacheDir(), "updates"), "DevRoom.apk"); }
+
+    private static boolean okUrl(String url) { return url != null && url.startsWith("https://github.com/Ronanski/dev-room-app/releases/"); }
+
+    /** Downloads the APK (progress as "updateProgress" events). Throws on failure. */
+    private void download(String url) throws Exception {
+        java.io.File apk = apkFile();
+        apk.getParentFile().mkdirs();
+        java.io.File part = new java.io.File(apk.getParentFile(), "DevRoom.apk.part");
+        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+        c.setInstanceFollowRedirects(true);
+        c.setConnectTimeout(15000);
+        c.setReadTimeout(30000);
+        int code = c.getResponseCode();
+        if (code != 200) throw new Exception("HTTP " + code);
+        long total = c.getContentLengthLong(), got = 0;
+        int last = -1;
+        try (java.io.InputStream in = c.getInputStream(); java.io.OutputStream out = new java.io.FileOutputStream(part)) {
+            byte[] buf = new byte[64 * 1024];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.write(buf, 0, n);
+                got += n;
+                int pct = total > 0 ? (int) (got * 100 / total) : -1;
+                if (pct != last) { last = pct; JSObject p = new JSObject(); p.put("pct", pct); notifyListeners("updateProgress", p); }
+            }
+        } finally { c.disconnect(); }
+        if (part.length() < 1024 * 1024) throw new Exception("download looks wrong");
+        apk.delete();
+        if (!part.renameTo(apk)) throw new Exception("cannot keep the download");
+    }
+
+    /** Android's "install unknown apps" switch for Dev Room; opens that setting when it is off. */
+    private boolean canInstall() {
         Context ctx = getContext();
         if (Build.VERSION.SDK_INT >= 26 && !ctx.getPackageManager().canRequestPackageInstalls()) {
             Intent s = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + ctx.getPackageName()));
             s.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             try { ctx.startActivity(s); } catch (Exception ignored) { }
-            JSObject r = new JSObject(); r.put("needsPermission", true); call.resolve(r); return;
+            return false;
         }
+        return true;
+    }
+
+    /**
+     * Installs the downloaded APK through an install session. On Android 12+ a self-update needs no tap
+     * (USER_ACTION_NOT_REQUIRED); when Android still asks, UpdateReceiver opens the confirmation. The app is
+     * replaced right after, so this is called when you leave the app or after the countdown.
+     */
+    private void sessionInstall(java.io.File apk) throws Exception {
+        Context ctx = getContext();
+        android.content.pm.PackageInstaller pi = ctx.getPackageManager().getPackageInstaller();
+        android.content.pm.PackageInstaller.SessionParams sp = new android.content.pm.PackageInstaller.SessionParams(android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+        sp.setAppPackageName(ctx.getPackageName());
+        sp.setSize(apk.length());
+        if (Build.VERSION.SDK_INT >= 31) sp.setRequireUserAction(android.content.pm.PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
+        if (Build.VERSION.SDK_INT >= 34) sp.setRequestUpdateOwnership(true);
+        int id = pi.createSession(sp);
+        try (android.content.pm.PackageInstaller.Session s = pi.openSession(id)) {
+            try (java.io.InputStream in = new java.io.FileInputStream(apk); java.io.OutputStream out = s.openWrite("DevRoom.apk", 0, apk.length())) {
+                byte[] buf = new byte[64 * 1024];
+                int n;
+                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                s.fsync(out);
+            }
+            Intent cb = new Intent(ctx, UpdateReceiver.class).setAction(UpdateReceiver.ACTION_RESULT);
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0);
+            s.commit(PendingIntent.getBroadcast(ctx, id, cb, flags).getIntentSender());
+        }
+    }
+
+    /** Downloads the update now, to install it later (when you leave the app). Resolves { ok } or { needsPermission }. */
+    @PluginMethod
+    public void downloadUpdate(PluginCall call) {
+        String url = call.getString("url");
+        if (!okUrl(url)) { call.reject("bad url"); return; }
         new Thread(() -> {
-            java.io.File dir = new java.io.File(ctx.getCacheDir(), "updates");
-            java.io.File apk = new java.io.File(dir, "DevRoom.apk");
+            try { download(url); JSObject r = new JSObject(); r.put("ok", true); call.resolve(r); }
+            catch (Exception e) { call.reject("Hindi na-download ang update: " + e.getMessage()); }
+        }).start();
+    }
+
+    /**
+     * Installs the update: the APK downloaded before (or downloads it now). With silent:true it uses the install
+     * session (no tap on Android 12+); otherwise Android's installer screen opens, as before.
+     * The first time, Android asks to allow installs from Dev Room; the call then resolves with needsPermission.
+     */
+    @PluginMethod
+    public void installUpdate(PluginCall call) {
+        String url = call.getString("url");
+        boolean silent = Boolean.TRUE.equals(call.getBoolean("silent", false));
+        if (!okUrl(url)) { call.reject("bad url"); return; }
+        if (!canInstall()) { JSObject r = new JSObject(); r.put("needsPermission", true); call.resolve(r); return; }
+        Context ctx = getContext();
+        new Thread(() -> {
+            java.io.File apk = apkFile();
             try {
-                dir.mkdirs();
-                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
-                c.setInstanceFollowRedirects(true);
-                c.setConnectTimeout(15000);
-                c.setReadTimeout(30000);
-                int code = c.getResponseCode();
-                if (code != 200) throw new Exception("HTTP " + code);
-                long total = c.getContentLengthLong(), got = 0;
-                int last = -1;
-                try (java.io.InputStream in = c.getInputStream(); java.io.OutputStream out = new java.io.FileOutputStream(apk)) {
-                    byte[] buf = new byte[64 * 1024];
-                    int n;
-                    while ((n = in.read(buf)) > 0) {
-                        out.write(buf, 0, n);
-                        got += n;
-                        int pct = total > 0 ? (int) (got * 100 / total) : -1;
-                        if (pct != last) { last = pct; JSObject p = new JSObject(); p.put("pct", pct); notifyListeners("updateProgress", p); }
-                    }
-                } finally { c.disconnect(); }
-                if (apk.length() < 1024 * 1024) throw new Exception("download looks wrong");
-                Uri uri = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", apk);
-                Intent i = new Intent(Intent.ACTION_VIEW);
-                i.setDataAndType(uri, "application/vnd.android.package-archive");
-                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-                ctx.startActivity(i);
-                JSObject r = new JSObject(); r.put("ok", true); call.resolve(r);
+                if (!silent || !apk.isFile() || apk.length() < 1024 * 1024) download(url);
+                if (silent) {
+                    sessionInstall(apk);
+                } else {
+                    Uri uri = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", apk);
+                    Intent i = new Intent(Intent.ACTION_VIEW);
+                    i.setDataAndType(uri, "application/vnd.android.package-archive");
+                    i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                    ctx.startActivity(i);
+                }
+                JSObject r = new JSObject(); r.put("ok", true); r.put("silent", silent); call.resolve(r);
             } catch (Exception e) {
-                call.reject("Hindi na-download ang update: " + e.getMessage());
+                call.reject("Hindi na-install ang update: " + e.getMessage());
             }
         }).start();
     }
@@ -208,6 +272,11 @@ public class DevRoomPlugin extends Plugin {
         try {
             Context c = getContext();
             r.put("versionCode", PackageInfoCompat.getLongVersionCode(c.getPackageManager().getPackageInfo(c.getPackageName(), 0)));
+            r.put("silentUpdate", Build.VERSION.SDK_INT >= 31);
+            r.put("canInstall", Build.VERSION.SDK_INT < 26 || c.getPackageManager().canRequestPackageInstalls());
+            android.content.SharedPreferences p = c.getSharedPreferences(WatchService.PREFS, Context.MODE_PRIVATE);
+            String err = p.getString("update_error", null);
+            if (err != null) { r.put("updateError", err); p.edit().remove("update_error").apply(); }
         } catch (Exception e) {
             r.put("versionCode", 0);
         }

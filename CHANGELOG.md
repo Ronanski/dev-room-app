@@ -7,6 +7,15 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.17.0 (2026-11-02)
+
+- **The phone app updates itself without a tap (Android 12 and newer).** The update downloads quietly and installs through an install session with `USER_ACTION_NOT_REQUIRED`, which Android allows for an app updating itself. It installs when you leave the app; if the app stays on screen (a tablet showing the office), a 15 s countdown with **Ngayon** and **Mamaya** (Mamaya waits an hour or until you leave the app). The app closes for a moment; open it again. On Android 14+ Dev Room also asks to own its updates. If Android still wants a confirmation, it opens it, and a notification "I-tap para i-install" is posted. Older Android keeps the I-update banner and Android's Install button.
+- **No APK when the Android app did not change.** CI stamps the APK and `version.json` with `shell`, the git tree id of `mobile/`. The phone downloads a new APK only when that id differs; releases that change only the office (served by the PC) download nothing. A `version.json` without `shell` still updates by build number.
+- **Alerts come back by themselves after an update:** `UpdateReceiver` starts the background watcher again on `MY_PACKAGE_REPLACED`.
+- The office header says "Phone app: kusang nag-a-update" while this happens. A failed install is shown the next time the app opens, with **I-install** (the manual way).
+- **Once more by hand:** the APK that brings this (0.17.0) still installs the old way: press I-update, then Install.
+- Tested here: the phone shell's update flow in Playwright with a stand-in plugin and server (same shell: nothing downloaded; new shell: quiet download, countdown, Ngayon installs silently, Mamaya waits, leaving the app installs at once, older Android gets the banner, an old `version.json` still updates). The Java (install session, receiver) is compiled by CI only. Not tested: a real Android phone or tablet.
+
 ## 0.16.2 (2026-11-02)
 
 - **Messages a Claude Projects coordinator passes to a thread are readable.** They arrive as the thread's prompt, wrapped in `<project_claude_message>` with `<relay>`, `<cited>` and `<note>` (an underscore tag, so the system-prompt filter missed it), and the chat showed the raw tags. The chat now shows them as **Coordinator → thread**, with your cited words under your name and the coordinator's note (`relayMsg` in the UI; `relay_text` in `server.rs`). The session's detail reads "Utos ng coordinator: …".

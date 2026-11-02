@@ -74,7 +74,10 @@ jobs:
       - name: Sync web shell into the Android project
         working-directory: mobile
         run: |
-          echo "window.APK_BUILD=${{ github.run_number }};window.APK_VERSION='$DEVROOM_VERSION';" > www/build.js
+          # APK_SHELL: the Android app's own code (the mobile/ folder). Phones only download a new APK when it changes;
+          # everything else (the office UI) comes from the PC.
+          SHELL_ID=$(git rev-parse --short=12 HEAD:mobile)
+          echo "window.APK_BUILD=${{ github.run_number }};window.APK_VERSION='$DEVROOM_VERSION';window.APK_SHELL='$SHELL_ID';" > www/build.js
           npm install
           npx cap sync android
       - name: Signing key
@@ -116,7 +119,8 @@ jobs:
       - name: Version file for the in-app updaters
         run: |
           API=$(tr -dc '0-9' < app/api-version.txt)
-          printf '{"version": "%s", "build": %s, "api": %s, "apk": %s, "commit": "%s"}\n' "$DEVROOM_VERSION" "${{ github.run_number }}" "$API" "${{ github.run_number }}" "${{ github.sha }}" > dl/version.json
+          SHELL_ID=$(git rev-parse --short=12 HEAD:mobile)
+          printf '{"version": "%s", "build": %s, "api": %s, "apk": %s, "shell": "%s", "commit": "%s"}\n' "$DEVROOM_VERSION" "${{ github.run_number }}" "$API" "${{ github.run_number }}" "$SHELL_ID" "${{ github.sha }}" > dl/version.json
           ls -la dl && cat dl/version.json
       # Every build gets its own release; GitHub refuses to update an existing one from this workflow.
       # main builds become the Latest release, which the apps update from (releases/latest/download/...).
