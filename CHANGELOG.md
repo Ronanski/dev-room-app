@@ -7,6 +7,17 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.16.0 (2026-11-02)
+
+- **Lite view for phone and tablet (portrait),** from `docs/lite-mockup.html`. It is on by default on a touch screen held upright; landscape and the PC keep the full view.
+  - **A small live office on top:** people sit at their desks while they work, stand at the door with a raised hand when they need you, walk around when they are done, and rest on the sofa after 30 idle minutes. Tapping a person opens her chat. Only this small canvas is drawn (about 30 fps), so the big map no longer runs on the phone, which saves battery.
+  - **An alert bar** for the first session that needs you (or failed), with **Sagutin**.
+  - **Filters:** Lahat, Kailangan ka, Gumagana and Tapos, with counts.
+  - **The session list:** face, name (★ for the leader), the real status (never the big map's pastimes, like billiards), what she is doing or the question, and the progress bar with n/m. Sessions that need you come first.
+  - **Phone:** the Office tab is the small office and the list; tapping a session opens the chat with a ‹ back arrow. **Tablet:** the office across the top, the list on the left and the chat on the right. While typing, only the chat stays.
+  - **Buong view (malaking office)** at the end of the list switches this device back to the full view (remembered); **Lite view** in the header turns it on again.
+- Tested here (Playwright with the Android WebView user agent, against a stand-in server with the same `/api/state`, `/api/convo` and `/api/send`): 360×740 and 390×844 phones, an 800×1280 tablet in dark mode, 1400×900 PC. Filters, Sagutin, sending a message, the back arrow, tapping a person, the alert clearing when a session goes back to work, the full-view switch (also after a reload), landscape and typing on the tablet all pass, with no page errors and no sideways scroll. Not tested: the real phone, the real tablet and the real PC server.
+
 ## 0.15.2 (2026-11-02)
 
 - **The plan-limits meter is gone** (the **5 oras** and **Linggo** chips in the header, added in 0.13.0). It read the Claude sign-in token from `~/.claude/.credentials.json` and sent it to the usage service every 2 minutes. Using a Claude login token outside Claude Code breaks the Consumer Terms, so it could get the account banned. Removed: `fetch_usage`, `claude_token` and the usage thread in `server.rs`, `usage` in `/api/state`, and `renderUsage` / `#usage` in the UI. Dev Room never reads the sign-in file now.

@@ -22,7 +22,8 @@ The work moves to a new Claude Code session that runs **on the user's Windows PC
 - **Lite UI, portrait only**, for phone and tablet, from `docs/lite-mockup.html`: a small live office, then the session list, then the chatroom, with alerts, progress, rename, playroom and two-way chat. The user picked "small office + list", "small office", all four features, and "phone and tablet".
 
 ### Where it stands now (2026-11-02, PC session)
-- **0.15.2 is in draft PR #31** (branch `claude/remove-usage-meter`, base `main`). It is **not merged and not released**: the PC still runs the old meter until it is.
+- **0.15.2 is merged** (PR #31).
+- **0.16.0 (Lite view)** was built in a cloud session on branch `claude/nifty-hypatia-32lm3b`, in its own draft PR. It is not merged until CI is green and the user agrees.
 - **CI on release branches:** `windows-app.yml` used to run on `main` and the old cloud branch only, so PR #31 had no checks. The user chose to add `claude/**` to the push trigger. Builds from those branches are prereleases (never Latest), so they never reach the PC or the phone before the merge.
 - Each release gets its own branch and PR from `origin/main`; never push to `main` directly (the user's rule).
 - Next: merge 0.15.2 once CI is green, then step 2 below.
@@ -46,7 +47,7 @@ The work moves to a new Claude Code session that runs **on the user's Windows PC
    
    First look at a real branched transcript on the PC (`~/.claude/projects/*/*.jsonl`) to confirm the field.
 5. **Name sync app → Claude, legally.** `/rename` writes a `custom-title` line to the transcript. Test on the PC whether appending such a line, while the session is idle, is picked up by Claude Code and the Claude app. If it is not reliable, keep names one-way (Claude → app).
-6. **Build the Lite UI** (portrait) per the mockup, as the main UI for phone and tablet.
+6. ~~**Build the Lite UI**~~ Done in 0.16.0: the `lite` class on `.app` (touch screen held upright, or `?lite=1`). The small office is `#liteRoom` (`liteDraw`); the list is `renderLite`. The big map is not drawn while Lite is on. "Buong view" saves `devroom.full=1`. Verify on the real phone and tablet.
 7. **A laptop readiness check in the app:** the PC is asleep or offline, hooks are missing, or the CLI is not found.
 
 ### Facts worth knowing
@@ -57,7 +58,7 @@ The work moves to a new Claude Code session that runs **on the user's Windows PC
 - **Claude Code transcript title lines:** `ai-title` (`aiTitle`) and `custom-title` (`customTitle`). 0.15.0 reads both.
 - **Testing on the user's PC (since 0.15.2):** Rust is the GNU toolchain (`~/.cargo/bin`, no MSVC) plus WinLibs MinGW from winget for `dlltool` and `ring`. Build the scratch server with `--target-dir C:/drt` (long Temp paths break build scripts). Run it on port 4417 with `APPDATA`, `LOCALAPPDATA`, `USERPROFILE`, `HOME` and `CLAUDE_CONFIG_DIR` set to a scratch folder: `start()` installs hooks for its own port, and it must never touch the real `~/.claude/settings.json` or `%APPDATA%DevRoom`. The real Dev Room keeps 4317 and 4318. Playwright 1.64 matches the cached Chromium; launching it needs the shell sandbox off. Stop the test server with `taskkill /IM drsrv.exe`.
 
-## Current state (v0.15.2, 2026-11-02)
+## Current state (v0.16.0, 2026-11-02)
 
 Shipped and auto-updating (releases v0.10.0 → v0.15.1 were all merged and published):
 - **PC self-update fixed (0.15.1):** restarts used the renamed old image (`current_exe`), so the PC stayed on v0.11.0. Now `app_exe()`. The user must close and reopen once; confirm the PC then shows the newest version after the next release.
