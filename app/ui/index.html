@@ -1575,6 +1575,8 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.18.1':{news:['<b>Hindi na natatakpan ng nav keys ang tabs</b> kahit hindi pa naka-install ang bagong phone app.','<b>Sa Detalye ng session,</b> makikita mo na kung saan galing ang pangalan niya at ang transcript niya. Kapag mali ang pangalan, i-screenshot ito at ipadala.'],
+    todo:['Wala kang gagawin sa PC.','Wala ring i-install sa phone o tablet.']},
   '0.18.0':{news:['<b>Lumalabas na ang mga pinalitan mong pangalan</b> ng thread, pati ang mga ni-rename mo sa Claude app o sa Claude Projects.','<b>Lahat ng session sa PC ay nakikita na,</b> kahit hindi nagpapadala ng update, at kahit nasa ibang Claude account.','<b>Mga Playroom:</b> may <b>I-scan ang PC</b> para sa mga mas lumang session, at naka-grupo na ayon sa project na may <b>Ilagay lahat sa</b>.','<b>Sa phone at tablet:</b> i-drag ang bar sa ilalim ng maliit na office para palakihin o paliitin ito.','<b>Sa phone:</b> hindi na natatakpan ng nav keys at ng status bar ang app, hindi na lumalampas ang chat, at bumabalik na ang tabs pagkasara ng keyboard. Ang back key ay bumabalik sa listahan.'],
     todo:['Wala kang gagawin sa PC.','Sa phone at tablet: kusang mag-a-update ang app (naka-0.17.0 ka na). Kung wala pang 0.17.0, pindutin ang I-update at Install.']},
   '0.17.0':{news:['<b>Kusa nang nag-a-update ang phone app</b> (Android 12 pataas): dina-download nang tahimik at ini-install pag-alis mo sa app. Kapag nakabukas lang ang app, may 15 segundong countdown na may <b>Ngayon</b> at <b>Mamaya</b>.','<b>Wala nang APK kapag walang binago sa phone app.</b> Ang mga bago sa office ay galing sa PC, kaya walang ida-download.','Bumabalik nang kusa ang alerts pagkatapos ng update.'],
@@ -1727,9 +1729,13 @@ function showUpd(){
   if(el.textContent!==t)el.textContent=t;if(el.dataset.st!==main.st)el.dataset.st=main.st;
   el.title=[pc&&('PC: '+pc.d),ap&&('Phone: '+ap.d)].filter(Boolean).join('\n');
 }
+// Inside the Android app (edge to edge) an older app version sends no bar sizes; until it does, keep the usual
+// status bar and navigation key heights clear so the tabs are never under the keys.
+let gotInsets=false;
+if(window.parent!==window&&/Android/i.test(navigator.userAgent))setTimeout(()=>{if(gotInsets)return;const st=document.documentElement.style;st.setProperty('--sat','28px');st.setProperty('--sab','48px');needResize=true;},2500);
 if(window.parent!==window)addEventListener('message',e=>{if(e.source!==window.parent)return;const d=e.data||{};
   if(d.type==='devroom:via'){const v={wifi:' (Wi-Fi)',tailscale:' (Tailscale)',remote:' (malayo, internet)'}[d.via]||'';const el=$('via');if(el&&el.textContent!==v)el.textContent=v;return;}
-  if(d.type==='devroom:insets'){const st=document.documentElement.style;for(const k of ['top','bottom','left','right'])st.setProperty('--sa'+k[0],Math.max(0,Math.min(200,Number(d[k])||0))+'px');needResize=true;return;}
+  if(d.type==='devroom:insets'){gotInsets=true;const st=document.documentElement.style;for(const k of ['top','bottom','left','right'])st.setProperty('--sa'+k[0],Math.max(0,Math.min(200,Number(d[k])||0))+'px');needResize=true;return;}
   if(d.type==='devroom:back'){let h=false;try{h=goBack();}catch(err){}try{window.parent.postMessage({type:'devroom:backDone',handled:h},'*');}catch(err){}return;}
   if(d.type==='devroom:apk'){UPD.apk={build:Number(d.build)||0,latest:Number(d.latest)||0,ver:String(d.ver||'').replace(/[^0-9A-Za-z.\-]/g,''),auto:!!d.auto};showUpd();}});
 // A downloaded update installs itself: right away when the window is not on screen, otherwise after 15 s
@@ -2765,7 +2771,9 @@ function renderPanel(){
 function liveRows(s){
   const pct=s.ctx&&s.ctx.max_tokens?Math.round(s.ctx.used_tokens/s.ctx.max_tokens*100):null;
   const arts=(s.artifacts||[]).filter(a=>/^https?:\/\//i.test(a.url||'')).slice(0,3).map(a=>`<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title||'Artifact')}</a>`).join(', ');
-  return `${s.detail?`<dt>Huling status</dt><dd>${esc(sent(s.detail))}</dd>`:''}${s.recent?`<dt>Huling ginawa</dt><dd>${esc(sent(s.recent))}</dd>`:''}
+  const rec=allRecords.find(r=>r.id===s.sid)||{};
+  const diag=rec.title_src?`<dt>Pangalan galing sa</dt><dd>${esc(rec.title_src)}${rec.sidecar?' · may custom-title.json':''} · nakita sa ${rec.found_by==='scan'?'scan ng PC':'hooks'}</dd>${rec.transcript?`<dt>Transcript</dt><dd style="font-family:var(--f-mono);font-size:11px;overflow-wrap:anywhere">${esc(rec.transcript)}</dd>`:''}`:'';
+  return diag+`${s.detail?`<dt>Huling status</dt><dd>${esc(sent(s.detail))}</dd>`:''}${s.recent?`<dt>Huling ginawa</dt><dd>${esc(sent(s.recent))}</dd>`:''}
     <dt>Huling update</dt><dd>${esc(dayLabel(s.at))}, ${esc(simLabel(s.at))}</dd>
     ${s.cwd?`<dt>Folder</dt><dd class="raw">${esc(s.cwd)}</dd>`:''}
     ${s.repo?`<dt>Repo</dt><dd class="raw">${esc(s.repo)}${s.branch?' @ '+esc(s.branch):''}</dd>`:''}
