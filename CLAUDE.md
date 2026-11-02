@@ -54,7 +54,7 @@ The user's real team is **LOGIC_SIM_PROJECT**: a leader plus subsessions (CODE F
   - **Progress:** `track_tasks` keeps each session's task list (`tasks`: id, t, a, st) from TodoWrite / TaskCreate / TaskUpdate; the UI's `prog()` drives tile bars, map bars, the Detalye checklist and the report walk to the Boss (`reportToBoss`).
   - **Queue reason:** `queue_why` (answering, step, nocli, busy, soon) is shown under a waiting message (`queueText`).
   - **Plan limits:** `fetch_usage` reads the 5-hour and weekly utilization every 2 minutes with the token in `~/.claude/.credentials.json` (never passed on); `usage` in `/api/state`, shown by `renderUsage`. `DEVROOM_USAGE_URL` points it at a stand-in for tests.
-  - **SessionEnd** from Dev Room's own `claude -p --resume` run (sid in `RUNS`) is ignored; a real one sets `ended_at`, and liveness removes the session after a quiet minute.
+  - **SessionEnd** from Dev Room's own `claude -p --resume` run is ignored (`ran_recently`: running, or ended under two minutes ago, since the hook can arrive after the run exits); a real one sets `ended_at`, and liveness removes the session after a quiet minute (ten for one placed in a playroom). Quick-answer copies (prompt starts with `QUICK_MARK`) are dropped and ignored if their hooks fire.
   - A liveness thread marks a session as working while its transcript keeps being written after Stop.
   - State lives in `%APPDATA%\DevRoom\state.json` and is written atomically.
 - **`app/src-tauri/src/main.rs`:**

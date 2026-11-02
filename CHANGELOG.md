@@ -7,6 +7,12 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.14.2 (2026-11-02)
+
+- **A session you chat with no longer disappears.** The SessionEnd hook of Dev Room's own run (`claude -p --resume`, which hands your message over) can arrive after the run has exited; Dev Room had already forgotten the run, took it for a real end, and removed the session a minute later. Now any SessionEnd within two minutes after Dev Room's own run of that session is ignored (`ran_recently`), and a session you placed in a playroom is removed only after ten quiet minutes after a real end.
+- **Quick-answer copies never show up as sessions.** If the copy's hooks fire despite `disableAllHooks`, its prompt (marked `[Dev Room] Mensahe ni Boss habang…`) makes Dev Room drop and ignore that copy.
+- Tested with a stand-in `claude` whose SessionEnd arrives two seconds after it exits, and whose quick-answer copy fires every hook: after 75 seconds both chatted sessions were still there and no copy appeared.
+
 ## 0.14.1 (2026-11-02)
 
 - **Typing on a portrait tablet no longer squeezes the app into a narrow strip.** The class the app set while you type (`typing`) was also the chat's "working…" line class, which centers its content; on the whole app it shrank everything to the width of its content. It is now `kbopen`. Tested: with the keyboard open (800×620 on a portrait tablet) the page stays 800 px wide.
