@@ -1,0 +1,464 @@
+<title>Dev Room System Flow</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a control-room logbook. One reading column; each figure is a full-width panel with its own legend strip. */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --ink:#18212b; --muted:#566373; --line:#cfd6de;
+  --accent:#b8740f; --accent-soft:#f6e7cc; --teal:#2d6a6f; --teal-soft:#d9ecec; --store:#e3e7ec;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12171d; --panel:#1a2129; --ink:#e6ebf0; --muted:#9aa7b4; --line:#2e3943;
+  --accent:#e2a23e; --accent-soft:#3a2e1a; --teal:#7cc3c6; --teal-soft:#1d3436; --store:#26303a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12171d; --panel:#1a2129; --ink:#e6ebf0; --muted:#9aa7b4; --line:#2e3943;
+  --accent:#e2a23e; --accent-soft:#3a2e1a; --teal:#7cc3c6; --teal-soft:#1d3436; --store:#26303a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+header.top{display:flex;flex-direction:column;gap:10px;border-bottom:2px solid var(--ink);padding-bottom:18px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(30px,5vw,46px);line-height:1.05;margin:0;text-wrap:balance}
+.lede{max-width:68ch;color:var(--muted);margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:8px 18px;font-family:var(--f-mono);font-size:12.5px;color:var(--muted)}
+.meta b{color:var(--ink);font-weight:500}
+h2{font-family:var(--f-display);font-weight:700;font-size:24px;margin:0;text-wrap:balance}
+h3{font-family:var(--f-display);font-weight:600;font-size:18px;margin:0}
+p{margin:0}
+nav.toc{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px 18px;font-size:14px}
+nav.toc a{color:var(--ink);text-decoration:none;display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+nav.toc a span{font-family:var(--f-mono);color:var(--accent);min-width:3.2em}
+nav.toc a:hover{color:var(--accent)}
+nav.toc a:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* legend of shapes */
+.legend{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.shapes{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.shape{display:flex;align-items:center;gap:12px;min-width:0}
+.shape svg{flex:none;width:84px;height:44px}
+.shape div{min-width:0;font-size:13.5px}
+.shape b{display:block;font-weight:600}
+.shape small{color:var(--muted)}
+.s-term{fill:var(--accent-soft);stroke:var(--accent)}
+.s-proc{fill:var(--panel);stroke:var(--ink)}
+.s-dec{fill:var(--accent-soft);stroke:var(--accent)}
+.s-io{fill:var(--teal-soft);stroke:var(--teal)}
+.s-store{fill:var(--store);stroke:var(--muted)}
+.s-sub{fill:var(--panel);stroke:var(--ink)}
+.shape svg *{stroke-width:1.6}
+/* figures */
+section.fig{background:var(--panel);border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;scroll-margin-top:16px}
+.fig-head{padding:18px 18px 12px;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid var(--line)}
+.fig-head .num{font-family:var(--f-mono);font-size:12px;color:var(--accent);letter-spacing:.08em}
+.fig-head p{color:var(--muted);max-width:75ch}
+.chart{overflow-x:auto;padding:18px;-webkit-overflow-scrolling:touch}
+.chart pre.mermaid,.chart pre.mermaid *{font-family:Arial,Helvetica,sans-serif}
+.chart pre.mermaid{margin:0;background:none;display:flex;justify-content:center;min-width:min-content}
+.notes{padding:14px 18px 18px;border-top:1px dashed var(--line);display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px 22px;font-size:13.5px}
+.notes div{min-width:0}
+.notes b{display:block;font-family:var(--f-mono);font-weight:500;font-size:12px;color:var(--teal);margin-bottom:2px}
+code{font-family:var(--f-mono);font-size:.9em;background:var(--store);padding:0 4px;border-radius:3px}
+/* quality plan */
+.plan{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.step{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.step .tag{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--teal)}
+.step ul{margin:0;padding-left:18px;font-size:14px;display:flex;flex-direction:column;gap:3px}
+footer{color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <span class="eyebrow">Technical walkthrough · v0.14.2</span>
+  <h1>Dev Room: how it works, end to end</h1>
+  <p class="lede">Ipinapakita ng Dev Room ang bawat Claude Code session bilang isang character sa isang isometric na planta. Mula sa mga hook ng Claude Code hanggang sa PC app, phone app at mga awtomatikong update, bawat bahagi ay may sariling flowchart sa ibaba. Standard ISO 5807 / ANSI ang mga hugis.</p>
+  <div class="meta"><span>PC: <b>Tauri app (Rust) + one-file UI</b></span><span>Phone: <b>Capacitor Android shell</b></span><span>Server: <b>tiny_http, port 4317</b></span><span>Repo: <b>Ronanski/dev-room-app</b></span></div>
+</header>
+
+<nav class="toc" aria-label="Mga figure">
+  <a href="#fig1"><span>Fig 1</span>Ang buong sistema</a>
+  <a href="#fig2"><span>Fig 2</span>Pagproseso ng hook event</a>
+  <a href="#fig3"><span>Fig 3</span>Mensahe mula sa app papunta sa session</a>
+  <a href="#fig4"><span>Fig 4</span>Live na pagbasa ng transcript</a>
+  <a href="#fig5"><span>Fig 5</span>Liveness at buhay ng session</a>
+  <a href="#fig6"><span>Fig 6</span>UI: mula state hanggang character</a>
+  <a href="#fig7"><span>Fig 7</span>Koneksyon ng phone (Wi-Fi o malayo)</a>
+  <a href="#fig8"><span>Fig 8</span>Awtomatikong update (PC at phone)</a>
+  <a href="#fig9"><span>Fig 9</span>Release pipeline</a>
+  <a href="#qa"><span>Plano</span>Paano maiiwasan ang bugs</a>
+</nav>
+
+<section class="legend" aria-label="Mga hugis">
+  <h3>Mga hugis na ginamit</h3>
+  <div class="shapes">
+    <div class="shape"><svg viewBox="0 0 84 44" aria-hidden="true"><rect class="s-term" x="4" y="8" width="76" height="28" rx="14"/></svg><div><b>Terminator</b><small>Simula o dulo ng daloy</small></div></div>
+    <div class="shape"><svg viewBox="0 0 84 44" aria-hidden="true"><rect class="s-proc" x="6" y="8" width="72" height="28"/></svg><div><b>Process</b><small>Isang gawain o hakbang</small></div></div>
+    <div class="shape"><svg viewBox="0 0 84 44" aria-hidden="true"><polygon class="s-dec" points="42,3 80,22 42,41 4,22"/></svg><div><b>Decision</b><small>Tanong na oo / hindi</small></div></div>
+    <div class="shape"><svg viewBox="0 0 84 44" aria-hidden="true"><polygon class="s-io" points="16,8 80,8 68,36 4,36"/></svg><div><b>Input / Output</b><small>Data na pumapasok o lumalabas</small></div></div>
+    <div class="shape"><svg viewBox="0 0 84 44" aria-hidden="true"><path class="s-store" d="M10 12 v20 a32 6 0 0 0 64 0 v-20"/><ellipse class="s-store" cx="42" cy="12" rx="32" ry="6"/></svg><div><b>Data store</b><small>File o naka-save na state</small></div></div>
+    <div class="shape"><svg viewBox="0 0 84 44" aria-hidden="true"><rect class="s-sub" x="6" y="8" width="72" height="28"/><line class="s-sub" x1="14" y1="8" x2="14" y2="36"/><line class="s-sub" x1="70" y1="8" x2="70" y2="36"/></svg><div><b>Predefined process</b><small>May sariling flowchart sa ibang figure</small></div></div>
+  </div>
+</section>
+
+<!-- Fig 1 -->
+<section class="fig" id="fig1">
+  <div class="fig-head"><span class="num">FIG 1 · ARCHITECTURE</span><h2>Ang buong sistema</h2>
+    <p>Mga Claude Code session sa PC → hooks → Dev Room server → PC window at phone. Ang GitHub Releases ang pinagmumulan ng mga update.</p></div>
+  <div class="chart"><pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, Helvetica, sans-serif","fontSize":"14px","primaryTextColor":"#18212b","lineColor":"#7d8a97","edgeLabelBackground":"#e8edf2","clusterBkg":"transparent","clusterBorder":"#7d8a97","titleColor":"#7d8a97"}}}%%
+flowchart TB
+  classDef term fill:#f6e7cc,stroke:#b8740f,color:#18212b
+  classDef proc fill:#ffffff,stroke:#18212b,color:#18212b
+  classDef dec fill:#f6e7cc,stroke:#b8740f,color:#18212b
+  classDef io fill:#d9ecec,stroke:#2d6a6f,color:#18212b
+  classDef store fill:#e3e7ec,stroke:#566373,color:#18212b
+  subgraph PC["PC ng user (Windows)"]
+    CC([Claude Code sessions<br/>Lead, Fixer, HMI, UI/UX, Tester, Docs]):::term
+    HK[/Hook events via curl<br/>POST /hook?devroom=1/]:::io
+    TR[(Transcript files<br/>.jsonl ng bawat session)]:::store
+    SRV[[Dev Room server<br/>server.rs · port 4317]]:::proc
+    ST[(state.json<br/>sessions, inbox, team)]:::store
+    ATT[(att/ folder<br/>larawan at artifacts)]:::store
+    WIN[PC window · Tauri<br/>index.html]:::proc
+    CLI[claude -p --resume<br/>pagpasa ng mensahe]:::proc
+    UPD[[Updater · updater.rs]]:::proc
+    TUN[[Malayo mode · tunnel.rs<br/>cloudflared → port 4318]]:::proc
+  end
+  subgraph PHONE["Phone / tablet"]
+    APP[Android app · Capacitor<br/>iframe ng office]:::proc
+    WS[WatchService<br/>background alerts]:::proc
+  end
+  GH[(GitHub Releases<br/>exe, apk, index.html, version.json)]:::store
+  NT[/ntfy relay<br/>address ng tunnel/]:::io
+  CC --> HK --> SRV
+  CC --> TR
+  TR -->|binabasa bawat 0.9 s| SRV
+  SRV <--> ST
+  SRV --> ATT
+  SRV -->|state · convo| WIN
+  WIN -->|POST /api/send| SRV
+  SRV --> CLI --> CC
+  SRV -->|Wi-Fi o Tailscale| APP
+  TUN --> APP
+  TUN -.-> NT -.-> APP
+  APP -->|POST /api/send| SRV
+  WS --> SRV
+  GH --> UPD --> WIN
+  GH --> APP
+  </pre></div>
+  <div class="notes">
+    <div><b>Hooks</b>Ang SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, SubagentStop, Notification, Stop at SessionEnd ang nagsasabi sa Dev Room kung ano ang ginagawa ng bawat session.</div>
+    <div><b>Transcript</b>Binabasa ang .jsonl ng bawat session para makuha agad ang sagot, larawan at artifact, kahit hindi pa tapos ang turn.</div>
+    <div><b>Seguridad</b>Host na IP o localhost lang, may X-DevRoom header ang bawat POST, may pairing token ang phone, at walang Origin ang hooks.</div>
+  </div>
+</section>
+
+<!-- Fig 2 -->
+<section class="fig" id="fig2">
+  <div class="fig-head"><span class="num">FIG 2 · server.rs · apply_hook</span><h2>Pagproseso ng isang hook event</h2>
+    <p>Bawat event mula sa Claude Code ay dumadaan dito. Dito nalalaman kung nagtatrabaho, naghihintay, o tapos na ang session, at dito rin naipapasa ang mensahe mo.</p></div>
+  <div class="chart"><pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, Helvetica, sans-serif","fontSize":"14px","primaryTextColor":"#18212b","lineColor":"#7d8a97","edgeLabelBackground":"#e8edf2","clusterBkg":"transparent","clusterBorder":"#7d8a97","titleColor":"#7d8a97"}}}%%
+flowchart TD
+  classDef term fill:#f6e7cc,stroke:#b8740f,color:#18212b
+  classDef proc fill:#ffffff,stroke:#18212b,color:#18212b
+  classDef dec fill:#f6e7cc,stroke:#b8740f,color:#18212b
+  classDef io fill:#d9ecec,stroke:#2d6a6f,color:#18212b
+  classDef store fill:#e3e7ec,stroke:#566373,color:#18212b
+  A([Hook event dumating]):::term --> B[/JSON: event, session_id,<br/>cwd, tool, prompt/]:::io
+  B --> C{May Origin header?}:::dec
+  C -->|Oo| X([Tanggihan · 403]):::term
+  C -->|Hindi| D{Kopya ng ⚡ quick answer?<br/>QUICK_MARK / IGNORE}:::dec
+  D -->|Oo| D1[Burahin at huwag pansinin]:::proc --> Z
+  D -->|Hindi| E{SessionEnd?}:::dec
+  E -->|Oo| E1{Galing sa sariling run<br/>ng Dev Room? ran_recently}:::dec
+  E1 -->|Oo| E2[Huwag pansinin<br/>status → idle]:::proc --> Z
+  E1 -->|Hindi| E3[Lagyan ng ended_at<br/>aalis pagkatapos ng 1 o 10 min]:::proc --> Z
+  E -->|Hindi| F{Galing sa subagent?<br/>agent_id o subagents/}:::dec
+  F -->|Oo| F1[Detail text lang ang palitan<br/>hindi ang status]:::proc --> Z
+  F -->|Hindi| G[I-update ang session:<br/>cwd, perm_mode, transcript, oras]:::proc
+  G --> H[[track_tasks<br/>TodoWrite · TaskCreate · TaskUpdate]]:::proc
+  H --> I{Anong event?}:::dec
+  I -->|UserPromptSubmit| I1{Sinulat ng Claude Code mismo?<br/>system_prompt}:::dec
+  I1 -->|Hindi| I2[Idagdag sa chat bilang Boss<br/>status: working]:::proc
+  I1 -->|Oo| I3[Huwag ipakita sa chat<br/>status: working]:::proc
+  I -->|PreToolUse| J[status: working<br/>ilarawan ang tool · step_at]:::proc
+  I -->|PostToolUse| K[status: working<br/>tapos ang hakbang]:::proc
+  I -->|Notification| L{Permission o tanong?}:::dec
+  L -->|Oo| L1[status: needs<br/>alarm sa app]:::proc
+  L -->|Hindi| L2[status: idle]:::proc
+  I -->|Stop| M[Idagdag ang huling sagot<br/>may tanong? needs : idle]:::proc
+  I2 & I3 & J & K & L1 & L2 & M --> S[(I-save sa state.json)]:::store
+  S --> N{PostToolUse o<br/>UserPromptSubmit?}:::dec
+  N -->|Oo| N1{May naka-pilang mensahe?}:::dec
+  N1 -->|Oo| N2[/Sagot: additionalContext<br/>= mensahe mo/]:::io --> Z
+  N1 -->|Hindi| Z
+  N -->|Hindi| O{Stop?}:::dec
+  O -->|Hindi| Z
+  O -->|Oo| P{May mensahe o naka-on<br/>ang away mode?}:::dec
+  P -->|May mensahe| P1[/Sagot: decision block<br/>tuloy ang turn sa mensahe mo/]:::io --> Z
+  P -->|Wala| P2[[deliver_soon<br/>Fig 3]]:::proc --> Z
+  Z([Sagot sa Claude Code]):::term
+  </pre></div>
+  <div class="notes">
+    <div><b>Bakit hindi ginagalaw ng subagent ang status</b>Dala ng subagent ang session id ng Lead. Kung binago nito ang status, magmumukhang busy ang Lead kahit tapos na siya, at maiipit ang mensahe mo.</div>
+    <div><b>Bakit may ran_recently</b>Ang sariling run ng Dev Room (claude -p) ay nagpapadala ng SessionEnd sa dulo, kung minsan pagkatapos nang lumabas ang run. Hindi iyon totoong pagsara ng session.</div>
+  </div>
+</section>
+
+<!-- Fig 3 -->
+<section class="fig" id="fig3">
+  <div class="fig-head"><span class="num">FIG 3 · /api/send · deliver_now · quick_answer</span><h2>Mensahe mula sa app papunta sa session</h2>
+    <p>Ang pinakamahalagang daloy: real-time na chat. Apat na daan para makarating ang mensahe mo, depende sa ginagawa ng session sa sandaling iyon.</p></div>
+  <div class="chart"><pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, Helvetica, sans-serif","fontSize":"14px","primaryTextColor":"#18212b","lineColor":"#7d8a97","edgeLabelBackground":"#e8edf2","clusterBkg":"transparent","clusterBorder":"#7d8a97","titleColor":"#7d8a97"}}}%%
+flowchart TD
+  classDef term fill:#f6e7cc,stroke:#b8740f,color:#18212b
+  classDef proc fill:#ffffff,stroke:#18212b,color:#18212b
+  classDef dec fill:#f6e7cc,stroke:#b8740f,color:#18212b
+  classDef io fill:#d9ecec,stroke:#2d6a6f,color:#18212b
+  classDef store fill:#e3e7ec,stroke:#566373,color:#18212b
+  A([Pinindot mo ang Send]):::term --> B[/POST /api/send<br/>sid + text/]:::io
+  B --> C{May pairing token?}:::dec
+  C -->|Hindi| C1([401 · i-pair muna]):::term
+  C -->|Oo| D[(Inbox ng session<br/>state: queued)]:::store
+  D --> E{Libre ba ang session?<br/>resumable: idle, hindi listening}:::dec
+  E -->|Oo| F{Nahanap ang Claude Code<br/>sa PC? claude_bin}:::dec
+  F -->|Hindi| F1[queue_why: nocli<br/>hintayin ang susunod na hook]:::proc
+  F -->|Oo| G[claude -p --resume sid<br/>sa cwd at perm_mode ng session]:::proc
+  G --> G1[Nagtatrabaho ang session<br/>lumalabas ang sagot via Fig 4]:::proc
+  G1 --> G2{Error?}:::dec
+  G2 -->|Oo| G3[Mensahe: failed<br/>dahilan sa chat]:::proc
+  G2 -->|Hindi| G4[Mensahe: delivered]:::proc
+  E -->|Hindi, nagtatrabaho| H[Maghintay sa susunod na hakbang]:::proc
+  H --> I{PostToolUse dumating<br/>bago mag-2.5 s?}:::dec
+  I -->|Oo| I1[/additionalContext<br/>nakita agad ng session/]:::io --> G4
+  I -->|Hindi| J[[quick_answer · kopya ng session<br/>--fork-session, plan mode, walang hooks]]:::proc
+  J --> J1[/⚡ Agarang sagot sa chat<br/>habang abala ang session/]:::io
+  J1 --> K[Nananatiling naka-pila ang mensahe<br/>para sa tunay na session]:::proc
+  K --> I1
+  H --> L{Natapos ang turn<br/>Stop}:::dec
+  L -->|Oo| M[/decision block<br/>itutuloy ang turn sa mensahe mo/]:::io --> G4
+  G3 & G4 & F1 --> Z([Ipinapakita ang status sa ilalim ng mensahe]):::term
+  </pre></div>
+  <div class="notes">
+    <div><b>Bakit may "kopya"</b>Tumatanggap lang ang Claude Code ng bagong mensahe sa pagitan ng mga hakbang. Sumasagot agad ang kopya, read-only, nang hindi ginugulo ang tunay na session.</div>
+    <div><b>queue_why</b>Nakasulat sa ilalim ng mensahe kung bakit ito naghihintay: answering, step (aling hakbang at gaano na katagal), nocli o busy.</div>
+    <div><b>Kaligtasan</b>Isang run lang bawat session (RUNS). Kapag hindi naipasa, ibinabalik sa pila (requeue), at may retry pagkatapos ng 3 minuto.</div>
+  </div>
+</section>
+
+<!-- Fig 4 -->
+<section class="fig" id="fig4">
+  <div class="fig-head"><span class="num">FIG 4 · tail_transcripts · bawat 0.9 s</span><h2>Live na pagbasa ng transcript</h2>
+    <p>Para lumabas agad ang sagot, larawan at artifact habang isinusulat pa ng session, hindi lang sa dulo ng turn.</p></div>
+  <div class="chart"><pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, Helvetica, sans-serif","fontSize":"14px","primaryTextColor":"#18212b","lineColor":"#7d8a97","edgeLabelBackground":"#e8edf2","clusterBkg":"transparent","clusterBorder":"#7d8a97","titleColor":"#7d8a97"}}}%%
+flowchart TD
+  classDef term fill:#f6e7cc,stroke:#b8740f,color:#18212b
+  classDef proc fill:#ffffff,stroke:#18212b,color:#18212b
+  classDef dec fill:#f6e7cc,stroke:#b8740f,color:#18212b
+  classDef io fill:#d9ecec,stroke:#2d6a6f,color:#18212b
+  classDef store fill:#e3e7ec,stroke:#566373,color:#18212b
+  A([Timer: bawat 0.9 s]):::term --> B[Para sa bawat session na may transcript]:::proc
+  B --> C{Unang beses makita?}:::dec
+  C -->|Oo, aktibo| C1[Basahin mula sa huling<br/>prompt mo, catch-up]:::proc
+  C -->|Oo, tahimik| C2[Simulan sa dulo ng file]:::proc
+  C -->|Hindi| D{Lumaki ang file?}:::dec
+  D -->|Hindi| N([Susunod na session]):::term
+  D -->|Oo| E[/Basahin ang bagong linya<br/>JSONL/]:::io
+  C1 --> E
+  E --> F{Anong klase ng linya?}:::dec
+  F -->|Sidechain o meta| N
+  F -->|Text ng assistant| G[Idagdag sa chat]:::proc
+  F -->|Prompt mo| H{Sinulat ng Claude Code?}:::dec
+  H -->|Oo| N
+  H -->|Hindi| G
+  F -->|Larawan sa tool_result| I[Itago sa att/ · sha256 na pangalan]:::proc
+  F -->|Artifact o SendUserFile| I
+  I --> J[(att/ folder · huling 300)]:::store --> G
+  G --> K{Kapareho ng isa<br/>sa huling 8 mensahe?}:::dec
+  K -->|Oo| N
+  K -->|Hindi| L[(state.json · convo_n + 1)]:::store --> M[/Kukunin ng UI via /api/convo/]:::io --> N
+  </pre></div>
+</section>
+
+<!-- Fig 5 -->
+<section class="fig" id="fig5">
+  <div class="fig-head"><span class="num">FIG 5 · liveness · bawat 3 s</span><h2>Liveness at buhay ng isang session</h2>
+    <p>Inaayos ang mga status na hindi naiulat ng hooks: Esc na turn, background work, naipit na mensahe, at mga session na totoong nagsara.</p></div>
+  <div class="chart"><pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, Helvetica, sans-serif","fontSize":"14px","primaryTextColor":"#18212b","lineColor":"#7d8a97","edgeLabelBackground":"#e8edf2","clusterBkg":"transparent","clusterBorder":"#7d8a97","titleColor":"#7d8a97"}}}%%
+flowchart TD
+  classDef term fill:#f6e7cc,stroke:#b8740f,color:#18212b
+  classDef proc fill:#ffffff,stroke:#18212b,color:#18212b
+  classDef dec fill:#f6e7cc,stroke:#b8740f,color:#18212b
+  classDef io fill:#d9ecec,stroke:#2d6a6f,color:#18212b
+  classDef store fill:#e3e7ec,stroke:#566373,color:#18212b
+  A([Timer: bawat 3 s]):::term --> B[Para sa bawat session]:::proc
+  B --> C{Idle pero sinusulat pa<br/>ang transcript nitong 15 s?}:::dec
+  C -->|Oo| C1[working · live_guess<br/>may ginagawa sa background]:::proc
+  C -->|Hindi| D{Working pero 10 min<br/>walang hook at sulat?}:::dec
+  D -->|Oo| D1[idle · na-Esc o naputol]:::proc
+  D -->|Hindi| E{Mensaheng sent na<br/>3 min walang kumpirma?}:::dec
+  C1 --> E
+  D1 --> E
+  E -->|Oo| E1[Ibalik sa pila]:::proc
+  E -->|Hindi| F{May naka-pila at<br/>libre ang session?}:::dec
+  E1 --> F
+  F -->|Oo| F1[[deliver_now · Fig 3]]:::proc
+  F -->|Hindi| G{May ended_at at tahimik na<br/>1 min, o 10 kung nasa playroom?}:::dec
+  F1 --> G
+  G -->|Oo| G1[Alisin sa office]:::proc
+  G -->|Hindi| H{3 araw walang galaw?}:::dec
+  G1 --> H
+  H -->|Oo| H1[Alisin]:::proc
+  H -->|Hindi| S[(I-save kung may nagbago)]:::store
+  H1 --> S
+  S --> Z([Susunod na ikot]):::term
+  </pre></div>
+</section>
+
+<!-- Fig 6 -->
+<section class="fig" id="fig6">
+  <div class="fig-head"><span class="num">FIG 6 · index.html</span><h2>UI: mula state hanggang character</h2>
+    <p>Iisa ang UI sa PC window at sa phone. Kinukuha nito ang state, hinahati sa mga playroom, at pinapagalaw ang mga character nang 60 fps.</p></div>
+  <div class="chart"><pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, Helvetica, sans-serif","fontSize":"14px","primaryTextColor":"#18212b","lineColor":"#7d8a97","edgeLabelBackground":"#e8edf2","clusterBkg":"transparent","clusterBorder":"#7d8a97","titleColor":"#7d8a97"}}}%%
+flowchart TD
+  classDef term fill:#f6e7cc,stroke:#b8740f,color:#18212b
+  classDef proc fill:#ffffff,stroke:#18212b,color:#18212b
+  classDef dec fill:#f6e7cc,stroke:#b8740f,color:#18212b
+  classDef io fill:#d9ecec,stroke:#2d6a6f,color:#18212b
+  classDef store fill:#e3e7ec,stroke:#566373,color:#18212b
+  A([Bukas ang app]):::term --> B[/GET /api/state?v=version/]:::io
+  B --> C{204: walang nagbago?}:::dec
+  C -->|Oo| B
+  C -->|Hindi| D[Sessions, team, usage, update info]:::proc
+  D --> E[[computeUnits<br/>Mga Playroom + Bagong dating]]:::proc
+  E --> F{Ibang playroom<br/>ang napili?}:::dec
+  F -->|Oo| F1[setScene: Office o Beach Resort<br/>bake ng background]:::proc
+  F -->|Hindi| G
+  F1 --> G[applyRecords: bawat session<br/>→ character, desk, status]:::proc
+  G --> H{Nagbago ang status?}:::dec
+  H -->|working| H1[Pupunta sa desk at magta-type]:::proc
+  H -->|needs| H2[Pipila sa opisina mo + alarm]:::proc
+  H -->|idle| H3[Break: kape, TV, gym, tulog]:::proc
+  H -->|tapos ang trabaho| H4[Magre-report sa Boss]:::proc
+  H1 & H2 & H3 & H4 --> I[Render: tiles, progress, chat, limits]:::proc
+  D --> J{Nagbago ang convo_n?}:::dec
+  J -->|Oo| J1[/GET /api/convo/]:::io --> I
+  I --> K[Game loop · 60 fps<br/>A* pathfinding, canvas, bubbles]:::proc
+  K --> L([Nakikita mo ang office]):::term
+  </pre></div>
+  <div class="notes">
+    <div><b>Layout</b>PC at tablet landscape: panel sa gilid. Tablet portrait: panel sa ilalim, at nadadrag ang taas. Phone: Office at Chat tabs.</div>
+    <div><b>Keyboard</b>Galing sa screen.orientation ang portrait, kaya hindi nagiging landscape ang layout kapag bukas ang keyboard.</div>
+  </div>
+</section>
+
+<!-- Fig 7 -->
+<section class="fig" id="fig7">
+  <div class="fig-head"><span class="num">FIG 7 · mobile/ · tunnel.rs</span><h2>Koneksyon ng phone: Wi-Fi o malayo</h2>
+    <p>Hinahanap ng phone ang PC sa tatlong paraan. Ang pinakamabilis na sumagot ang ginagamit.</p></div>
+  <div class="chart"><pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, Helvetica, sans-serif","fontSize":"14px","primaryTextColor":"#18212b","lineColor":"#7d8a97","edgeLabelBackground":"#e8edf2","clusterBkg":"transparent","clusterBorder":"#7d8a97","titleColor":"#7d8a97"}}}%%
+flowchart TD
+  classDef term fill:#f6e7cc,stroke:#b8740f,color:#18212b
+  classDef proc fill:#ffffff,stroke:#18212b,color:#18212b
+  classDef dec fill:#f6e7cc,stroke:#b8740f,color:#18212b
+  classDef io fill:#d9ecec,stroke:#2d6a6f,color:#18212b
+  classDef store fill:#e3e7ec,stroke:#566373,color:#18212b
+  A([Bukas ang phone app]):::term --> B{Naka-pair na?}:::dec
+  B -->|Hindi| B1[/I-scan ang QR sa PC<br/>devroom://pair · u, t, a/]:::io --> B2[(Naka-save sa phone:<br/>address at token)]:::store --> C
+  B -->|Oo| C{Sumasagot ang PC<br/>sa Wi-Fi?}:::dec
+  C -->|Oo| OK
+  C -->|Hindi| D{Sumasagot sa<br/>Tailscale address?}:::dec
+  D -->|Oo| OK
+  D -->|Hindi| E[/Basahin ang private ntfy topic<br/>hash ng token/]:::io
+  E --> F{May tunnel address?}:::dec
+  F -->|Oo| G[Kumonekta via cloudflared tunnel<br/>token kailangan, PC-only routes sarado]:::proc --> OK
+  F -->|Hindi| H([Offline: subukan ulit]):::term
+  OK[Buksan ang office sa iframe<br/>Wi-Fi · Tailscale · malayo]:::proc --> I([Live na ang office sa phone]):::term
+  </pre></div>
+</section>
+
+<!-- Fig 8 -->
+<section class="fig" id="fig8">
+  <div class="fig-head"><span class="num">FIG 8 · updater.rs · installUpdate</span><h2>Awtomatikong update</h2>
+    <p>Walang download na manual sa PC. Sa phone, ang pindot sa I-update at sa Install ng Android lang ang kailangan.</p></div>
+  <div class="chart"><pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, Helvetica, sans-serif","fontSize":"14px","primaryTextColor":"#18212b","lineColor":"#7d8a97","edgeLabelBackground":"#e8edf2","clusterBkg":"transparent","clusterBorder":"#7d8a97","titleColor":"#7d8a97"}}}%%
+flowchart TD
+  classDef term fill:#f6e7cc,stroke:#b8740f,color:#18212b
+  classDef proc fill:#ffffff,stroke:#18212b,color:#18212b
+  classDef dec fill:#f6e7cc,stroke:#b8740f,color:#18212b
+  classDef io fill:#d9ecec,stroke:#2d6a6f,color:#18212b
+  classDef store fill:#e3e7ec,stroke:#566373,color:#18212b
+  subgraph PCU["PC"]
+    A([Timer: bawat 30 s]):::term --> B[/version.json mula sa<br/>Latest release/]:::io
+    B --> C{Mas bago ang build?}:::dec
+    C -->|Hindi| A
+    C -->|Oo| D[Palitan agad ang UI<br/>hot swap ng index.html]:::proc
+    D --> E[I-download ang bagong DevRoom.exe<br/>at ipalit]:::proc
+    E --> F{Nasa tray, minimized,<br/>o walang gumagamit?}:::dec
+    F -->|Oo| G[I-save ang ayos ng window<br/>window.json]:::proc
+    F -->|Hindi| F1[Countdown pagkatapos ng<br/>15 s na walang galaw]:::proc --> G
+    G --> H[Restart: --tray o --minimized]:::proc --> I([Bumalik sa dating ayos]):::term
+  end
+  subgraph PH["Phone"]
+    P1([Bagong apk sa release]):::term --> P2[Lalabas ang I-update banner]:::proc
+    P2 --> P3[/I-download sa loob ng app<br/>may progress/]:::io
+    P3 --> P4{Pinapayagan ang install?}:::dec
+    P4 -->|Hindi| P5[Buksan ang setting<br/>isang switch, isang beses]:::proc --> P3
+    P4 -->|Oo| P6([Pindutin ang Install ng Android]):::term
+  end
+  </pre></div>
+</section>
+
+<!-- Fig 9 -->
+<section class="fig" id="fig9">
+  <div class="fig-head"><span class="num">FIG 9 · GitHub · windows-app.yml</span><h2>Release pipeline</h2>
+    <p>Paano napupunta ang isang ayos mula sa code hanggang sa PC at phone mo.</p></div>
+  <div class="chart"><pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, Helvetica, sans-serif","fontSize":"14px","primaryTextColor":"#18212b","lineColor":"#7d8a97","edgeLabelBackground":"#e8edf2","clusterBkg":"transparent","clusterBorder":"#7d8a97","titleColor":"#7d8a97"}}}%%
+flowchart TD
+  classDef term fill:#f6e7cc,stroke:#b8740f,color:#18212b
+  classDef proc fill:#ffffff,stroke:#18212b,color:#18212b
+  classDef dec fill:#f6e7cc,stroke:#b8740f,color:#18212b
+  classDef io fill:#d9ecec,stroke:#2d6a6f,color:#18212b
+  classDef store fill:#e3e7ec,stroke:#566373,color:#18212b
+  A([Bug report o bagong hiling]):::term --> B[I-reproduce sa test server<br/>+ Playwright]:::proc
+  B --> C[Ayusin ang code]:::proc
+  C --> D{Pasado ang local tests?<br/>build, JS check, screenshots}:::dec
+  D -->|Hindi| C
+  D -->|Oo| E[VERSION, CHANGELOG,<br/>NOTES card, CLAUDE.md]:::proc
+  E --> F[Push at draft PR]:::proc
+  F --> G{CI: windows, android,<br/>publish pasado?}:::dec
+  G -->|Hindi, sa code| C
+  G -->|Hindi, sa network ng CI| G1[Re-run isang beses]:::proc --> G
+  G -->|Oo| H[Ready at merge sa main]:::proc
+  H --> I[(Latest release<br/>vX.Y.Z-build.N)]:::store
+  I --> J[[Fig 8 · Awtomatikong update]]:::proc
+  J --> K([Nasa PC at phone mo na]):::term
+  </pre></div>
+</section>
+
+<!-- QA -->
+<section id="qa" class="fig" style="border:none;background:none">
+  <div class="fig-head" style="padding:0 0 12px;border-bottom:2px solid var(--ink)"><span class="num">PLANO · QUALITY</span><h2>Paano maiiwasan ang bugs</h2>
+    <p>Karamihan ng nakita mong bugs ay lumabas lang sa totoong device: Android WebView, keyboard, totoong Claude Code sa Windows. Ito ang dagdag na mga hakbang para mahuli sila bago makarating sa iyo.</p></div>
+  <div class="plan">
+    <div class="step"><span class="tag">1 · Automated tests sa CI</span><h3>Bawat PR, may full test</h3><ul><li>Server tests: lahat ng hook event at chat flow gamit ang pekeng Claude.</li><li>UI tests: PC, tablet portrait at landscape, phone, dark at light.</li><li>Hindi ma-merge kung may pumalya.</li></ul></div>
+    <div class="step"><span class="tag">2 · Android na kondisyon</span><h3>Gayahin ang tablet mo</h3><ul><li>Android WebView user agent at iframe tulad ng app.</li><li>Keyboard: lumiliit ang screen habang nagta-type.</li><li>Pag-rotate habang bukas ang panel.</li></ul></div>
+    <div class="step"><span class="tag">3 · Totoong Claude Code</span><h3>Gayahin ang totoong ugali</h3><ul><li>Late na SessionEnd, subagents, background agents, Esc.</li><li>Mahahabang hakbang, at mensahe habang abala.</li><li>Bawat bug na nakita mo, nagiging test na hindi na babalik.</li></ul></div>
+    <div class="step"><span class="tag">4 · Diagnostics sa app</span><h3>Makita agad ang dahilan</h3><ul><li>Health check sa Detalye: hooks, Claude Code CLI, koneksyon, version.</li><li>Error log na maipapadala ng isang pindot.</li><li>Hindi na kailangang hulaan.</li></ul></div>
+  </div>
+</section>
+
+<footer>Batay sa source code ng Dev Room v0.14.2 · server.rs, updater.rs, tunnel.rs, main.rs, index.html at ang mobile/ shell.</footer>
+</div>
