@@ -7,6 +7,38 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.14.3 (2026-11-02)
+
+A full test pass of every button and flow on PC (1366, 1920, touch 1280), tablet (portrait and landscape, with the keyboard) and phone (portrait and landscape, Android WebView user agent, inside an iframe like the shell), plus every hook event and API route. 22 bugs fixed:
+
+**Server and chat**
+- **An auto-compact no longer makes a working session look done.** `SessionStart` with `source: "compact"` comes in the middle of a turn; it used to set the session idle, so a message from you started a second run of it. Now it only updates the detail.
+- **A project folder named like "subagents" no longer hides the session.** Only a transcript inside a `/subagents/` folder marks a subagent (`is_sub_path`).
+- **Leaving a session (`/exit`, `/clear`, logout) right after chatting removes it after a minute.** Only a plain end (`reason: "other"`) can be Dev Room's own run; liveness waits only while a run of ours is going.
+- **A late ⚡ answer is dropped** when the session itself already answered.
+- **Every waiting message gets a ⚡ answer.** Messages that arrive while one is being answered are answered together next.
+- **The same text said twice stays twice** (two "continue" prompts). The hooks and the transcript reader now pair copies by source instead of hiding any repeat within 30 minutes.
+- **Saving the team without rooms keeps your playrooms** (`/api/team` keeps parts left out).
+- **Queue reason "ask"** when the session waits on a permission prompt; an ended session no longer stays "Kailangan ka".
+
+**Tablet and phone**
+- Tablet portrait with the keyboard open: only the chat shows, so the message box stays in view.
+- Phone landscape (short screens): the page scrolls, the office keeps its size and the panel takes the screen.
+- The phone's Office/Chat bar sticks to the bottom again (`overflow-x:clip` instead of `hidden`).
+- Tapping a character on a phone opens her chat.
+- Safe areas (Android status and navigation bars) are respected.
+- Mga Playroom on touch no longer pops up the keyboard; its Save bar stays in view.
+- Bigger zoom and name inputs for fingers; no double "…" in the placeholder.
+
+**PC**
+- "Buong office" and fullscreen show the whole office, centred.
+- Markdown tables render in the chat; one-line summaries drop markdown symbols.
+- The selected "Para kay" chip is scrolled into view; the recipient and unit rows scroll with the mouse wheel.
+- Switching panel tabs starts at the top (Detalye) or at the newest message (Chat).
+- The area around the map matches the scene's colour (no seam).
+- Names with Ñ and other letters are capitalised correctly.
+- The pairing card scrolls; "Sagutin" puts the cursor in the message box.
+
 ## 0.14.2 (2026-11-02)
 
 - **A session you chat with no longer disappears.** The SessionEnd hook of Dev Room's own run (`claude -p --resume`, which hands your message over) can arrive after the run has exited; Dev Room had already forgotten the run, took it for a real end, and removed the session a minute later. Now any SessionEnd within two minutes after Dev Room's own run of that session is ignored (`ran_recently`), and a session you placed in a playroom is removed only after ten quiet minutes after a real end.

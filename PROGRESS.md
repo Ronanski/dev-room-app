@@ -11,9 +11,10 @@ Dev Room shows them all in one place instead. Each session is a character in a s
 - who needs the user's input,
 - what each session is doing right now, and how far along it is.
 
-## Current state (v0.14.2, 2026-11-02)
+## Current state (v0.14.3, 2026-11-02)
 
-Shipped and auto-updating (releases v0.10.0 → v0.14.2 were all merged and published):
+Shipped and auto-updating (releases v0.10.0 → v0.14.3 were all merged and published):
+- **Full test pass (0.14.3):** three testers (server and hooks, every PC button, tablet and phone) found 22 bugs; all fixed and re-tested here (see CHANGELOG). Harness notes: `PORT` env picks the scratch server port; stop a test server by the PID whose environ has that port (never `pkill -f` / `pgrep -f`).
 - **Windows tray app:** hooks give live status in an isometric world.
   - **Updates:** checks every 30 s. It installs at once in the tray or minimized; with the window open, after 15 s idle with a countdown.
   - **Window state** (0.11.0): place, size and maximized are saved in `window.json` and restored after an update restart. A restart while minimized comes back minimized via `SetWindowPlacement`. The user confirmed that auto-update itself works with no manual step.
