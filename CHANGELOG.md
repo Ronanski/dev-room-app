@@ -7,6 +7,12 @@ Dev Room uses [semantic versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
 The version lives in `VERSION`. Each build is published as release `v<VERSION>-build.<N>`; builds from `main` are marked Latest. Every CI run also has a build number, which the in-app updaters use to tell which build is newer. A version shows as `v0.3.0 (build 12)`.
 
+## 0.18.3 (2026-11-03)
+
+- **Hooks in every Claude folder on the PC.** The user switched to a Claude account with Claude Projects; if that account keeps its own folder (`CLAUDE_CONFIG_DIR`, e.g. `~/.claude-work`), its threads sent no hooks at all, because Dev Room installed them only in `~/.claude/settings.json`. Without hooks there is no live status, no chat and no `session_title`, so every earlier name fix could not reach those threads. Once the hooks are set up in `~/.claude` (your consent), the same hooks now go into every other Claude folder the scan finds (`install_hooks_everywhere`, each minute), with the same merge and backup, keeping the folder's own hooks and settings.
+- **Detalye shows the last hook** from the session: which event, when, and whether it carried `session_title` (and its value), or that no hook came at all (found only by the scan). `/api/state` records carry `last_hook` and `last_hook_at`.
+- Tested here (scratch server build): with hooks set up in `~/.claude`, a second folder `~/.claude-work` with its own `PreToolUse` hook and `model` gets all eight Dev Room hooks, a backup, and keeps its own hook and setting; `last_hook` shows `UserPromptSubmit · session_title = "SANA : PIXEL OFFICE"`. Not tested: the real PC.
+
 ## 0.18.2 (2026-11-02)
 
 - **Thread names from the Claude app and Claude Projects, for real.** The user's screenshots showed names such as `SANA : PIXEL OFFICE` and `GISELLE : KATULONG NG FIXER` in the Claude app's project overview while Dev Room showed folder names. Claude Code 2.1.3xx sends the session's current name as `session_title` in its hook input (SessionStart, UserPromptSubmit), including renames made in the Claude app or by a project's coordinator (`rename_session` from the host). With its newer storage that name may never reach the transcript file, which is why reading the transcript and the sidecar was not enough. `server.rs` now keeps it as `hook_title`, which comes first after a Dev Room rename; Detalye shows "Pangalan sa Claude app (galing sa hook)".
