@@ -1575,6 +1575,8 @@ async function poll(){
 let uiBuild=null;
 /* What's new: shown once per version after an update, on every device, with the steps to take. */
 const NOTES={
+  '0.18.3':{news:['<b>Naka-set up na ang hooks sa lahat ng Claude account sa PC</b>, pati sa bagong account mo. Kaya makikita na ang live status, chat at tamang pangalan ng mga thread doon.','<b>Sa Detalye:</b> makikita kung kailan dumating ang huling update mula sa thread at kung may dala itong pangalan.'],
+    todo:['Wala kang gagawin sa PC.','Kapag mali pa rin ang pangalan, i-screenshot ang Detalye ng thread at ipadala.']},
   '0.18.2':{news:['<b>Ang mga pangalan ng thread mula sa Claude app at Claude Projects</b> (hal. SANA : PIXEL OFFICE) ay lumalabas na. Kinukuha na ito mismo sa Claude Code tuwing may galaw ang thread, kaya lalabas ang tamang pangalan sa susunod na mensahe sa kanya.'],
     todo:['Wala kang gagawin sa PC.','Wala ring i-install sa phone o tablet.']},
   '0.18.1':{news:['<b>Hindi na natatakpan ng nav keys ang tabs</b> kahit hindi pa naka-install ang bagong phone app.','<b>Sa Detalye ng session,</b> makikita mo na kung saan galing ang pangalan niya at ang transcript niya. Kapag mali ang pangalan, i-screenshot ito at ipadala.'],
@@ -2774,7 +2776,7 @@ function liveRows(s){
   const pct=s.ctx&&s.ctx.max_tokens?Math.round(s.ctx.used_tokens/s.ctx.max_tokens*100):null;
   const arts=(s.artifacts||[]).filter(a=>/^https?:\/\//i.test(a.url||'')).slice(0,3).map(a=>`<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title||'Artifact')}</a>`).join(', ');
   const rec=allRecords.find(r=>r.id===s.sid)||{};
-  const diag=rec.title_src?`<dt>Pangalan galing sa</dt><dd>${esc(rec.title_src)}${rec.sidecar?' · may custom-title.json':''} · nakita sa ${rec.found_by==='scan'?'scan ng PC':'hooks'}</dd>${rec.transcript?`<dt>Transcript</dt><dd style="font-family:var(--f-mono);font-size:11px;overflow-wrap:anywhere">${esc(rec.transcript)}</dd>`:''}`:'';
+  const diag=rec.title_src?`<dt>Pangalan galing sa</dt><dd>${esc(rec.title_src)}${rec.sidecar?' · may custom-title.json':''} · nakita sa ${rec.found_by==='scan'?'scan ng PC':'hooks'}</dd><dt>Huling hook</dt><dd>${rec.last_hook?esc(rec.last_hook)+(rec.last_hook_at?' · '+esc(simLabel(rec.last_hook_at)):''):'Walang hook na dumating mula sa session na ito (nakita lang sa scan). Baka hindi naka-set up ang hooks sa Claude folder ng account na ito.'}</dd>${rec.transcript?`<dt>Transcript</dt><dd style="font-family:var(--f-mono);font-size:11px;overflow-wrap:anywhere">${esc(rec.transcript)}</dd>`:''}`:'';
   return diag+`${s.detail?`<dt>Huling status</dt><dd>${esc(sent(s.detail))}</dd>`:''}${s.recent?`<dt>Huling ginawa</dt><dd>${esc(sent(s.recent))}</dd>`:''}
     <dt>Huling update</dt><dd>${esc(dayLabel(s.at))}, ${esc(simLabel(s.at))}</dd>
     ${s.cwd?`<dt>Folder</dt><dd class="raw">${esc(s.cwd)}</dd>`:''}

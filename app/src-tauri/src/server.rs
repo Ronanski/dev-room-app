@@ -148,8 +148,10 @@ fn has_any_ours() -> bool {
     v.get("hooks").and_then(|h| h.as_object()).map(|m| m.values().any(|a| a.as_array().map(|a| a.iter().any(is_ours)).unwrap_or(false))).unwrap_or(false)
 }
 
-pub fn hooks_installed(port: u16) -> bool {
-    let Ok(text) = fs::read_to_string(claude_settings_path()) else { return false };
+pub fn hooks_installed(port: u16) -> bool { hooks_installed_at(&claude_settings_path(), port) }
+
+fn hooks_installed_at(path: &Path, port: u16) -> bool {
+    let Ok(text) = fs::read_to_string(path) else { return false };
     let Ok(v) = serde_json::from_str::<Value>(&text) else { return false };
     HOOK_EVENTS.iter().all(|ev| { let cmd = hook_command(port, ev); v.pointer(&format!("/hooks/{ev}")).and_then(|a| a.as_array()).map(|a| a.iter().any(|e|
         e.get("hooks").and_then(|h| h.as_array()).map(|hs| hs.iter().any(|h| h.get("command").and_then(|c| c.as_str()) == Some(cmd.as_str()))).unwrap_or(false)
@@ -157,8 +159,23 @@ pub fn hooks_installed(port: u16) -> bool {
 }
 
 /// Merge Dev Room's hooks into ~/.claude/settings.json, keeping everything else and writing a backup first.
-pub fn install_hooks(port: u16) -> Result<Value, String> {
-    let path = claude_settings_path();
+pub fn install_hooks(port: u16) -> Result<Value, String> { install_hooks_at(&claude_settings_path(), port) }
+
+/// Another Claude account on this PC keeps its own folder (CLAUDE_CONFIG_DIR, e.g. ~/.claude-work) with its own
+/// settings.json, so its sessions sent no hooks: no live status, no chat, no names. Once you set up the hooks
+/// (in ~/.claude), the same hooks go into every other Claude folder found on this PC, with the same backup.
+fn install_hooks_everywhere(port: u16) {
+    if !hooks_installed(port) { return; }
+    let main = claude_settings_path().parent().map(|p| fs::canonicalize(p).unwrap_or(p.to_path_buf()));
+    for d in claude_dirs() {
+        if Some(&d) == main.as_ref() { continue; }
+        let p = d.join("settings.json");
+        if !hooks_installed_at(&p, port) { let _ = install_hooks_at(&p, port); }
+    }
+}
+
+fn install_hooks_at(path: &Path, port: u16) -> Result<Value, String> {
+    let path = path.to_path_buf();
     let original = fs::read_to_string(&path).unwrap_or_default();
     let mut root: Value = if original.trim().is_empty() { json!({}) } else {
         serde_json::from_str(&original).map_err(|e| format!("Hindi mabasa ang {}: {e}", path.display()))?
@@ -352,6 +369,8 @@ fn apply_hook(st: &mut State, v: &Value, pre: &Option<(Option<String>, Titles)>)
     // Claude Code 2.1.3xx sends the session's current name with its hooks (SessionStart, UserPromptSubmit):
     // the name the Claude app shows, also a rename made there or by a Claude Projects coordinator. With its newer
     // storage that name may never reach the transcript file, so this is the name to trust.
+    s.insert("last_hook".into(), json!(format!("{} · {}", ev, match v.get("session_title") { Some(Value::String(t)) if !t.trim().is_empty() => format!("session_title = \"{}\"", clip(t.trim(), 80)), Some(_) => "session_title walang laman".to_string(), None => "walang session_title".to_string() })));
+    s.insert("last_hook_at".into(), json!(now));
     if let Some(t) = v.get("session_title").and_then(|x| x.as_str()).map(|t| t.split_whitespace().collect::<Vec<_>>().join(" ")).filter(|t| !t.is_empty()) {
         s.insert("hook_title".into(), json!(clip(&t, 120)));
     }
@@ -744,6 +763,7 @@ fn record(s: &Value, names: &Value, shared: bool) -> Value {
     };
     json!({
         "id": id, "title": title, "own_title": own, "status_bucket": bucket, "title_src": title_src, "transcript": transcript, "sidecar": side,
+        "last_hook": s.get("last_hook").cloned().unwrap_or(json!("")), "last_hook_at": s.get("last_hook_at").cloned().unwrap_or(json!(0)),
         "found_by": if s.get("scanned").and_then(|x| x.as_bool()).unwrap_or(false) { "scan" } else { "hooks" },
         "updated_at": s.get("updated_at").cloned().unwrap_or(json!(0)),
         "environment_kind": "bridge", "origin": "local_pc", "cwd": cwd,
@@ -1261,7 +1281,7 @@ pub fn start(port: u16) -> Option<u16> {
     std::thread::spawn(move || loop { std::thread::sleep(std::time::Duration::from_secs(3)); liveness(&live); });
     // every session on this PC shows up, also the ones that send no hooks (scanned each minute: the last 48 hours)
     let scan = st.clone();
-    std::thread::spawn(move || loop { scan_sessions(&scan, 48 * 3600 * 1000, false); std::thread::sleep(std::time::Duration::from_secs(60)); });
+    std::thread::spawn(move || loop { install_hooks_everywhere(port); scan_sessions(&scan, 48 * 3600 * 1000, false); std::thread::sleep(std::time::Duration::from_secs(60)); });
     // Malayo mode: a loopback-only port for the tunnel, where every request counts as a phone
     if let Ok(ts) = Server::http(("127.0.0.1", crate::tunnel::PORT)) {
         let st2 = st.clone();
